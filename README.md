@@ -19,21 +19,47 @@ What sets Flux apart is its **Compassionate Drift & Shuffle** engine. Instead of
 
 > 📹 **Demo Video:** [Coming Soon](#)
 
+### Who is Flux for?
+
+**Goal-Setters** — Individuals with aspirations who struggle to create and maintain actionable plans. Flux turns ambiguous intentions into concrete daily steps and keeps you accountable without pressure.
+
+**Busy Professionals** — Knowledge workers juggling multiple responsibilities who need intelligent prioritization. Flux auto-resolves scheduling conflicts and surfaces only what matters right now.
+
+**Neurodivergent Users** — People with ADHD or executive dysfunction who benefit from adaptive, shame-free task management. Flux never punishes a missed task — it adapts the plan and meets you where you are.
+
+**Lifestyle Optimizers** — Anyone seeking a personal AI assistant that understands their patterns and adapts. Flux learns your rhythms over time and schedules around your energy, not just your calendar.
+
 ---
 
 ## Features
 
-**Empathetic Goal Breakdown** — An AI dialogue that understands your "why" before creating a plan. Flux asks the right questions to build a schedule rooted in your personal motivation, not generic templates.
+**Empathetic Goal Breakdown** — An AI dialogue that understands your "why" before creating a plan. Flux asks the right questions to build a schedule rooted in your personal motivation, not generic templates. Goals are decomposed through multi-turn conversation into weekly milestones with concrete recurring tasks.
 
-**Context-Aware Reminders** — Smart notifications that factor in location, time of day, and behavior patterns. Flux knows when you're most productive and when a gentle nudge is more effective than an alarm.
+**Context-Aware Reminders** — Smart notifications that factor in location, time of day, and behavior patterns. Flux knows when you're most productive and when a gentle nudge is more effective than an alarm. On-device sensors detect context like "just left work" to trigger relevant reminders at the right moment.
 
-**Compassionate Drift & Shuffle** — Missed a task? Flux reschedules with encouragement, not guilt. The drift engine evaluates what can shift, what's critical, and how to keep your day balanced.
+**Compassionate Drift & Shuffle** — Missed a task? Flux reschedules with encouragement, not guilt. The drift engine evaluates what can shift, what's critical, and how to keep your day balanced. Instead of a red "overdue" label, you get a negotiation: "Gym drifted — I can fit it at 5 PM or tomorrow at 7 AM."
 
-**Multi-Channel Escalation** — Push notification → SMS → WhatsApp, escalating based on task priority and response history. Critical tasks don't get lost in notification noise.
+**Multi-Channel Escalation** — Push notification → SMS → WhatsApp, escalating based on task priority and response history. Critical tasks don't get lost in notification noise. Must-not-miss items can escalate all the way to a VoIP call as a final safety net.
 
-**Pattern Learning** — Over time, Flux learns your productive hours, preferred routines, and common disruption patterns to build increasingly accurate schedules.
+**Pattern Learning** — Over time, Flux learns your productive hours, preferred routines, and common disruption patterns to build increasingly accurate schedules. The Observer agent detects aversions (like consistently skipping Monday gym sessions) and suggests preference updates weekly.
 
-**Demo Mode** — Time-warp controls and scenario simulation tools for showcasing the full lifecycle — goal creation, drift detection, recovery — in minutes instead of weeks.
+**Demo Mode** — Time-warp controls and scenario simulation tools for showcasing the full lifecycle — goal creation, drift detection, recovery — in minutes instead of weeks. Pre-seeded data lets anyone experience Flux's failure-handling flows without waiting for real time to pass.
+
+**Voice-First Interaction** — Speak naturally to create tasks, set goals, and manage your schedule. Flux uses Speech-to-Text and Text-to-Speech for a conversational experience that reduces form-filling friction.
+
+---
+
+## Why Flux?
+
+| Competitor | Their Approach | Where They Fall Short |
+|------------|----------------|----------------------|
+| **Todoist** | Task lists with due dates and manual rescheduling | No understanding of *why* you missed; pure list management |
+| **Reclaim.ai** | Auto-schedules around calendar meetings | Rigid time slots; no emotional intelligence; no pattern learning |
+| **Motion** | AI auto-scheduler for teams | Enterprise-focused; no compassion layer; expensive |
+| **Notion Calendar** | Unified workspace with drag-and-drop | Manual effort; no AI intervention when plans fail |
+| **Google Calendar** | Universal calendar standard | Binary missed/done states; red "overdue" labels trigger shame |
+
+**Flux fills the gap** with goal decomposition, context-aware nudging, compassionate rescheduling, and multi-channel escalation — capabilities none of the above offer together.
 
 ---
 
@@ -52,21 +78,72 @@ What sets Flux apart is its **Compassionate Drift & Shuffle** engine. Instead of
 ## Architecture
 
 ```mermaid
-graph TB
-    User[User / PWA] --> FE[React Frontend]
-    FE --> API[FastAPI Backend]
-    API --> Planner[Goal Planner Agent]
-    API --> Scheduler[Scheduler Agent]
-    API --> Nudge[Nudge Agent]
-    API --> DB[(PostgreSQL / Supabase)]
-    Planner --> LLM[GPT-4o-mini]
-    Scheduler --> LLM
-    Nudge --> LLM
-    Nudge --> Notify[Notification Service]
-    API --> RAG[RAG / Vector DB]
+flowchart TD
+    subgraph Client
+        User["👤 User / PWA"]
+    end
+
+    subgraph Frontend
+        FE["⚛️ React Frontend<br/>Vite + TypeScript + Framer Motion"]
+    end
+
+    subgraph Backend["FastAPI Backend"]
+        API["🔌 API Gateway"]
+
+        subgraph Agents["AI Agent Layer"]
+            GP["🎯 Goal Planner<br/>Goal Breakdown & Plans"]
+            SC["🗓️ Scheduler<br/>Core Orchestrator"]
+            OB["🔍 Observer<br/>Pattern Learning"]
+            SN["📍 Sensor<br/>Context Awareness"]
+            EM["💚 Empath<br/>Sentiment Detection"]
+        end
+
+        LLM["🧠 GPT-4o-mini<br/>NL Understanding + Tool Use"]
+    end
+
+    subgraph Data
+        DB[("🗄️ PostgreSQL<br/>Supabase")]
+        RAG["📚 Vector DB<br/>Pinecone/Chroma"]
+    end
+
+    subgraph Notifications
+        N["🔔 Notification Service"]
+        Push["📱 Push"]
+        WA["📲 WhatsApp"]
+        Call["📞 VoIP Call"]
+    end
+
+    User --> FE
+    FE --> API
+    API --> GP
+    API --> SC
+    GP -->|"Structured plan"| SC
+    OB -->|"User patterns"| SC
+    SN -->|"Current context"| SC
+    EM -->|"Emotional state"| SC
+    SC <-->|"NL + Tool Calling"| LLM
+    GP <--> LLM
+    SC --> DB
+    SC --> RAG
+    SC --> N
+    N --> Push
+    N --> WA
+    N --> Call
 ```
 
-Flux uses a **multi-agent architecture** where specialized AI agents handle distinct responsibilities. The **Goal Planner Agent** decomposes user goals into weekly milestones and daily tasks. The **Scheduler Agent** manages time-blocking, conflict resolution, and drift recovery. The **Nudge Agent** determines when, how, and through which channel to remind or encourage the user. All three agents share a common LLM backbone (GPT-4o-mini) and access user context through a RAG-powered vector database for personalized, history-aware responses.
+Flux uses a **multi-agent architecture** where five specialized AI agents work in concert. The **Goal Planner** decomposes user goals into weekly milestones and daily tasks through empathetic dialogue. The **Scheduler** is the core orchestrator — it manages time-blocking, conflict resolution, drift recovery, and coordinates inputs from all other agents. The **Observer** tracks behavioral patterns over time (e.g., "you always skip gym on Mondays") and feeds scheduling preferences back to the Scheduler. The **Sensor** infers real-time user context from device signals — location, phone state, calendar status — to adjust nudge timing. The **Empath** gauges emotional state from voice input to modulate tone and urgency. All agents share GPT-4o-mini as their language backbone, with a RAG-powered vector database providing personalized, history-aware context.
+
+---
+
+## AI Agents
+
+| Agent | Purpose | Key Behavior |
+|-------|---------|-------------|
+| 🎯 **Goal Planner** | Transforms vague goals into structured plans | Multi-turn empathetic dialogue; weekly milestones; recurring task creation |
+| 🗓️ **Scheduler** | Core orchestrator for all calendar operations | Conflict resolution; drift recovery; negotiation when no perfect slot exists |
+| 🔍 **Observer** | Learns user behavior patterns over time | Detects aversions (e.g., Monday gym skips); suggests preference updates weekly |
+| 📍 **Sensor** | Infers real-time context from device signals | GPS, phone state, calendar status; adjusts nudge timing; 100% on-device processing |
+| 💚 **Empath** | Gauges emotional state from voice input | Stressed → reduce nudges; low energy → suggest lighter tasks; upbeat → tackle challenges |
 
 ---
 
@@ -149,11 +226,84 @@ flux/
 
 ---
 
+## Scope
+
+| Capability | v1 (MVP Demo) | v2 (Post-Launch) |
+|-----------|---------------|-----------------|
+| **Goal Categories** | Health & Fitness only | Career, Personal, Finance, Learning, Relationships |
+| **Goal Timeline** | Up to 6 months | Multi-year with quarterly reviews |
+| **Plan Depth** | High-level weekly milestones | Deep plans (calories, specific workouts, curricula) |
+| **Calendar Sync** | Internal Flux calendar only | Google Calendar two-way sync |
+| **Pattern Learning** | Hard-coded demo scenarios | Lightweight RL model tracking accept/reject/miss rates |
+| **Context Awareness** | Simulated via demo controls | On-device ML (TensorFlow Lite) for location and phone state |
+| **Sentiment Detection** | Keyword-based tone adjustment | On-device speech emotion recognition |
+| **Cold Storage** | Static parking lot view | Full chronic-avoidance detection with weekly review prompts |
+| **Notification Channels** | Push + 1 WhatsApp + 1 call path | Email, rich WhatsApp quick replies, full VoIP |
+| **External Integrations** | None | Apple Health, Fitbit, Strava, MyFitnessPal |
+
+---
+
+## Guardrails
+
+**Tone Safety** — Flux never uses shaming language. If a task is missed, responses use neutral or supportive phrasing: *"Let's find a better time"* rather than *"You failed again."*
+
+**Privacy by Design** — Context awareness (location, phone state) uses on-device processing only. No location data leaves the device. Voice interactions produce transcripts and emotion labels — raw audio is never stored.
+
+**Explainability** — When suggesting a new time slot, Flux displays a brief rationale: *"Suggested 6 PM because you prefer evening workouts and 5 PM was blocked."*
+
+**Consent & Control** — All sensor-based features require explicit opt-in with granular permissions. Users can disable any data signal at any time; the AI falls back to time-based heuristics.
+
+---
+
 ## Demo Day
 
 - **Date:** Early March 2026
 - **Duration:** 15–20 minutes
 - **Key flows:** Goal creation → schedule generation → drift handling → recovery
+
+---
+
+## Demo Mode
+
+Flux includes an integrated sandbox that lets anyone experience its failure-handling flows without waiting for real time to pass.
+
+**Activation:** Toggle "Demo Mode" in Settings → a floating control panel appears over the normal UI.
+
+| Control | What It Does |
+|---------|-------------|
+| **Time Warp** | Slider to fast-forward 1–24 hours, triggering drift detection on passed tasks |
+| **Force Miss** | Select any upcoming task → immediately mark as drifted → triggers ghost animation |
+| **Simulate Leaving Home** | Fires context-aware reminder cascade (grocery nudge with hardcoded distance) |
+| **Escalation Speed** | 1x / 5x / 10x multiplier for the push → WhatsApp → call notification ladder |
+| **Reset State** | Returns to fresh demo with pre-seeded sample tasks and goals |
+
+**Pre-seeded demo data:** One user with a "Lose weight for a wedding" goal, weekly milestones, recurring gym tasks, a grocery reminder, and one must-not-miss task for escalation demonstration.
+
+### Sample Demo Flow
+
+```mermaid
+sequenceDiagram
+    participant D as Demonstrator
+    participant F as Flux App
+    participant A as Audience
+
+    Note over D,A: 1. Show Clean Dashboard
+    D->>F: Calendar with 3–5 tasks visible
+    F-->>A: Fluid UI with time-blocked tasks
+
+    Note over D,A: 2. Force Miss a Task
+    D->>F: Click "Force Miss" on Gym at 10 AM
+    F-->>A: Task ghosts with fade animation
+
+    Note over D,A: 3. AI Negotiation
+    F->>D: "Gym drifted. I can do 5 PM or tomorrow 7 AM"
+    D->>F: Selects "Tomorrow 7 AM"
+    F-->>A: Task smoothly animates to tomorrow's slot
+
+    Note over D,A: 4. Escalation Demo
+    D->>F: Trigger escalation on must-not-miss task
+    F-->>A: Push notification → WhatsApp message → Call UI
+```
 
 ---
 
