@@ -8,7 +8,7 @@ Thanks for your interest in contributing to Flux! This guide covers the workflow
 
 We follow a **fork-and-branch** model:
 
-1. **Clone** your fork locally.
+1. **Clone** the main branch locally.
 2. **Create a branch** from `main` for your work.
 3. **Commit** your changes following the conventions below.
 4. **Push** your branch to your fork.
