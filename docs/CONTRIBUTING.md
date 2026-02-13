@@ -8,13 +8,12 @@ Thanks for your interest in contributing to Flux! This guide covers the workflow
 
 We follow a **fork-and-branch** model:
 
-1. **Fork** the repository to your GitHub account.
-2. **Clone** your fork locally.
-3. **Create a branch** from `main` for your work.
-4. **Commit** your changes following the conventions below.
-5. **Push** your branch to your fork.
-6. **Open a Pull Request** against `main` on the upstream repo.
-7. **Address review feedback** — then it gets merged.
+1. **Clone** your fork locally.
+2. **Create a branch** from `main` for your work.
+3. **Commit** your changes following the conventions below.
+4. **Push** your branch to your fork.
+5. **Open a Pull Request** against `main` on the upstream repo.
+6. **Address review feedback** — then it gets merged.
 
 ```bash
 # Example workflow
