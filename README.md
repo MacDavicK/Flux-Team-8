@@ -161,15 +161,18 @@ Flux uses a **multi-agent architecture** where five specialized AI agents work i
 
 ### Quick Start (Recommended)
 
-The setup script handles everything — dependencies, Supabase, and environment files:
-
 ```bash
 git clone https://github.com/MacDavicK/Flux-Team-8.git
 cd Flux-Team-8
+
+# 1. Install frontend & backend dependencies
 bash scripts/setup.sh
+
+# 2. Set up Supabase (Docker Desktop must be running)
+bash scripts/supabase_setup.sh
 ```
 
-> **Note:** The first run downloads ~2-3 GB of Docker images for Supabase. Subsequent runs are fast.
+> **Note:** The first Supabase run downloads ~2-3 GB of Docker images. Subsequent runs are fast.
 
 After setup completes:
 
@@ -234,27 +237,27 @@ If you prefer to set things up step by step:
 git clone https://github.com/MacDavicK/Flux-Team-8.git
 cd Flux-Team-8
 
-# Start Supabase (Docker Desktop must be running)
+# Frontend
+cd frontend
+npm install
+cp .env.example .env
+cd ..
+
+# Backend
+cd backend
+python -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+cd ..
+
+# Supabase (Docker Desktop must be running)
 supabase start
 supabase db reset
 
 # Seed test data (optional but recommended)
 docker cp supabase/scripts/seed_test_data.sql supabase_db_Flux-Team-8:/tmp/seed_test_data.sql
 docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/seed_test_data.sql
-
-# Frontend
-cd frontend
-npm install
-cp .env.example .env
-npm run dev
-
-# Backend (in a separate terminal)
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-uvicorn main:app --reload
 ```
 
 ---
