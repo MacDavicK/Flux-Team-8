@@ -24,5 +24,7 @@
     "."
   ],
   "vscode-nmake-tools.installRazzleSourcesFormatterExtension": false,
-  "vscode-nmake-tools.installOsRepoRustHelperExtension": false
+  "vscode-nmake-tools.installOsRepoRustHelperExtension": false,
+  "python-envs.defaultEnvManager": "ms-python.python:system",
+  "python-envs.pythonProjects": []
 }
