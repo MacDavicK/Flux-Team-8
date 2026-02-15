@@ -1,0 +1,44 @@
+# Test files (not needed in production image)
+tests/
+pytest.ini
+pyproject.toml
+requirements-dev.txt
+
+# Virtual environments
+venv/
+.venv/
+env/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+
+# Coverage reports
+htmlcov/
+.coverage
+coverage.xml
+
+# Environment files (secrets — never include in image)
+.env
+.env.local
+.env.example
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Docker files (prevent recursive copy)
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Makefile (dev tool — not needed in image)
+Makefile
+
+# Test reports
+TEST_REPORT.md
+test-results/

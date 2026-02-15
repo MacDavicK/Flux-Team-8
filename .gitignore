@@ -46,6 +46,13 @@ Desktop.ini
 dist/
 build/
 
+# ---------- Test reports & coverage ----------
+TEST_REPORT.md
+test-results/
+htmlcov/
+.coverage
+coverage.xml
+
 # ---------- Logs ----------
 *.log
 
