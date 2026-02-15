@@ -1,0 +1,15 @@
+import { format } from "~/utils/date";
+
+export function DateHeader({ date }: { date?: string }) {
+  const displayDate = date || format(new Date(), "MMMM do");
+
+  return (
+    <header className="pt-10 px-6 pb-6 relative z-10 flex justify-between items-end">
+      <div>
+        <h1 className="text-display italic text-4xl text-charcoal leading-tight">
+          {displayDate}
+        </h1>
+      </div>
+    </header>
+  );
+}

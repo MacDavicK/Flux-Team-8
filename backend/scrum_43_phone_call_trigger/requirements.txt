@@ -1,0 +1,13 @@
+# Phone Call Trigger - Required Dependencies
+# SCRUM-43: Phone Call Trigger
+
+# Twilio SDK for Voice API
+twilio>=8.10.0
+
+# FastAPI and dependencies (assuming already in main requirements)
+# fastapi>=0.104.0
+# pydantic>=2.0.0
+# uvicorn>=0.24.0
+
+# For async operations
+# httpx>=0.25.0
