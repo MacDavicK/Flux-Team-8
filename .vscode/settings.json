@@ -19,5 +19,10 @@
     "**/node_modules": true,
     "**/dist": true,
     "**/.venv": true
-  }
+  },
+  "vscode-nmake-tools.workspaceBuildDirectories": [
+    "."
+  ],
+  "vscode-nmake-tools.installRazzleSourcesFormatterExtension": false,
+  "vscode-nmake-tools.installOsRepoRustHelperExtension": false
 }
