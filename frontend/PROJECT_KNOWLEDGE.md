@@ -39,6 +39,7 @@ src/
 │   ├── demo/           # Demo mode components
 │   ├── reflection/     # Reflection screen components
 │   ├── navigation/     # Shared navigation (BottomNav)
+│   ├── splash/         # Splash screen components (initial load)
 │   ├── ui/             # Reusable UI primitives (GlassCard, etc.)
 │   └── modals/         # Modal dialogs
 ├── routes/             # File-based routes (TanStack Router)

@@ -13,6 +13,7 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 
 ## 2. Key Architecture Patterns
 - **Glassmorphism**: The design relies heavily on `backdrop-filter`, translucent backgrounds, and organic borders.
+- **Splash Screen**: Shows on every page load/refresh for 3 seconds. Later will be used to load initial data from server.
 - **Component Structure**:
   - `src/components/ui`: Atomic, reusable components (GlassCard, Button, etc.).
   - `src/components/{feature}`: Feature-specific molecules (e.g., `src/components/chat`).
@@ -30,9 +31,13 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 - `npm run dev`: Start development server.
 - `npm run check`: Run Biome lint & format.
 
+## 5. MCP Configuration
+The project uses `.mcp.json` for MCP server configuration. Currently configured:
+- **Stitch**: Google Stitch MCP server for design-to-code workflows.
+
 _Generated from codebase analysis._
 
-## 5. Documentation Protocol
+## 6. Documentation Protocol
 To ensure this documentation remains a source of truth, ALL agents must follow this protocol:
 
 ### A. When Creating New Components
