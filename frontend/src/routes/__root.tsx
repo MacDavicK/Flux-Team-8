@@ -57,8 +57,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+import { FluxNotificationModal } from "~/components/modals/FluxNotificationModal";
+
 function RootDocument({ children }: { children: React.ReactNode }) {
   const [isDemoOpen, setIsDemoOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const {
     locationAgent,
     addNotification,
@@ -94,11 +97,19 @@ function RootDocument({ children }: { children: React.ReactNode }) {
           <DemoPanel
             isOpen={isDemoOpen}
             onClose={() => setIsDemoOpen(false)}
-            onTimeWarp={() => console.log("Time warp activated")}
+            onTimeWarp={() => {
+              setIsDemoOpen(false);
+              setIsNotificationOpen(true);
+            }}
             onTravelMode={() => console.log("Travel mode activated")}
             onSimulateLeavingHome={handleSimulateLeavingHome}
             onSimulateNearStore={handleSimulateNearStore}
             onEscalationSpeedChange={setEscalationSpeed}
+          />
+
+          <FluxNotificationModal
+            isOpen={isNotificationOpen}
+            onClose={() => setIsNotificationOpen(false)}
           />
         </main>
         <Scripts />
