@@ -312,7 +312,7 @@ sequenceDiagram
 | Name | Role | GitHub |
 |------|------|--------|
 | Harshal Kale | Team Leader | [@harshalkale](https://github.com/harshalkale) |
-| Session Mwamufiya | | [@placeholder](#) |
+| Session Mwamufiya | | [@Session-SOS](https://github.com/Session-SOS) |
 | Krishnan Iyer | | [@kiyer1974](https://github.com/kiyer1974) |
 | Sathish Kulal | | [@placeholder](#) |
 | Hima | | [@placeholder](#) |
