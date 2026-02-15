@@ -36,6 +36,7 @@ src/
 ├── components/         # React components
 │   ├── chat/           # Chat-specific components
 │   ├── flow/           # Flow/Home screen components
+│   ├── demo/           # Demo mode components
 │   ├── reflection/     # Reflection screen components
 │   ├── navigation/     # Shared navigation (BottomNav)
 │   ├── ui/             # Reusable UI primitives (GlassCard, etc.)
