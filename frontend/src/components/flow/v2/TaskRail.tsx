@@ -1,4 +1,3 @@
-import { Plus } from "lucide-react";
 import { cn } from "~/utils/cn";
 
 interface Task {
@@ -24,13 +23,6 @@ export function TaskRail({ tasks }: TaskRailProps) {
           <span className="text-xs text-sage font-semibold bg-sage/10 px-2 py-0.5 rounded-full">
             {uncompletedCount} left
           </span>
-          {/* <button
-            type="button"
-            className="bg-sage hover:bg-sage-dark text-white rounded-full transition-colors px-3 shadow-sm flex items-center justify-center py-1.5 active:scale-95"
-          >
-            <Plus className="w-3 h-3 mr-1" strokeWidth={3} />
-            <span className="text-xs font-semibold">Add</span>
-          </button> */}
         </div>
       </div>
       <div className="flex overflow-x-auto scrollbar-hide pb-2 snap-x space-x-2 pt-1">

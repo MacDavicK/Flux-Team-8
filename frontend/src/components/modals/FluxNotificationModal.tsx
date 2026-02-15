@@ -1,7 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock, AlertCircle, ChevronRight, X, Calendar, Check } from "lucide-react";
+import {
+  AlertCircle,
+  Calendar,
+  Check,
+  ChevronRight,
+  Clock,
+  X,
+} from "lucide-react";
 import { useState } from "react";
-import { cn } from "~/utils/cn";
 
 interface FluxNotificationModalProps {
   isOpen: boolean;
@@ -113,7 +119,9 @@ export function FluxNotificationModal({
                       <button
                         type="button"
                         onClick={() => {
-                          console.log(`Marked ${eventDetails.title} as already done`);
+                          console.log(
+                            `Marked ${eventDetails.title} as already done`,
+                          );
                           onClose();
                         }}
                         className="w-full glass-bubble p-4 flex items-center justify-between group hover:bg-sage/10 transition-all border-none"
@@ -181,7 +189,7 @@ export function FluxNotificationModal({
                           >
                             <span className="text-xs font-bold">{time}</span>
                             <span className="text-[8px] opacity-60 font-medium">
-                                Free Slot
+                              Free Slot
                             </span>
                           </button>
                         ))}

@@ -1,4 +1,4 @@
-import { TimelineEvent, type EventType } from "./TimelineEvent";
+import { type EventType, TimelineEvent } from "./TimelineEvent";
 
 interface Event {
   id: string;

@@ -11,7 +11,7 @@ export type AgentResponse = {
   type: "text" | "plan" | "notification" | "whatsapp" | "call";
   distance?: string;
   trigger?: "leaving_home" | "near_grocery";
-  plan?: any[];
+  plan?: unknown[];
   suggestedAction?: string;
 };
 
@@ -99,7 +99,7 @@ export class LocationReminderAgent {
   simulateEscalation(level: "whatsapp" | "call"): AgentResponse {
     if (level === "whatsapp") {
       return {
-        message: "Hey! Don't forget the " + (this.task || "tomatoes") + " 🍅",
+        message: `Hey! Don't forget the ${this.task || "tomatoes"} 🍅`,
         type: "whatsapp",
       };
     }

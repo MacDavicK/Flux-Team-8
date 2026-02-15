@@ -76,7 +76,7 @@
   }
 
   .using-mouse * {
-    outline: none !important;
+    outline: none;
   }
 }
 

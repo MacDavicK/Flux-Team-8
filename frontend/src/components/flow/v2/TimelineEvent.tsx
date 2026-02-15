@@ -19,7 +19,6 @@ export function TimelineEvent({
   time,
   period,
   type,
-  avatars,
 }: TimelineEventProps) {
   const typeClasses = {
     sage: "glass-pebble-sage rounded-tl-md",
