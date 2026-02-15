@@ -39,9 +39,7 @@
   },
   "overrides": [
     {
-      "includes": [
-        "src/routeTree.gen.ts"
-      ],
+      "includes": ["src/routeTree.gen.ts"],
       "linter": {
         "enabled": false
       },

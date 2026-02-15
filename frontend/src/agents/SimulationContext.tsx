@@ -1,14 +1,15 @@
-import React, {
+import type React from "react";
+import {
   createContext,
-  useContext,
-  useState,
   useCallback,
+  useContext,
   useEffect,
   useRef,
+  useState,
 } from "react";
 import {
-  LocationReminderAgent,
   type AgentResponse,
+  LocationReminderAgent,
 } from "./LocationReminderAgent";
 
 interface SimulationContextType {

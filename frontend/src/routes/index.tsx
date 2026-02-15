@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState } from "react";
-import { BottomNav } from "~/components/navigation/BottomNav";
 import { DateHeader } from "~/components/flow/v2/DateHeader";
-import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { FlowTimeline } from "~/components/flow/v2/FlowTimeline";
 import { TaskRail } from "~/components/flow/v2/TaskRail";
 import { RescheduleModal } from "~/components/modals/RescheduleModal";
+import { BottomNav } from "~/components/navigation/BottomNav";
+import { AmbientBackground } from "~/components/ui/AmbientBackground";
 
 // Sample v2 data
 const sampleEvents = [

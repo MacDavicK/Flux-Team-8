@@ -1,12 +1,12 @@
 /// <reference types="vite/client" />
 import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
 import { useState } from "react";
-import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
-import { NotFound } from "~/components/NotFound";
-import { DemoPanel } from "~/components/demo/DemoPanel";
-import { DemoButton } from "~/components/flow/v2/DemoButton";
-import { NotificationCenter } from "~/components/demo/NotificationCenter";
 import { SimulationProvider, useSimulation } from "~/agents/SimulationContext";
+import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
+import { DemoPanel } from "~/components/demo/DemoPanel";
+import { NotificationCenter } from "~/components/demo/NotificationCenter";
+import { DemoButton } from "~/components/flow/v2/DemoButton";
+import { NotFound } from "~/components/NotFound";
 import appCss from "~/styles/app.css?url";
 import { seo } from "~/utils/seo";
 

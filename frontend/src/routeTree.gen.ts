@@ -9,9 +9,9 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as ReflectionRouteImport } from './routes/reflection'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ReflectionRouteImport } from './routes/reflection'
 
 const ReflectionRoute = ReflectionRouteImport.update({
   id: '/reflection',
@@ -94,8 +94,9 @@ export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from './router.tsx'
 import type { createStart } from '@tanstack/react-start'
+import type { getRouter } from './router.tsx'
+
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true

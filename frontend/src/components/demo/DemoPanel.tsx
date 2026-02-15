@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock, Plane, Home, Navigation, Zap } from "lucide-react";
+import { Clock, Home, Navigation, Plane, Zap } from "lucide-react";
 import { useState } from "react";
 import { cn } from "~/utils/cn";
 
