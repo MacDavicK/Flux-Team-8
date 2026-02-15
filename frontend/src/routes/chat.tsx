@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { GoalPlannerAgent } from "~/agents/GoalPlannerAgent";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { AgentResponse as LocationAgentResponse } from "~/agents/LocationReminderAgent";
 import { useSimulation } from "~/agents/SimulationContext";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { ChatInput } from "~/components/chat/ChatInput";
@@ -9,6 +9,12 @@ import { PlanView } from "~/components/chat/PlanView";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
+import {
+  AgentState,
+  type GoalContext,
+  goalPlannerService,
+  type PlanMilestone,
+} from "~/services/GoalPlannerService";
 
 interface Message {
   id: string;
@@ -32,11 +38,11 @@ export const Route = createFileRoute("/chat")({
 function ChatPage() {
   const [messages, setMessages] = useState<Message[]>(initialMessages);
   const [isThinking, setIsThinking] = useState(false);
+  const [agentState, setAgentState] = useState<AgentState>(AgentState.IDLE);
+  const [goalContext, setGoalContext] = useState<GoalContext>({});
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { locationAgent, stopEscalation } = useSimulation();
-
-  // Initialize the GoalPlannerAgent
-  const goalAgent = useMemo(() => new GoalPlannerAgent(), []);
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -60,7 +66,7 @@ function ChatPage() {
     stopEscalation();
 
     // Decide which agent to use
-    let response: any;
+    let response: LocationAgentResponse | null = null;
     const isLocationScenario =
       text.toLowerCase().includes("remind") ||
       locationAgent.getState() !== "IDLE";
@@ -71,7 +77,14 @@ function ChatPage() {
 
     // Fallback to goal agent if location agent didn't handle it or it's not a location scenario
     if (!response || !response.message) {
-      response = await goalAgent.processMessage(text);
+      const result = await goalPlannerService.sendMessage(
+        text,
+        agentState,
+        goalContext,
+      );
+      response = result.response as LocationAgentResponse;
+      setAgentState(result.newState);
+      setGoalContext(result.newContext);
     }
 
     setTimeout(() => {
@@ -87,7 +100,7 @@ function ChatPage() {
             <p>{response.message}</p>
             {response.type === "plan" && response.plan && (
               <PlanView
-                plan={response.plan}
+                plan={response.plan as PlanMilestone[]}
                 onConfirm={() => handleSendMessage("Yes, this looks great!")}
               />
             )}
