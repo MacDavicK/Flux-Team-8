@@ -14,6 +14,9 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 ## 2. Key Architecture Patterns
 - **Glassmorphism**: The design relies heavily on `backdrop-filter`, translucent backgrounds, and organic borders.
 - **Splash Screen**: Shows on every page load/refresh for 3 seconds. Later will be used to load initial data from server.
+- **Centralized Type System**: All domain types are organized in `src/types/` with domain-specific files (e.g., `user.ts`, `task.ts`) and barrel exports via `index.ts`.
+- **Union Types**: Polymorphic content uses TypeScript union types (e.g., different message content types in `MessageContent`).
+- **Strict Typing**: All types use explicit optional markers (`?`) and avoid `any`.
 - **Component Structure**:
   - `src/components/ui`: Atomic, reusable components (GlassCard, Button, etc.).
   - `src/components/{feature}`: Feature-specific molecules (e.g., `src/components/chat`).
@@ -26,6 +29,10 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 - **New Components**: Place in `src/components`. Prefer composition over inheritance.
 - **Routing**: To add a page, create a file in `src/routes`. `routeTree.gen.ts` is auto-generated; DO NOT edit it manually.
 - **Icons**: Use `lucide-react`.
+- **Types**: Place new domain types in `src/types/` organized by entity (e.g., `user.ts`, `task.ts`). Export from `src/types/index.ts`.
+- **Type Imports**: Import types from `~/types` (e.g., `import { User, Task } from '~/types'`).
+- **Union Types**: Use union types for polymorphic content with strict type guards.
+- **Strict Fields**: Define strict required vs optional fields; use `?` for optional, never use `any`.
 
 ## 4. Commands
 - `npm run dev`: Start development server.

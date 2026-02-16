@@ -42,6 +42,17 @@ src/
 │   ├── splash/         # Splash screen components (initial load)
 │   ├── ui/             # Reusable UI primitives (GlassCard, etc.)
 │   └── modals/         # Modal dialogs
+├── types/              # Centralized TypeScript type definitions
+│   ├── user.ts         # User, Profile, Preference types
+│   ├── task.ts         # Task, TaskStatus, Priority, TaskCategory types
+│   ├── event.ts        # Event, EventType, EventStatus types
+│   ├── message.ts      # Message union types (Text, Plan, Task, Notification)
+│   ├── goal.ts         # Goal, Milestone, AgentState, GoalContext types
+│   ├── notification.ts # Notification, EscalationLevel, LocationReminderState
+│   ├── analytics.ts    # EnergyPoint, FocusMetrics, ProductivityMetrics
+│   ├── demo.ts         # DemoMode, RescheduleOption, TimeWarpSettings
+│   ├── common.ts       # Utility types, ColorTheme, GlassEffect, AnimationConfig
+│   └── index.ts        # Barrel exports for all types
 ├── routes/             # File-based routes (TanStack Router)
 │   ├── __root.tsx      # Root layout & HTML shell
 │   ├── index.tsx       # Home page (Flow)
@@ -78,6 +89,14 @@ src/
 - **Local State**: `useState`, `useReducer` for component-level logic.
 - **URL State**: TanStack Router handles URL-based state (search params, etc.).
 - **Server State**: TanStack Start `loader` functions handle data fetching (server-side).
+
+### Type System
+- **Centralized Types**: All domain types are defined in `src/types/` with clear domain separation.
+- **Union Types**: Message and notification content use TypeScript union types for type-safe polymorphism (e.g., `TextMessage | PlanMessage | TaskSuggestionMessage`).
+- **Strict Typing**: All types use explicit optional markers (`?`) for optional fields; no use of `any`.
+- **Barrel Exports**: All types are exported from `src/types/index.ts` for centralized importing via `~/types`.
+- **Enums**: Extensive use of TypeScript enums for state machines (e.g., `AgentState`, `TaskStatus`, `EventType`).
+- **Import Pattern**: Always import types from `~/types` rather than deep imports (e.g., `import { User, Task } from '~/types'`).
 
 ## 5. Design System Highlights
 

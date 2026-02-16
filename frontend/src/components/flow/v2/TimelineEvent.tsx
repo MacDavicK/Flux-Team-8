@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
+import type { EventType } from "~/types/event";
 import { cn } from "~/utils/cn";
-
-export type EventType = "sage" | "terra" | "stone";
 
 interface TimelineEventProps {
   title: string;
@@ -50,3 +49,5 @@ export function TimelineEvent({
     </div>
   );
 }
+
+export type { EventType };

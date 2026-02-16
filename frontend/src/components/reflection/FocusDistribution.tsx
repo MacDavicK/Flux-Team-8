@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import type { FocusCategory, FocusMetrics } from "~/types/analytics";
 
 interface FocusDistributionProps {
   work: number;
@@ -18,7 +19,7 @@ export function FocusDistribution({
   const personalPercent = (personal / total) * 100;
   const healthPercent = (health / total) * 100;
 
-  const categories = [
+  const categories: FocusCategory[] = [
     { name: "Work", value: work, percent: workPercent, color: "#5C7C66" },
     {
       name: "Personal",
@@ -90,3 +91,5 @@ export function FocusDistribution({
     </motion.div>
   );
 }
+
+export type { FocusMetrics, FocusCategory };

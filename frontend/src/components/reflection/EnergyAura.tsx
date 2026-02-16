@@ -1,8 +1,9 @@
 import { motion } from "framer-motion";
 import { useEffect, useRef } from "react";
+import type { EnergyPoint } from "~/types/analytics";
 
 interface EnergyAuraProps {
-  data: { date: string; intensity: number }[];
+  data: EnergyPoint[];
   className?: string;
 }
 
@@ -85,3 +86,6 @@ export function EnergyAura({ data, className }: EnergyAuraProps) {
     </motion.div>
   );
 }
+
+export type { EnergyPoint };
+export { EnergyLevel } from "~/types/analytics";

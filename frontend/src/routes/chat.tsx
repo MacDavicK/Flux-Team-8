@@ -1,7 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { AgentResponse as LocationAgentResponse } from "~/agents/LocationReminderAgent";
 import { useSimulation } from "~/agents/SimulationContext";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { ChatInput } from "~/components/chat/ChatInput";
@@ -10,22 +9,23 @@ import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import {
-  AgentState,
-  type GoalContext,
+  type AgentResponse,
   goalPlannerService,
-  type PlanMilestone,
 } from "~/services/GoalPlannerService";
+import type { GoalContext, PlanMilestone } from "~/types/goal";
+import { AgentState } from "~/types/goal";
+import { MessageVariant } from "~/types/message";
 
 interface Message {
   id: string;
-  type: "user" | "ai";
+  type: MessageVariant;
   content: React.ReactNode;
 }
 
 const initialMessages: Message[] = [
   {
     id: "1",
-    type: "ai",
+    type: MessageVariant.AI,
     content:
       "Hi! I'm here to help you break down your goals into manageable tasks. What would you like to achieve?",
   },
@@ -42,7 +42,7 @@ function ChatPage() {
   const [goalContext, setGoalContext] = useState<GoalContext>({});
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { locationAgent, stopEscalation } = useSimulation();
+  const { stopEscalation } = useSimulation();
 
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -55,7 +55,7 @@ function ChatPage() {
   const handleSendMessage = async (text: string) => {
     const userMessage: Message = {
       id: Date.now().toString(),
-      type: "user",
+      type: MessageVariant.USER,
       content: text,
     };
 
@@ -65,27 +65,15 @@ function ChatPage() {
     // Stop any pending escalations if the user responds
     stopEscalation();
 
-    // Decide which agent to use
-    let response: LocationAgentResponse | null = null;
-    const isLocationScenario =
-      text.toLowerCase().includes("remind") ||
-      locationAgent.getState() !== "IDLE";
-
-    if (isLocationScenario) {
-      response = await locationAgent.processMessage(text);
-    }
-
-    // Fallback to goal agent if location agent didn't handle it or it's not a location scenario
-    if (!response || !response.message) {
-      const result = await goalPlannerService.sendMessage(
-        text,
-        agentState,
-        goalContext,
-      );
-      response = result.response as LocationAgentResponse;
-      setAgentState(result.newState);
-      setGoalContext(result.newContext);
-    }
+    // Use goal planner service for all messages (backend handles routing)
+    const result = await goalPlannerService.sendMessage(
+      text,
+      agentState,
+      goalContext,
+    );
+    const response = result.response;
+    setAgentState(result.newState as AgentState);
+    setGoalContext(result.newContext);
 
     setTimeout(() => {
       setIsThinking(false);
@@ -94,7 +82,7 @@ function ChatPage() {
 
       const aiMessage: Message = {
         id: (Date.now() + 1).toString(),
-        type: "ai",
+        type: MessageVariant.AI,
         content: (
           <div className="space-y-3">
             <p>{response.message}</p>
@@ -138,7 +126,9 @@ function ChatPage() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ delay: index * 0.05 }}
-              className={message.type === "user" ? "flex justify-end" : ""}
+              className={
+                message.type === MessageVariant.USER ? "flex justify-end" : ""
+              }
             >
               <ChatBubble variant={message.type} animate={false}>
                 {message.content}
@@ -153,7 +143,7 @@ function ChatPage() {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
           >
-            <ChatBubble variant="ai" animate={false}>
+            <ChatBubble variant={MessageVariant.AI} animate={false}>
               <ThinkingIndicator />
             </ChatBubble>
           </motion.div>

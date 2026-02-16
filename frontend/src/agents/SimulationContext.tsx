@@ -7,19 +7,16 @@ import {
   useRef,
   useState,
 } from "react";
-import {
-  type AgentResponse,
-  LocationReminderAgent,
-} from "./LocationReminderAgent";
+import { goalPlannerService } from "~/services/GoalPlannerService";
+import type { AgentResponse } from "~/types/notification";
 
 interface SimulationContextType {
-  locationAgent: LocationReminderAgent;
   notifications: AgentResponse[];
   addNotification: (notification: AgentResponse) => void;
   removeNotification: (index: number) => void;
   escalationSpeed: number;
   setEscalationSpeed: (speed: number) => void;
-  startEscalation: () => void;
+  startEscalation: (task?: string) => void;
   stopEscalation: () => void;
   handleNotificationAction: (action: "done" | "snooze") => void;
 }
@@ -31,7 +28,6 @@ const SimulationContext = createContext<SimulationContextType | undefined>(
 export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [locationAgent] = useState(() => new LocationReminderAgent());
   const [notifications, setNotifications] = useState<AgentResponse[]>([]);
   const [escalationSpeed, setEscalationSpeed] = useState(1);
   const escalationTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -61,24 +57,33 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({
     [stopEscalation],
   );
 
-  const startEscalation = useCallback(() => {
-    stopEscalation();
+  const startEscalation = useCallback(
+    async (task?: string) => {
+      stopEscalation();
 
-    // Step 2: WhatsApp after 30 "simulated" seconds
-    const whatsAppDelay = (30 * 1000) / escalationSpeed;
-    // Step 3: Call after another 45 "simulated" seconds (relative to WhatsApp)
-    const callDelay = (45 * 1000) / escalationSpeed;
+      // Step 2: WhatsApp after 30 "simulated" seconds
+      const whatsAppDelay = (30 * 1000) / escalationSpeed;
+      // Step 3: Call after another 45 "simulated" seconds (relative to WhatsApp)
+      const callDelay = (45 * 1000) / escalationSpeed;
 
-    escalationTimerRef.current = setTimeout(() => {
-      const response = locationAgent.simulateEscalation("whatsapp");
-      addNotification(response);
-
-      escalationTimerRef.current = setTimeout(() => {
-        const response = locationAgent.simulateEscalation("call");
+      escalationTimerRef.current = setTimeout(async () => {
+        const response = await goalPlannerService.triggerSimulation(
+          "whatsapp",
+          task,
+        );
         addNotification(response);
-      }, callDelay);
-    }, whatsAppDelay);
-  }, [escalationSpeed, locationAgent, addNotification, stopEscalation]);
+
+        escalationTimerRef.current = setTimeout(async () => {
+          const response = await goalPlannerService.triggerSimulation(
+            "call",
+            task,
+          );
+          addNotification(response);
+        }, callDelay);
+      }, whatsAppDelay);
+    },
+    [escalationSpeed, addNotification, stopEscalation],
+  );
 
   useEffect(() => {
     return () => stopEscalation();
@@ -87,7 +92,6 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({
   return (
     <SimulationContext.Provider
       value={{
-        locationAgent,
         notifications,
         addNotification,
         removeNotification,

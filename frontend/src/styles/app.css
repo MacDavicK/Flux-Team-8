@@ -513,7 +513,7 @@
   }
 }
 
-@keyframes pulse-glow {
+@keyframes pulse-glow-opacity {
   0%,
   100% {
     opacity: 0.05;
@@ -544,6 +544,6 @@
   animation: drift-3 30s ease-in-out infinite;
 }
 
-.animate-pulse-glow {
-  animation: pulse-glow 4s ease-in-out infinite;
+.animate-pulse-glow-opacity {
+  animation: pulse-glow-opacity 4s ease-in-out infinite;
 }

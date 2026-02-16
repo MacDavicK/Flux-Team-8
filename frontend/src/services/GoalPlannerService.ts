@@ -1,43 +1,18 @@
-export type GoalContext = {
-  goal?: string;
-  timeline?: string;
-  currentWeight?: string;
-  targetWeight?: string;
-  preferences?: string;
-};
+import type { AgentResponse } from "~/types/notification";
 
-export type PlanMilestone = {
-  week: string;
-  milestone: string;
-  tasks: string[];
-};
-
-export type AgentResponse = {
-  message: string;
-  type: "text" | "plan";
-  plan?: PlanMilestone[];
-  suggestedAction?: string;
-};
-
-export enum AgentState {
-  IDLE = "IDLE",
-  GATHERING_TIMELINE = "GATHERING_TIMELINE",
-  GATHERING_CURRENT_WEIGHT = "GATHERING_CURRENT_WEIGHT",
-  GATHERING_TARGET_WEIGHT = "GATHERING_TARGET_WEIGHT",
-  GATHERING_PREFERENCES = "GATHERING_PREFERENCES",
-  PLAN_READY = "PLAN_READY",
-  CONFIRMED = "CONFIRMED",
-}
+export type { GoalContext, PlanMilestone } from "~/types/goal";
+export type { AgentResponse };
+export { AgentState } from "~/types/goal";
 
 class GoalPlannerService {
   async sendMessage(
     message: string,
-    state: AgentState,
-    context: GoalContext,
+    state: string,
+    context: any,
   ): Promise<{
     response: AgentResponse;
-    newState: AgentState;
-    newContext: GoalContext;
+    newState: string;
+    newContext: any;
   }> {
     const response = await fetch("/api/goal-planner/message", {
       method: "POST",
@@ -52,6 +27,26 @@ class GoalPlannerService {
     }
 
     return response.json();
+  }
+
+  async triggerSimulation(
+    trigger: string,
+    task?: string,
+  ): Promise<AgentResponse> {
+    const response = await fetch("/api/simulation/trigger", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ trigger, task }),
+    });
+
+    if (!response.ok) {
+      throw new Error("Failed to trigger simulation");
+    }
+
+    const data = await response.json();
+    return data.response;
   }
 }
 

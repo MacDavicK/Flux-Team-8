@@ -8,6 +8,7 @@ import { NotificationCenter } from "~/components/demo/NotificationCenter";
 import { DemoButton } from "~/components/flow/v2/DemoButton";
 import { NotFound } from "~/components/NotFound";
 import { SplashScreen } from "~/components/splash/SplashScreen";
+import { goalPlannerService } from "~/services/GoalPlannerService";
 import appCss from "~/styles/app.css?url";
 import { seo } from "~/utils/seo";
 
@@ -64,25 +65,21 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   const [isDemoOpen, setIsDemoOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
-  const {
-    locationAgent,
-    addNotification,
-    setEscalationSpeed,
-    startEscalation,
-  } = useSimulation();
+  const { addNotification, setEscalationSpeed, startEscalation } =
+    useSimulation();
 
   const handleSplashComplete = () => {
     setShowSplash(false);
   };
 
-  const handleSimulateLeavingHome = () => {
-    const response = locationAgent.simulateTrigger("leaving_home");
+  const handleSimulateLeavingHome = async () => {
+    const response = await goalPlannerService.triggerSimulation("leaving_home");
     addNotification(response);
     startEscalation();
   };
 
-  const handleSimulateNearStore = () => {
-    const response = locationAgent.simulateTrigger("near_grocery");
+  const handleSimulateNearStore = async () => {
+    const response = await goalPlannerService.triggerSimulation("near_grocery");
     addNotification(response);
     startEscalation();
   };

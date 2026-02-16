@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, Trophy } from "lucide-react";
-import type { PlanMilestone } from "~/services/GoalPlannerService";
+import type { PlanMilestone } from "~/types/goal";
 import { cn } from "~/utils/cn";
 
 interface PlanViewProps {
