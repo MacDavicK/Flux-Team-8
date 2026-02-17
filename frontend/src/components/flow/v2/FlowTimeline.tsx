@@ -19,17 +19,6 @@ export function FlowTimeline({ events }: FlowTimelineProps) {
               type={event.type}
               avatars={event.avatars}
             />
-            {/* Simple logic for "Now" indicator - could be more dynamic */}
-            {index === 1 && (
-              <div className="relative py-4 flex items-center justify-end">
-                <div className="absolute left-0 w-full h-[1px] bg-now-line"></div>
-                <div className="flex flex-col items-center w-12 shrink-0 relative z-10 mr-0">
-                  <span className="text-xs font-bold text-sage bg-stone/80 backdrop-blur px-2 py-0.5 rounded-full shadow-sm border border-sage/10">
-                    Now
-                  </span>
-                </div>
-              </div>
-            )}
           </div>
         ))}
         <div className="h-24"></div>

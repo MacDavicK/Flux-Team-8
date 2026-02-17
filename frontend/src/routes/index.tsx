@@ -1,70 +1,39 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DateHeader } from "~/components/flow/v2/DateHeader";
 import { FlowTimeline } from "~/components/flow/v2/FlowTimeline";
 import { TaskRail } from "~/components/flow/v2/TaskRail";
 import { RescheduleModal } from "~/components/modals/RescheduleModal";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
-import { EventType, type TaskRailItem, type TimelineEvent } from "~/types";
-
-// Sample v2 data
-const sampleEvents: TimelineEvent[] = [
-  {
-    id: "1",
-    title: "Deep Work: Strategy",
-    description: "Focus block for Q4 roadmap planning.",
-    time: "10:00",
-    period: "AM",
-    type: EventType.SAGE,
-  },
-  {
-    id: "2",
-    title: "Coffee w/ Team",
-    description: "Discussion about the offsite.",
-    time: "11:30",
-    period: "AM",
-    type: EventType.TERRA,
-  },
-  {
-    id: "3",
-    title: "Client Review",
-    description: "Reviewing final mockups for Flux.",
-    time: "01:00",
-    period: "PM",
-    type: EventType.STONE,
-  },
-  {
-    id: "4",
-    title: "Pick up dry cleaning",
-    description: "",
-    time: "03:30",
-    period: "PM",
-    type: EventType.STONE,
-    isPast: true,
-  },
-  {
-    id: "5",
-    title: "Gym Session",
-    description: "",
-    time: "04:30",
-    period: "PM",
-    type: EventType.STONE,
-    isPast: true,
-  },
-];
-
-const sampleTasks: TaskRailItem[] = [
-  { id: "1", title: "Email Sarah regarding brand", completed: false },
-  { id: "2", title: "Sketch logo concepts", completed: false },
-  { id: "3", title: "Update documentation", completed: true },
-];
+import { LoadingState } from "~/components/ui/LoadingState";
+import type { TasksResponse } from "~/mocks/tasksHandlers";
+import type { TaskRailItem, TimelineEvent } from "~/types";
 
 export const Route = createFileRoute("/")({
   component: FlowPage,
 });
 
 function FlowPage() {
+  const [data, setData] = useState<{
+    events: TimelineEvent[];
+    tasks: TaskRailItem[];
+  }>({ events: [], tasks: [] });
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/tasks")
+      .then((res) => res.json() as Promise<TasksResponse>)
+      .then((data) => {
+        setData({ events: data.events, tasks: data.tasks });
+        setIsLoading(false);
+      })
+      .catch((error) => {
+        console.error("Failed to fetch tasks:", error);
+        setIsLoading(false);
+      });
+  }, []);
+
   const [rescheduleModal, setRescheduleModal] = useState<{
     isOpen: boolean;
     taskTitle: string;
@@ -75,15 +44,25 @@ function FlowPage() {
     setRescheduleModal({ isOpen: false, taskTitle: "" });
   };
 
+  if (isLoading) {
+    return (
+      <div className="relative w-full max-w-md mx-auto h-screen flex flex-col overflow-hidden">
+        <AmbientBackground />
+        <LoadingState />
+        <BottomNav />
+      </div>
+    );
+  }
+
   return (
     <div className="relative w-full max-w-md mx-auto h-screen flex flex-col overflow-hidden">
       <AmbientBackground />
 
       <DateHeader />
 
-      <TaskRail tasks={sampleTasks} />
+      <TaskRail tasks={data.tasks} />
 
-      <FlowTimeline events={sampleEvents} />
+      <FlowTimeline events={data.events} />
 
       <BottomNav />
 
