@@ -1,13 +1,8 @@
+import type { TaskRailItem } from "~/types";
 import { cn } from "~/utils/cn";
 
-interface Task {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
 interface TaskRailProps {
-  tasks: Task[];
+  tasks: TaskRailItem[];
 }
 
 export function TaskRail({ tasks }: TaskRailProps) {

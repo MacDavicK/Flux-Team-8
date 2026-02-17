@@ -153,3 +153,16 @@ type TaskSuggestion = {
   category?: "WORK" | "PERSONAL" | "HEALTH";
   priority?: "LOW" | "MEDIUM" | "HIGH" | "URGENT";
 };
+
+/**
+ * UI-specific chat message for React components
+ * Allows React.ReactNode content for rendering rich UI
+ */
+export interface ChatMessage {
+  /** Unique identifier */
+  id: string;
+  /** Sender variant */
+  type: MessageVariant;
+  /** Content as React node for UI rendering */
+  content: React.ReactNode;
+}

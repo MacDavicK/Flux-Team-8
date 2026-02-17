@@ -49,5 +49,3 @@ export function TimelineEvent({
     </div>
   );
 }
-
-export type { EventType };

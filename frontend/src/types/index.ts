@@ -49,6 +49,7 @@ export type {
 export type {
   Event,
   EventOccurrence,
+  TimelineEvent,
   TimelinePosition,
   TimelineSegment,
 } from "./event";
@@ -72,6 +73,7 @@ export {
 export type {
   BaseMessage,
   CallMessage,
+  ChatMessage,
   ChatSession,
   MessageContent,
   NotificationMessage,
@@ -100,6 +102,7 @@ export {
 export type {
   Task,
   TaskFilter,
+  TaskRailItem,
   TaskSuggestion,
 } from "./task";
 export {

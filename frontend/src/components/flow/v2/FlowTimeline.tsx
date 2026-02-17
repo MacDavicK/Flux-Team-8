@@ -1,18 +1,8 @@
-import { type EventType, TimelineEvent } from "./TimelineEvent";
-
-interface Event {
-  id: string;
-  title: string;
-  description: string;
-  time: string;
-  period: string;
-  type: EventType;
-  avatars?: string[];
-  isPast?: boolean;
-}
+import type { TimelineEvent as TimelineEventType } from "~/types";
+import { TimelineEvent } from "./TimelineEvent";
 
 interface FlowTimelineProps {
-  events: Event[];
+  events: TimelineEventType[];
 }
 
 export function FlowTimeline({ events }: FlowTimelineProps) {

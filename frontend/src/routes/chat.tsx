@@ -8,21 +8,12 @@ import { PlanView } from "~/components/chat/PlanView";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
-import {
-  type AgentResponse,
-  goalPlannerService,
-} from "~/services/GoalPlannerService";
-import type { GoalContext, PlanMilestone } from "~/types/goal";
+import { goalPlannerService } from "~/services/GoalPlannerService";
+import type { ChatMessage, GoalContext, PlanMilestone } from "~/types";
 import { AgentState } from "~/types/goal";
 import { MessageVariant } from "~/types/message";
 
-interface Message {
-  id: string;
-  type: MessageVariant;
-  content: React.ReactNode;
-}
-
-const initialMessages: Message[] = [
+const initialMessages: ChatMessage[] = [
   {
     id: "1",
     type: MessageVariant.AI,
@@ -36,7 +27,7 @@ export const Route = createFileRoute("/chat")({
 });
 
 function ChatPage() {
-  const [messages, setMessages] = useState<Message[]>(initialMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>(initialMessages);
   const [isThinking, setIsThinking] = useState(false);
   const [agentState, setAgentState] = useState<AgentState>(AgentState.IDLE);
   const [goalContext, setGoalContext] = useState<GoalContext>({});
@@ -53,7 +44,7 @@ function ChatPage() {
   }, [scrollToBottom]);
 
   const handleSendMessage = async (text: string) => {
-    const userMessage: Message = {
+    const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: MessageVariant.USER,
       content: text,
@@ -80,7 +71,7 @@ function ChatPage() {
 
       if (!response) return;
 
-      const aiMessage: Message = {
+      const aiMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: MessageVariant.AI,
         content: (

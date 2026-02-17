@@ -42,8 +42,6 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 The project uses `.mcp.json` for MCP server configuration. Currently configured:
 - **Stitch**: Google Stitch MCP server for design-to-code workflows.
 
-_Generated from codebase analysis._
-
 ## 6. Documentation Protocol
 To ensure this documentation remains a source of truth, ALL agents must follow this protocol:
 

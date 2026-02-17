@@ -91,3 +91,26 @@ export interface TimelineSegment {
   events: Event[];
   isEmpty?: boolean;
 }
+
+/**
+ * Timeline event for UI display (simplified from Event)
+ * Used in FlowTimeline component
+ */
+export interface TimelineEvent {
+  /** Unique identifier */
+  id: string;
+  /** Event title */
+  title: string;
+  /** Detailed description */
+  description: string;
+  /** Display time (e.g., "10:00") */
+  time: string;
+  /** Time period (e.g., "AM", "PM") */
+  period: string;
+  /** Visual type for theming */
+  type: EventType;
+  /** Attendee avatar URLs */
+  avatars?: string[];
+  /** Whether the event is in the past */
+  isPast?: boolean;
+}

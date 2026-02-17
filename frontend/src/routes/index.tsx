@@ -6,16 +6,17 @@ import { TaskRail } from "~/components/flow/v2/TaskRail";
 import { RescheduleModal } from "~/components/modals/RescheduleModal";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
+import { EventType, type TaskRailItem, type TimelineEvent } from "~/types";
 
 // Sample v2 data
-const sampleEvents = [
+const sampleEvents: TimelineEvent[] = [
   {
     id: "1",
     title: "Deep Work: Strategy",
     description: "Focus block for Q4 roadmap planning.",
     time: "10:00",
     period: "AM",
-    type: "sage" as const,
+    type: EventType.SAGE,
   },
   {
     id: "2",
@@ -23,7 +24,7 @@ const sampleEvents = [
     description: "Discussion about the offsite.",
     time: "11:30",
     period: "AM",
-    type: "terra" as const,
+    type: EventType.TERRA,
   },
   {
     id: "3",
@@ -31,7 +32,7 @@ const sampleEvents = [
     description: "Reviewing final mockups for Flux.",
     time: "01:00",
     period: "PM",
-    type: "stone" as const,
+    type: EventType.STONE,
   },
   {
     id: "4",
@@ -39,7 +40,7 @@ const sampleEvents = [
     description: "",
     time: "03:30",
     period: "PM",
-    type: "stone" as const,
+    type: EventType.STONE,
     isPast: true,
   },
   {
@@ -48,12 +49,12 @@ const sampleEvents = [
     description: "",
     time: "04:30",
     period: "PM",
-    type: "stone" as const,
+    type: EventType.STONE,
     isPast: true,
   },
 ];
 
-const sampleTasks = [
+const sampleTasks: TaskRailItem[] = [
   { id: "1", title: "Email Sarah regarding brand", completed: false },
   { id: "2", title: "Sketch logo concepts", completed: false },
   { id: "3", title: "Update documentation", completed: true },

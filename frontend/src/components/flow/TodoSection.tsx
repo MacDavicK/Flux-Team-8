@@ -1,16 +1,11 @@
 import { motion } from "framer-motion";
 import { CheckCircle2, Circle } from "lucide-react";
 import { useState } from "react";
+import type { TaskRailItem } from "~/types";
 import { cn } from "~/utils/cn";
 
-interface Todo {
-  id: string;
-  title: string;
-  completed: boolean;
-}
-
 interface TodoSectionProps {
-  todos: Todo[];
+  todos: TaskRailItem[];
   onToggle?: (id: string) => void;
 }
 
@@ -43,7 +38,7 @@ export function TodoSection({ todos, onToggle }: TodoSectionProps) {
 }
 
 interface TodoItemProps {
-  todo: Todo;
+  todo: TaskRailItem;
   onToggle: () => void;
   index: number;
 }
