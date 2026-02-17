@@ -151,11 +151,84 @@ Flux uses a **multi-agent architecture** where five specialized AI agents work i
 
 ### Prerequisites
 
-- Node.js 18+
-- Python 3.11+
-- Supabase account (or local PostgreSQL)
+- **Node.js 18+** — [Install](https://nodejs.org)
+- **Python 3.11+** — [Install](https://python.org)
+- **Docker Desktop** — [Install for Mac](https://docs.docker.com/desktop/install/mac-install/) (must be running)
+- **Supabase CLI** — Install via Homebrew:
+  ```bash
+  brew install supabase/tap/supabase
+  ```
 
-### Installation
+### Quick Start (Recommended)
+
+```bash
+git clone https://github.com/MacDavicK/Flux-Team-8.git
+cd Flux-Team-8
+
+# 1. Install frontend & backend dependencies
+bash scripts/setup.sh
+
+# 2. Set up Supabase (Docker Desktop must be running)
+bash scripts/supabase_setup.sh
+```
+
+> **Note:** The first Supabase run downloads ~2-3 GB of Docker images. Subsequent runs are fast.
+
+After setup completes:
+
+```bash
+# Terminal 1 — Frontend
+cd frontend && npm run dev
+
+# Terminal 2 — Backend (DAO Service)
+cd backend && source venv/bin/activate && uvicorn dao_service.main:app --reload
+```
+
+### Supabase Local Development
+
+Supabase runs entirely in Docker on your machine. No cloud account needed for local dev.
+
+| Service | URL |
+|---------|-----|
+| Studio (Dashboard) | http://127.0.0.1:54323 |
+| API (Project URL) | http://127.0.0.1:54321 |
+| Database | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
+| Email Testing (Mailpit) | http://127.0.0.1:54324 |
+
+**Useful commands:**
+
+```bash
+supabase status    # Show local URLs and keys
+supabase stop      # Stop all Supabase containers
+supabase start     # Restart (fast after first run)
+supabase db reset  # Reset database and re-apply all migrations
+```
+
+**Setting up the database with test data:**
+
+After `supabase start` (or as part of initial setup), run:
+
+```bash
+# Apply migrations (creates all tables)
+supabase db reset
+
+# Load sample data for development
+docker cp supabase/scripts/seed_test_data.sql supabase_db_Flux-Team-8:/tmp/seed_test_data.sql
+docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/seed_test_data.sql
+```
+
+This seeds 3 users, 4 goals, 8 milestones, 7 tasks, 3 conversations, and demo flags — enough to exercise every feature locally.
+
+**Other database utility scripts:**
+
+| Script | Purpose | Command |
+|--------|---------|---------|
+| `truncate_tables.sql` | Delete all rows, keep schema | `docker cp supabase/scripts/truncate_tables.sql supabase_db_Flux-Team-8:/tmp/truncate_tables.sql && docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/truncate_tables.sql` |
+| `drop_tables.sql` | Drop all tables and enums | `docker cp supabase/scripts/drop_tables.sql supabase_db_Flux-Team-8:/tmp/drop_tables.sql && docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/drop_tables.sql` |
+
+### Manual Installation
+
+If you prefer to set things up step by step:
 
 ```bash
 # Clone the repository
@@ -166,15 +239,23 @@ cd Flux-Team-8
 cd frontend
 npm install
 cp .env.example .env
-npm run dev
+cd ..
 
-# Backend (in a separate terminal)
+# Backend
 cd backend
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
 cp .env.example .env
-uvicorn main:app --reload
+cd ..
+
+# Supabase (Docker Desktop must be running)
+supabase start
+supabase db reset
+
+# Seed test data (optional but recommended)
+docker cp supabase/scripts/seed_test_data.sql supabase_db_Flux-Team-8:/tmp/seed_test_data.sql
+docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/seed_test_data.sql
 ```
 
 ---
@@ -195,12 +276,16 @@ flux/
 │   ├── public/
 │   └── package.json
 ├── backend/           # FastAPI + Python
-│   ├── app/
-│   │   ├── agents/    # AI agent modules
-│   │   ├── api/       # Route handlers
-│   │   ├── models/    # Database models
-│   │   └── services/  # Business logic
-│   ├── tests/
+│   ├── dao_service/   # DAO microservice (data access layer)
+│   │   ├── api/       # API route handlers (v1/)
+│   │   ├── core/      # Database engine, config, exceptions
+│   │   ├── dao/       # Data Access Objects (protocols + implementations)
+│   │   ├── models/    # SQLAlchemy ORM models
+│   │   ├── schemas/   # Pydantic DTOs
+│   │   ├── services/  # Data validation services
+│   │   └── repositories/ # Unit of Work pattern
+│   ├── tests/         # Unit (44) + Integration (40) tests
+│   ├── Dockerfile     # Service-specific Docker image
 │   └── requirements.txt
 ├── docs/              # Documentation
 └── README.md
@@ -307,12 +392,128 @@ sequenceDiagram
 
 ---
 
+## Database Schema
+
+### Custom Enum Types
+
+| Type | Values |
+|------|--------|
+| `task_state` | `scheduled`, `drifted`, `completed`, `missed` |
+| `task_priority` | `standard`, `important`, `must-not-miss` |
+| `trigger_type` | `time`, `on_leaving_home` |
+
+### Tables
+
+**`users`** — User profiles and preferences.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK, auto-generated |
+| `name` | text | required |
+| `email` | text | required, unique |
+| `preferences` | jsonb | default `{}` |
+| `demo_mode` | boolean | default `false` |
+| `created_at` | timestamptz | default `now()` |
+
+**`goals`** — User goals with category and timeline.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK, auto-generated |
+| `user_id` | uuid | FK → users, CASCADE |
+| `title` | text | required |
+| `category` | text | |
+| `timeline` | text | |
+| `status` | text | default `'active'` |
+| `created_at` | timestamptz | default `now()` |
+
+**`milestones`** — Weekly milestones within a goal.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK, auto-generated |
+| `goal_id` | uuid | FK → goals, CASCADE |
+| `week_number` | integer | required |
+| `title` | text | required |
+| `status` | text | default `'pending'` |
+| `created_at` | timestamptz | default `now()` |
+
+**`tasks`** — Time-blocked actions linked to goals and milestones.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK, auto-generated |
+| `user_id` | uuid | FK → users, CASCADE |
+| `goal_id` | uuid | FK → goals, CASCADE |
+| `milestone_id` | uuid | FK → milestones, CASCADE, **nullable** |
+| `title` | text | required |
+| `start_time` | timestamptz | |
+| `end_time` | timestamptz | |
+| `state` | task_state | default `'scheduled'` |
+| `priority` | task_priority | default `'standard'` |
+| `trigger_type` | trigger_type | default `'time'` |
+| `is_recurring` | boolean | default `false` |
+| `calendar_event_id` | varchar(255) | **nullable**, indexed — external calendar sync |
+| `created_at` | timestamptz | default `now()` |
+
+**`conversations`** — AI conversation history per goal.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK, auto-generated |
+| `user_id` | uuid | FK → users, CASCADE |
+| `goal_id` | uuid | FK → goals, CASCADE |
+| `messages` | jsonb | default `[]`, array of `{role, text}` objects |
+| `status` | text | default `'open'` |
+| `created_at` | timestamptz | default `now()` |
+
+**`demo_flags`** — Per-user demo mode controls (one row per user).
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `user_id` | uuid | PK, FK → users, CASCADE |
+| `virtual_now` | timestamptz | simulated current time for demo |
+| `escalation_speed` | float | default `1.0` |
+
+### Entity Relationships
+
+```
+users
+ ├── goals (1:N)
+ │    ├── milestones (1:N)
+ │    ├── tasks (1:N)
+ │    └── conversations (1:N)
+ ├── tasks (1:N)
+ └── demo_flags (1:1)
+```
+
+All foreign keys use `ON DELETE CASCADE` — deleting a user removes all their data.
+
+### Indexes
+
+Foreign key columns are indexed for query performance:
+
+- `idx_goals_user_id`
+- `idx_milestones_goal_id`
+- `idx_tasks_user_id`, `idx_tasks_goal_id`, `idx_tasks_milestone_id`, `idx_tasks_calendar_event_id`
+- `idx_conversations_user_id`, `idx_conversations_goal_id`
+
+### Design Decisions
+
+- **UUIDs everywhere** — Supabase standard; avoids sequential ID leakage.
+- **PostgreSQL enums** for task state/priority/trigger — enforces valid values at the DB level.
+- **jsonb for preferences and messages** — flexible schema for evolving fields without migrations.
+- **`demo_flags` as a separate table** — keeps demo concerns out of the main `users` table; PK is `user_id` enforcing one row per user.
+- **`IF NOT EXISTS` guards** in the migration — safe to re-run without errors.
+
+---
+
 ## Team
 
 | Name | Role | GitHub |
 |------|------|--------|
 | Harshal Kale | Team Leader | [@harshalkale](https://github.com/harshalkale) |
-| Session Mwamufiya | | [@placeholder](#) |
+| Session Mwamufiya | | [@Session-SOS](https://github.com/Session-SOS) |
 | Krishnan Iyer | | [@kiyer1974](https://github.com/kiyer1974) |
 | Sathish Kulal | | [@placeholder](#) |
 | Hima | | [@placeholder](#) |

@@ -2,7 +2,8 @@
 # ============================================================
 # Flux — Development Environment Setup (macOS / Linux)
 # Installs frontend and backend dependencies, copies .env files,
-# and validates that required tools are present.
+# and validates that required tools (Node.js, Python) are present.
+# For Supabase setup, run: bash scripts/supabase_setup.sh
 # Usage:  bash scripts/setup.sh
 # ============================================================
 
@@ -106,8 +107,9 @@ echo -e "  ${GREEN}Setup complete!${NC}"
 echo "=============================="
 echo ""
 echo "Next steps:"
-echo "  1. Fill in API keys in backend/.env"
-echo "  2. Start frontend:  cd frontend && npm run dev"
-echo "  3. Start backend:   cd backend && source venv/bin/activate && make dev"
-echo "  4. Open http://localhost:5173 in your browser"
+echo "  1. Set up Supabase:  bash scripts/supabase_setup.sh"
+echo "  2. Fill in API keys in backend/.env"
+echo "  3. Start frontend:   cd frontend && npm run dev"
+echo "  4. Start backend:    cd backend && source venv/bin/activate && make dev"
+echo "  5. Open http://localhost:5173 in your browser"
 echo ""
