@@ -10,6 +10,7 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 - **State**: URL-based (Search Params) + Server State (Loaders) + Local React State
 - **Icons**: Lucide React
 - **Animations**: Framer Motion
+- **API Mocking**: MSW (Mock Service Worker) for development
 
 ## 2. Key Architecture Patterns
 - **Glassmorphism**: The design relies heavily on `backdrop-filter`, translucent backgrounds, and organic borders.
@@ -17,6 +18,11 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 - **Centralized Type System**: All domain types are organized in `src/types/` with domain-specific files (e.g., `user.ts`, `task.ts`) and barrel exports via `index.ts`.
 - **Union Types**: Polymorphic content uses TypeScript union types (e.g., different message content types in `MessageContent`).
 - **Strict Typing**: All types use explicit optional markers (`?`) and avoid `any`.
+- **API Mocking**: MSW handles API mocking in development. Handlers are in `src/mocks/` organized by domain (e.g., `userHandlers.ts`, `tasksHandlers.ts`).
+- **Data Fetching**: 
+  - Page-level data: Fetched via TanStack Router `loader` functions (blocking, before page renders).
+  - Component-level data: Fetched via `useEffect` with local state (non-blocking, shows loading states).
+- **Loading States**: Each component section has its own glassmorphic loading state component (e.g., `StatsLoadingState`, `EnergyAuraLoadingState`).
 - **Component Structure**:
   - `src/components/ui`: Atomic, reusable components (GlassCard, Button, etc.).
   - `src/components/{feature}`: Feature-specific molecules (e.g., `src/components/chat`).
@@ -26,6 +32,11 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 
 ## 3. Important Rules for Agents
 - **Styling**: ALWAYS use Tailwind classes. Do NOT create new CSS files. Use `src/styles/app.css` for global theme variables.
+- **Data Fetching**: NEVER use direct `fetch` calls in React components. ALWAYS use services from `src/services/`:
+  - Services encapsulate API logic (URL construction, error handling, response parsing).
+  - Example: Use `userService.getProfile()` instead of `fetch("/api/user/profile")`.
+  - Services are organized by domain (e.g., `UserService`, `TasksService`, `GoalPlannerService`).
+  - Each service method returns typed Promise and handles errors consistently.
 - **New Components**: Place in `src/components`. Prefer composition over inheritance.
 - **Routing**: To add a page, create a file in `src/routes`. `routeTree.gen.ts` is auto-generated; DO NOT edit it manually.
 - **Icons**: Use `lucide-react`.
@@ -33,6 +44,15 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 - **Type Imports**: Import types from `~/types` (e.g., `import { User, Task } from '~/types'`).
 - **Union Types**: Use union types for polymorphic content with strict type guards.
 - **Strict Fields**: Define strict required vs optional fields; use `?` for optional, never use `any`.
+- **API Mocking**: 
+  - All API endpoints must be mocked using MSW in development.
+  - Create handlers in `src/mocks/{domain}Handlers.ts`.
+  - Export handlers from `src/mocks/handlers.ts`.
+  - Add appropriate delays (300-500ms) to simulate real API latency.
+- **Loading States**: 
+  - Create feature-specific loading state components (e.g., `StatsLoadingState`).
+  - Use glassmorphic design with pulsing animations.
+  - Match the structure of the loaded component.
 
 ## 4. Commands
 - `npm run dev`: Start development server.

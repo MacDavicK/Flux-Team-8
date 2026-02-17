@@ -53,3 +53,57 @@ export enum ColorTheme {
   STONE = "stone",
   CHARCOAL = "charcoal",
 }
+
+/**
+ * User profile API response
+ */
+export interface UserProfileResponse {
+  id: string;
+  name: string;
+  email: string;
+  avatar?: string;
+}
+
+/**
+ * Weekly stats pill data
+ */
+export interface WeeklyStatsPill {
+  icon: "check" | "clock" | "flame";
+  value: string;
+  label: string;
+}
+
+/**
+ * User stats API response
+ */
+export interface UserStatsResponse {
+  title: string;
+  stats: WeeklyStatsPill[];
+}
+
+/**
+ * User energy aura API response
+ */
+export interface UserEnergyAuraResponse {
+  data: Array<{
+    date: string;
+    intensity: number;
+  }>;
+}
+
+/**
+ * User focus distribution API response
+ */
+export interface UserFocusDistributionResponse {
+  work: number;
+  personal: number;
+  health: number;
+}
+
+/**
+ * User weekly insight API response
+ */
+export interface UserWeeklyInsightResponse {
+  title: string;
+  insight: string;
+}

@@ -16,6 +16,7 @@
 | | clsx / tailwind-merge | - | For dynamic class construction |
 | **Animation** | Framer Motion | 12.x | Complex UI transitions & gestures |
 | **Icons** | Lucide React | 0.564.x | Standard icon set |
+| **API Mocking** | MSW | 2.12.x | Mock Service Worker for development |
 | **Linting** | Biome | 2.3.x | Fast linter & formatter (replaces ESLint/Prettier) |
 
 ## 2. Key Commands
@@ -38,12 +39,29 @@ src/
 │   ├── flow/           # Flow/Home screen components
 │   ├── demo/           # Demo mode components
 │   ├── reflection/     # Reflection screen components
+│   │   ├── ProfileHeader.tsx
+│   │   ├── EnergyAura.tsx
+│   │   ├── EnergyAuraLoadingState.tsx
+│   │   ├── FocusDistribution.tsx
+│   │   ├── FocusDistributionLoadingState.tsx
+│   │   ├── StatsLoadingState.tsx
+│   │   └── WeeklyInsightLoadingState.tsx
 │   ├── navigation/     # Shared navigation (BottomNav)
 │   ├── splash/         # Splash screen components (initial load)
 │   ├── ui/             # Reusable UI primitives (GlassCard, etc.)
 │   └── modals/         # Modal dialogs
+├── mocks/              # MSW API mock handlers
+│   ├── browser.ts      # MSW browser setup
+│   ├── handlers.ts     # Combined handlers export
+│   ├── userHandlers.ts # User API mocks
+│   ├── tasksHandlers.ts # Tasks API mocks
+│   └── goalPlannerHandlers.ts # Goal planner API mocks
+├── services/           # API service layer
+│   ├── UserService.ts  # User API service
+│   ├── TasksService.ts # Tasks API service
+│   └── GoalPlannerService.ts # Goal planner API service
 ├── types/              # Centralized TypeScript type definitions
-│   ├── user.ts         # User, Profile, Preference types
+│   ├── user.ts         # User, Profile, Preference types + API response types
 │   ├── task.ts         # Task, TaskStatus, Priority, TaskCategory types
 │   ├── event.ts        # Event, EventType, EventStatus types
 │   ├── message.ts      # Message union types (Text, Plan, Task, Notification)
@@ -57,7 +75,7 @@ src/
 │   ├── __root.tsx      # Root layout & HTML shell
 │   ├── index.tsx       # Home page (Flow)
 │   ├── chat.tsx        # Chat interface
-│   └── reflection.tsx  # Analytics/Reflection page
+│   └── reflection.tsx  # Analytics/Reflection page (with loaders + data fetching)
 ├── styles/
 │   └── app.css         # Global styles & Tailwind @theme config
 ├── utils/              # Helper functions & constants
@@ -89,6 +107,38 @@ src/
 - **Local State**: `useState`, `useReducer` for component-level logic.
 - **URL State**: TanStack Router handles URL-based state (search params, etc.).
 - **Server State**: TanStack Start `loader` functions handle data fetching (server-side).
+
+### Data Fetching
+- **Page-Level Data**: Use TanStack Router `loader` functions for blocking data fetches (e.g., user profile).
+  - Data is available before page renders via `Route.useLoaderData()`.
+  - Shows full-page loading state if data is not available.
+- **Component-Level Data**: Use `useEffect` with local state for non-blocking fetches (e.g., stats, charts).
+  - Each section shows its own loading state while data loads.
+  - Allows progressive page rendering.
+
+### Service Layer
+- **Encapsulation**: All API calls must go through service classes in `src/services/`.
+  - Services handle URL construction, error handling, and response parsing.
+  - Never use direct `fetch` calls in React components.
+- **Domain Organization**: Services are organized by domain (e.g., `UserService`, `TasksService`, `GoalPlannerService`).
+- **Usage Pattern**: Import and use services directly:
+  ```typescript
+  import { userService } from "~/services/UserService";
+  const profile = await userService.getProfile();
+  ```
+- **Error Handling**: Services throw typed errors that can be caught by callers.
+
+### API Mocking
+- **MSW in Development**: All API endpoints are mocked using Mock Service Worker.
+- **Handler Organization**: Handlers are organized by domain in `src/mocks/{domain}Handlers.ts`.
+- **Realistic Delays**: Handlers include 300-500ms delays to simulate real API latency.
+- **Type Safety**: Mock responses are typed using the same types as real API responses.
+
+### Loading States
+- **Feature-Specific Loading**: Each component section has its own loading state component.
+- **Glassmorphic Design**: Loading states use glassmorphic styling with pulsing animations.
+- **Structure Matching**: Loading state components match the structure of the loaded component.
+- **Examples**: `StatsLoadingState`, `EnergyAuraLoadingState`, `FocusDistributionLoadingState`, `WeeklyInsightLoadingState`.
 
 ### Type System
 - **Centralized Types**: All domain types are defined in `src/types/` with clear domain separation.

@@ -8,7 +8,7 @@ interface SplashScreenProps {
 
 export function SplashScreen({
   onComplete,
-  minDuration = 2500,
+  minDuration = 700,
 }: SplashScreenProps) {
   const [isVisible, setIsVisible] = useState(true);
 
@@ -109,7 +109,7 @@ export function SplashScreen({
                   strokeDasharray="300"
                   strokeWidth="0.5"
                   style={{
-                    animation: "dash 8s linear infinite",
+                    animation: "dash 5s linear infinite",
                   }}
                 />
               </svg>

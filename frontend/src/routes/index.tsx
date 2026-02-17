@@ -7,7 +7,7 @@ import { RescheduleModal } from "~/components/modals/RescheduleModal";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
-import type { TasksResponse } from "~/mocks/tasksHandlers";
+import { tasksService } from "~/services/TasksService";
 import type { TaskRailItem, TimelineEvent } from "~/types";
 
 export const Route = createFileRoute("/")({
@@ -22,8 +22,8 @@ function FlowPage() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    fetch("/api/tasks")
-      .then((res) => res.json() as Promise<TasksResponse>)
+    tasksService
+      .getTasks()
       .then((data) => {
         setData({ events: data.events, tasks: data.tasks });
         setIsLoading(false);

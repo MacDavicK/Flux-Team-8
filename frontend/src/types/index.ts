@@ -115,5 +115,11 @@ export type {
   Preference,
   Profile,
   User,
+  UserEnergyAuraResponse,
+  UserFocusDistributionResponse,
+  UserProfileResponse,
+  UserStatsResponse,
+  UserWeeklyInsightResponse,
+  WeeklyStatsPill,
 } from "./user";
 export { ColorTheme as UserColorTheme } from "./user";
