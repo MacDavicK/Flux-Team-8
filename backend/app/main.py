@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import goals
+from app.routers import goals, rag
 
 app = FastAPI(
     title="Flux Life Assistant API",
@@ -27,6 +27,7 @@ app.add_middleware(
 
 # ── Routers ─────────────────────────────────────────────────
 app.include_router(goals.router)
+app.include_router(rag.router)
 
 
 # ── Health Check ────────────────────────────────────────────
