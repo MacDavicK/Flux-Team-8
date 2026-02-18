@@ -31,7 +31,7 @@ _DEFAULT_ARTICLES_DIR = Path(__file__).resolve().parents[2] / "articles"
 # TODO: Restrict articles_dir to allowed paths (path traversal risk)
 
 @router.post("/ingest")
-async def ingest_articles(
+def ingest_articles(
     articles_dir: Optional[str] = Query(
         default=None,
         description="Path to the articles directory (defaults to backend/articles/)",
@@ -65,7 +65,7 @@ async def ingest_articles(
 # ── GET /api/v1/rag/search ──────────────────────────────────
 
 @router.get("/search")
-async def search_articles(
+def search_articles(
     q: str = Query(..., description="Search query"),
     top_k: Optional[int] = Query(
         default=None,

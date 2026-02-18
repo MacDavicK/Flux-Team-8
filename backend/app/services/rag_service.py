@@ -269,17 +269,17 @@ def ingest_articles(articles_dir: Path, clear_existing: bool = True) -> dict:
 
     Returns ``{"articles": int, "chunks": int}``.
     """
-    # Optionally clear the index before ingesting
-    if clear_existing:
-        index = _get_pinecone_index()
-        index.delete(delete_all=True)
-        logger.info("Cleared existing vectors from '%s'", settings.pinecone_index_name)
-
     # Load
     articles = load_articles(articles_dir)
     if not articles:
         logger.warning("No articles found in %s — nothing to ingest.", articles_dir)
         return {"articles": 0, "chunks": 0}
+
+    # Clear existing vectors only after confirming we have articles to ingest
+    if clear_existing:
+        index = _get_pinecone_index()
+        index.delete(delete_all=True)
+        logger.info("Cleared existing vectors from '%s'", settings.pinecone_index_name)
 
     # Chunk
     chunks = chunk_articles(articles)
