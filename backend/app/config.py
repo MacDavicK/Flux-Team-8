@@ -17,6 +17,21 @@ class Settings(BaseSettings):
     openai_api_key: str = ""
     openai_model: str = "gpt-4o-mini"
 
+    # RAG — OpenRouter (embedding proxy)
+    open_router_api_key: str = ""
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    embedding_model: str = "openai/text-embedding-3-small"
+
+    # RAG — Pinecone (vector store)
+    pinecone_api_key: str = ""
+    pinecone_index_name: str = "flux-articles"
+
+    # RAG — Chunking & retrieval
+    rag_chunk_size: int = 2000
+    rag_chunk_overlap: int = 200
+    rag_top_k: int = 5
+    rag_relevance_threshold: float = 0.2
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
