@@ -1,0 +1,7 @@
+# Twilio SDK for WhatsApp messaging
+twilio>=8.10.0
+
+# Flask for REST API
+flask>=3.0.0
+
+# Python standard library (no additional packages needed)

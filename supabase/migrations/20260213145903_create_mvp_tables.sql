@@ -64,11 +64,13 @@ CREATE TABLE IF NOT EXISTS tasks (
   priority task_priority DEFAULT 'standard',
   trigger_type trigger_type DEFAULT 'time',
   is_recurring boolean DEFAULT false,
+  calendar_event_id varchar(255),
   created_at timestamptz DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks (user_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_goal_id ON tasks (goal_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_milestone_id ON tasks (milestone_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_calendar_event_id ON tasks (calendar_event_id);
 
 -- Conversations
 CREATE TABLE IF NOT EXISTS conversations (

@@ -180,8 +180,8 @@ After setup completes:
 # Terminal 1 — Frontend
 cd frontend && npm run dev
 
-# Terminal 2 — Backend
-cd backend && source venv/bin/activate && uvicorn main:app --reload
+# Terminal 2 — Backend (DAO Service)
+cd backend && source venv/bin/activate && uvicorn dao_service.main:app --reload
 ```
 
 ### Supabase Local Development
@@ -276,12 +276,16 @@ flux/
 │   ├── public/
 │   └── package.json
 ├── backend/           # FastAPI + Python
-│   ├── app/
-│   │   ├── agents/    # AI agent modules
-│   │   ├── api/       # Route handlers
-│   │   ├── models/    # Database models
-│   │   └── services/  # Business logic
-│   ├── tests/
+│   ├── dao_service/   # DAO microservice (data access layer)
+│   │   ├── api/       # API route handlers (v1/)
+│   │   ├── core/      # Database engine, config, exceptions
+│   │   ├── dao/       # Data Access Objects (protocols + implementations)
+│   │   ├── models/    # SQLAlchemy ORM models
+│   │   ├── schemas/   # Pydantic DTOs
+│   │   ├── services/  # Data validation services
+│   │   └── repositories/ # Unit of Work pattern
+│   ├── tests/         # Unit (44) + Integration (40) tests
+│   ├── Dockerfile     # Service-specific Docker image
 │   └── requirements.txt
 ├── docs/              # Documentation
 └── README.md
@@ -449,6 +453,7 @@ sequenceDiagram
 | `priority` | task_priority | default `'standard'` |
 | `trigger_type` | trigger_type | default `'time'` |
 | `is_recurring` | boolean | default `false` |
+| `calendar_event_id` | varchar(255) | **nullable**, indexed — external calendar sync |
 | `created_at` | timestamptz | default `now()` |
 
 **`conversations`** — AI conversation history per goal.
@@ -490,7 +495,7 @@ Foreign key columns are indexed for query performance:
 
 - `idx_goals_user_id`
 - `idx_milestones_goal_id`
-- `idx_tasks_user_id`, `idx_tasks_goal_id`, `idx_tasks_milestone_id`
+- `idx_tasks_user_id`, `idx_tasks_goal_id`, `idx_tasks_milestone_id`, `idx_tasks_calendar_event_id`
 - `idx_conversations_user_id`, `idx_conversations_goal_id`
 
 ### Design Decisions
@@ -508,7 +513,7 @@ Foreign key columns are indexed for query performance:
 | Name | Role | GitHub |
 |------|------|--------|
 | Harshal Kale | Team Leader | [@harshalkale](https://github.com/harshalkale) |
-| Session Mwamufiya | | [@placeholder](#) |
+| Session Mwamufiya | | [@Session-SOS](https://github.com/Session-SOS) |
 | Krishnan Iyer | | [@kiyer1974](https://github.com/kiyer1974) |
 | Sathish Kulal | | [@placeholder](#) |
 | Hima | | [@placeholder](#) |
