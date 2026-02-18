@@ -66,3 +66,6 @@ docker-compose.override.yml
 
 # ---------- PWA dev artifacts ----------
 dev-dist/
+
+# ---------- Files ----------
+*.pdf
