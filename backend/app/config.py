@@ -13,9 +13,8 @@ class Settings(BaseSettings):
     supabase_url: str = "http://127.0.0.1:54321"
     supabase_key: str = ""
 
-    # AI / LLM
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    # AI / LLM (all via OpenRouter)
+    goal_planner_model: str = "openai/gpt-4o-mini"
 
     # RAG — OpenRouter (embedding proxy)
     open_router_api_key: str = ""

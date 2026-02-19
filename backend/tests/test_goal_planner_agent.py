@@ -223,6 +223,7 @@ class TestSerialization:
         assert restored.plan is not None
         assert len(restored.plan) == len(agent.plan)
         assert restored.plan[0].title == agent.plan[0].title
+        assert restored._sources == agent._sources
 
     def test_to_dict_structure(self, agent):
         data = agent.to_dict()
@@ -231,6 +232,8 @@ class TestSerialization:
         assert "state" in data
         assert "context" in data
         assert "messages" in data
+        assert "sources" in data
+        assert isinstance(data["sources"], list)
 
 
 # ── Fallback Behavior ──────────────────────────────────────
