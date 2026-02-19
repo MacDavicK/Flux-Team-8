@@ -1,7 +1,7 @@
 """
 Tests for the Goals API endpoints.
 
-Uses FastAPI's TestClient with mocked DB, real OpenAI calls via .env key.
+Uses FastAPI's TestClient with mocked DB, real OpenRouter calls via .env key.
 """
 
 import pytest

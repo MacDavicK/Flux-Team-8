@@ -129,7 +129,10 @@ class GoalPlannerAgent:
         self.messages: list[dict[str, str]] = []
         self.plan: Optional[list[PlanMilestone]] = None
 
-        self._client = AsyncOpenAI(api_key=settings.openai_api_key)
+        self._client = AsyncOpenAI(
+            api_key=settings.open_router_api_key,
+            base_url=settings.openrouter_base_url,
+        )
         self._model = settings.openai_model
         self._sources: list[dict] = []
         self._rag_available = False
@@ -483,6 +486,9 @@ class GoalPlannerAgent:
 
         except Exception as e:
             logger.error("Plan generation failed: %s", e)
+            # Fallback plan is generic; do not claim it was based on RAG/sources
+            self._rag_available = False
+            self._sources = []
             return self._fallback_plan()
 
     # ── Fallbacks ───────────────────────────────────────────

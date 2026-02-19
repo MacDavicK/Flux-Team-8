@@ -14,7 +14,8 @@ class AIAgent:
         self.llm = ChatOpenAI(
             model=settings.openai_model,
             temperature=0.7,
-            openai_api_key=settings.openai_api_key
+            openai_api_key=settings.open_router_api_key or "",
+            openai_api_base=settings.openrouter_base_url,
         )
     
     async def analyze_goal(self, title: str, description: str, due_date: datetime) -> str:
