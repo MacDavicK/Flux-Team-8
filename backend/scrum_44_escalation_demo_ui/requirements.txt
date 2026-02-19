@@ -1,0 +1,10 @@
+# Escalation Demo UI API Requirements
+
+# Web framework
+flask>=2.3.0
+
+# Async support
+aiohttp>=3.9.0
+
+# Python standard library enhancements
+python-dotenv>=1.0.0
