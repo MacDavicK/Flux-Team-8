@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     supabase_key: str = ""
 
     # AI / LLM — OpenRouter (chat + embeddings; single API key)
+    # AI / LLM (all via OpenRouter)
+    goal_planner_model: str = "openai/gpt-4o-mini"
+
+    # RAG — OpenRouter (embedding proxy)
     open_router_api_key: str = ""
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
     openai_model: str = "openai/gpt-4o-mini"  # OpenRouter model id
