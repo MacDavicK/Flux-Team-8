@@ -224,3 +224,33 @@ This implementation follows escalation best practices from industry research:
 - [ ] Integration with actual notification services
 - [ ] Retry mechanisms for failed notifications
 - [ ] Multi-user escalation policies
+---
+
+## Swagger / API Documentation
+
+This module uses **Flask** with **flasgger**, which provides Swagger UI for interactive API documentation.
+
+### Running the standalone API server
+
+```bash
+# From the backend/ directory
+cd /workspaces/Flux-Team-8/backend
+python3 scrum_44_escalation_demo_ui/main.py
+```
+
+### Accessing Swagger UI
+
+| Interface | URL |
+|---|---|
+| **Swagger UI** (interactive) | `http://localhost:8044/docs` |
+| **OpenAPI JSON spec** | `http://localhost:8044/apispec.json` |
+
+Once running, open `http://localhost:8044/docs` in your browser to explore and test all endpoints interactively.
+
+### Installing dependencies
+
+```bash
+pip install flask flasgger
+# or
+pip install -r scrum_44_escalation_demo_ui/requirements.txt
+```
