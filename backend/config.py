@@ -5,9 +5,10 @@ from typing import Optional
 class Settings(BaseSettings):
     """Application settings loaded from environment variables."""
     
-    # OpenAI Configuration (optional for testing)
-    openai_api_key: Optional[str] = None
-    openai_model: str = "gpt-4-turbo-preview"
+    # OpenRouter (chat; single API key for all LLM/embedding calls)
+    open_router_api_key: Optional[str] = None
+    openrouter_base_url: str = "https://openrouter.ai/api/v1"
+    openai_model: str = "openai/gpt-4o-mini"  # OpenRouter model id
     
     # Supabase Database Configuration
     supabase_url: Optional[str] = None
