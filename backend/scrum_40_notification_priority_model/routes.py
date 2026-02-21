@@ -20,7 +20,7 @@ priority_router = APIRouter(
 service = NotificationPriorityService()
 
 
-@priority_router.post("/send", response_model=NotificationResponse)
+@priority_router.post("/send", response_model=NotificationResponse, summary="Send Notification", description="Calculate priority score and dispatch a notification. Returns escalation timing details for the specified priority level.", responses={400: {"description": "Invalid priority level or multiplier"}, 500: {"description": "Internal service error"}})
 async def send_notification(request: NotificationRequest):
     """
     Send a notification with specified priority and escalation settings.
@@ -40,7 +40,7 @@ async def send_notification(request: NotificationRequest):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@priority_router.get("/config", response_model=EscalationConfig)
+@priority_router.get("/config", response_model=EscalationConfig, summary="Get Escalation Config", description="Retrieve the current escalation configuration including timing windows and thresholds for all priority levels.", responses={500: {"description": "Internal service error"}})
 async def get_escalation_config():
     """
     Get the complete escalation configuration for all priority levels.
@@ -50,7 +50,7 @@ async def get_escalation_config():
     return service.get_all_escalation_paths()
 
 
-@priority_router.get("/timing")
+@priority_router.get("/timing", summary="Calculate Timing", description="Calculate escalation timing windows for a given priority level and speed multiplier. Returns start/end timestamps and interval durations.", responses={400: {"description": "Invalid parameters"}, 500: {"description": "Internal service error"}})
 async def calculate_timing(
     priority: NotificationPriority = Query(..., description="Priority level"),
     multiplier: float = Query(1.0, ge=1.0, le=10.0, description="Escalation speed multiplier")
@@ -72,7 +72,7 @@ async def calculate_timing(
         raise HTTPException(status_code=500, detail=str(e))
 
 
-@priority_router.get("/health")
+@priority_router.get("/health", summary="Health Check", description="Returns the service health status, name, and version.", tags=["Health"])
 async def health_check():
     """
     Health check endpoint for the notification priority service.
