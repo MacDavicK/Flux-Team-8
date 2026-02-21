@@ -20,6 +20,7 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 - **Strict Typing**: All types use explicit optional markers (`?`) and avoid `any`.
 - **API Mocking**: MSW handles API mocking in development. Handlers are in `src/mocks/` organized by domain (e.g., `userHandlers.ts`, `tasksHandlers.ts`).
 - **SSR Safety**: This project uses TanStack Start with SSR. Browser-only globals (`document`, `window`, `navigator`) are unavailable in Node.js. Always use `isClient()` / `isServer()` from `~/utils/env` to guard such code. Never access browser globals at the module top level or synchronously during render.
+- **Onboarding Flow**: Onboarding uses the `/chat` route. When a user is not onboarded (`user.onboarded === false`), the chat screen displays onboarding questions instead of regular chat. The bottom navigation is hidden during onboarding.
 - **Data Fetching**: 
   - Page-level data: Fetched via TanStack Router `loader` functions (blocking, before page renders).
   - Component-level data: Fetched via `useEffect` with local state (non-blocking, shows loading states).
@@ -29,7 +30,8 @@ This file serves as a persistent memory for AI agents working on the Flux projec
   - `src/components/{feature}`: Feature-specific molecules (e.g., `src/components/chat`).
 - **Routing**:
   - Root layout: `src/routes/__root.tsx`.
-  - Pages: `src/routes/index.tsx` (Flow), `src/routes/chat.tsx`, etc.
+  - Pages: `src/routes/index.tsx` (Flow), `src/routes/chat.tsx` (Chat + Onboarding), etc.
+- **Navigation Visibility**: The bottom navigation (`BottomNav`) is hidden on the login page and when the user is not yet onboarded.
 
 ## 3. Important Rules for Agents
 - **Styling**: ALWAYS use Tailwind classes. Do NOT create new CSS files. Use `src/styles/app.css` for global theme variables.

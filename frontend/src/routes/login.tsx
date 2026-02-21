@@ -14,7 +14,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login, signup, isAuthenticated, hasTasks } = useAuth();
+  const { login, signup, isAuthenticated, user } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -23,6 +23,14 @@ function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | undefined>(undefined);
   const [success, setSuccess] = useState<string | undefined>(undefined);
+
+  const postLogin = () => {
+    if (user?.onboarded) {
+      navigate({ to: "/" });
+    } else {
+      navigate({ to: "/chat" });
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -34,13 +42,6 @@ function LoginPage() {
       if (mode === "login") {
         await login(email, password);
         setSuccess("Welcome back!");
-        setTimeout(() => {
-          if (hasTasks) {
-            navigate({ to: "/" });
-          } else {
-            navigate({ to: "/onboarding" });
-          }
-        }, 500);
       } else {
         if (!name.trim()) {
           setError("Name is required");
@@ -49,10 +50,9 @@ function LoginPage() {
         }
         await signup(name.trim(), email, password);
         setSuccess("Account created successfully!");
-        setTimeout(() => {
-          navigate({ to: "/onboarding" });
-        }, 500);
       }
+
+      postLogin();
     } catch (err) {
       setError(err instanceof Error ? err.message : "An error occurred");
     } finally {

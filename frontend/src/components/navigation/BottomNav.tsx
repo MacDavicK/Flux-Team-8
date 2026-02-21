@@ -1,6 +1,7 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { Home, MessageCircle, User } from "lucide-react";
+import { useAuth } from "~/contexts/AuthContext";
 import { cn } from "~/utils/cn";
 
 interface NavItem {
@@ -31,12 +32,15 @@ const navItems: NavItem[] = [
   },
 ];
 
-const HIDDEN_ROUTES = ["/login", "/onboarding"];
+const HIDDEN_ROUTES = ["/login"];
 
 export function BottomNav() {
   const location = useLocation();
+  const { user, isAuthenticated } = useAuth();
 
-  if (HIDDEN_ROUTES.includes(location.pathname)) {
+  const isNotOnboarded = isAuthenticated && user && !user.onboarded;
+
+  if (HIDDEN_ROUTES.includes(location.pathname) || isNotOnboarded) {
     return null;
   }
 

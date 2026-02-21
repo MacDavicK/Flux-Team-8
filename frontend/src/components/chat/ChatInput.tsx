@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Send, Sparkles } from "lucide-react";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { cn } from "~/utils/cn";
 
 interface ChatInputProps {
@@ -18,6 +18,12 @@ export function ChatInput({
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  useEffect(() => {
+    if (!disabled) {
+      inputRef.current?.focus();
+    }
+  }, [disabled]);
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
@@ -32,7 +38,7 @@ export function ChatInput({
   return (
     <motion.form
       onSubmit={handleSubmit}
-      className="fixed bottom-32 left-5 right-5 z-30"
+      className="px-5 pb-24 pt-4"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}

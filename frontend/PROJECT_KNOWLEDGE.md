@@ -74,7 +74,7 @@ src/
 ├── routes/             # File-based routes (TanStack Router)
 │   ├── __root.tsx      # Root layout & HTML shell
 │   ├── index.tsx       # Home page (Flow)
-│   ├── chat.tsx        # Chat interface
+│   ├── chat.tsx        # Chat interface + Onboarding flow
 │   └── reflection.tsx  # Analytics/Reflection page (with loaders + data fetching)
 ├── styles/
 │   └── app.css         # Global styles & Tailwind @theme config
@@ -92,6 +92,7 @@ src/
 - **File-Based**: Routes are defined by files in `src/routes`.
 - **Root Layout**: `src/routes/__root.tsx` wraps all pages. It handles the `<html>` and `<body>` tags, global styles, and metadata.
 - **Navigation**: Uses `Link` component from `@tanstack/react-router`.
+- **Onboarding Flow**: The `/chat` route handles both onboarding and regular chat. When `user.onboarded === false`, the chat screen displays onboarding questions. The bottom navigation is hidden during onboarding.
 
 ### Styling
 - **Tailwind v4**: Configuration is located in `src/styles/app.css` using the `@theme` directive, NOT in a JavaScript config file.

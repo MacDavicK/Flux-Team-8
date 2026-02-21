@@ -1,5 +1,5 @@
-import type { AgentResponse } from "~/types/notification";
 import type { GoalContext } from "~/types/goal";
+import type { AgentResponse } from "~/types/notification";
 
 export type { GoalContext, PlanMilestone } from "~/types/goal";
 export type { AgentResponse };

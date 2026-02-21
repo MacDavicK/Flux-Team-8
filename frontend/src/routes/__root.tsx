@@ -7,7 +7,6 @@ import {
   useNavigate,
 } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { SimulationProvider, useSimulation } from "~/agents/SimulationContext";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { DemoPanel } from "~/components/demo/DemoPanel";
 import { NotificationCenter } from "~/components/demo/NotificationCenter";
@@ -15,6 +14,10 @@ import { DemoButton } from "~/components/flow/v2/DemoButton";
 import { NotFound } from "~/components/NotFound";
 import { SplashScreen } from "~/components/splash/SplashScreen";
 import { AuthProvider, useAuth } from "~/contexts/AuthContext";
+import {
+  SimulationProvider,
+  useSimulation,
+} from "~/contexts/SimulationContext";
 import { goalPlannerService } from "~/services/GoalPlannerService";
 import appCss from "~/styles/app.css?url";
 import { seo } from "~/utils/seo";
@@ -94,9 +97,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       isAuthenticated &&
       user &&
       !user.onboarded &&
-      currentPath !== "/onboarding"
+      currentPath !== "/chat"
     ) {
-      navigate({ to: "/onboarding" });
+      navigate({ to: "/chat" });
     }
   }, [authLoading, isAuthenticated, user, showSplash, navigate]);
 
@@ -125,7 +128,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         {showSplash && (
           <SplashScreen onComplete={handleSplashComplete} minDuration={3000} />
         )}
-        <main className="relative min-h-screen bg-offwhite overflow-x-hidden">
+        <main className="relative min-h-screen overflow-x-hidden">
           {children}
 
           {showDemoUI && (

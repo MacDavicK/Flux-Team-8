@@ -1,7 +1,7 @@
 import { useNavigate } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { Bell, MessageSquare, Phone, X } from "lucide-react";
-import { useSimulation } from "~/agents/SimulationContext";
+import { useSimulation } from "~/contexts/SimulationContext";
 import { cn } from "~/utils/cn";
 
 export function NotificationCenter() {
