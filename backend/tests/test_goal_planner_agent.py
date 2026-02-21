@@ -2,7 +2,7 @@
 Tests for the GoalPlannerAgent state machine.
 
 Verifies state transitions, context extraction, serialization,
-and fallback behavior — uses real OpenAI calls via .env key.
+and fallback behavior — uses real OpenRouter calls via .env key.
 """
 
 import pytest
@@ -13,7 +13,7 @@ from app.models.schemas import ConversationState, PlanMilestone
 
 @pytest.fixture()
 def agent():
-    """Fresh agent instance using real OpenAI from .env."""
+    """Fresh agent instance using real OpenRouter from .env."""
     return GoalPlannerAgent(conversation_id="test-conv-1", user_id="test-user-1")
 
 
@@ -223,6 +223,7 @@ class TestSerialization:
         assert restored.plan is not None
         assert len(restored.plan) == len(agent.plan)
         assert restored.plan[0].title == agent.plan[0].title
+        assert restored._sources == agent._sources
 
     def test_to_dict_structure(self, agent):
         data = agent.to_dict()
@@ -231,6 +232,8 @@ class TestSerialization:
         assert "state" in data
         assert "context" in data
         assert "messages" in data
+        assert "sources" in data
+        assert isinstance(data["sources"], list)
 
 
 # ── Fallback Behavior ──────────────────────────────────────

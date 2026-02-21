@@ -4,17 +4,20 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
 import json
 
-from config import settings
+from app.config import settings
 
 
 class AIAgent:
-    """AI Agent for goal analysis and breakdown."""
+    """AI Agent for goal analysis and breakdown (uses OpenRouter like goal_planner)."""
     
     def __init__(self):
         self.llm = ChatOpenAI(
-            model=settings.openai_model,
+            model=settings.goal_planner_model,
             temperature=0.7,
-            openai_api_key=settings.openai_api_key
+            openai_api_key=settings.open_router_api_key or "",
+            openai_api_base=settings.openrouter_base_url,
+            openai_api_key=settings.open_router_api_key,
+            base_url=settings.openrouter_base_url,
         )
     
     async def analyze_goal(self, title: str, description: str, due_date: datetime) -> str:

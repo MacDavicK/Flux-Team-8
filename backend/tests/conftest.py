@@ -1,7 +1,7 @@
 """
 Shared fixtures for all Flux backend tests.
 
-Uses real OpenAI calls (key loaded from backend/.env).
+Uses real OpenRouter LLM calls (key loaded from backend/.env).
 Mocks Supabase only since DB may not be running.
 """
 
@@ -13,7 +13,7 @@ from unittest.mock import MagicMock, patch
 from dotenv import load_dotenv
 from fastapi.testclient import TestClient
 
-# Load .env from the backend directory so OPENAI_API_KEY is available
+# Load .env from the backend directory so OPEN_ROUTER_API_KEY is available
 _backend_dir = Path(__file__).resolve().parent.parent
 load_dotenv(_backend_dir / ".env")
 
@@ -43,14 +43,14 @@ def mock_supabase():
 
 @pytest.fixture()
 def agent():
-    """Fresh GoalPlannerAgent instance using real OpenAI from .env."""
+    """Fresh GoalPlannerAgent instance using real OpenRouter from .env."""
     from app.agents.goal_planner import GoalPlannerAgent
     return GoalPlannerAgent(conversation_id="test-conv-1", user_id="test-user-1")
 
 
 @pytest.fixture()
 def client(mock_supabase):
-    """FastAPI TestClient with DB mocked out, real OpenAI."""
+    """FastAPI TestClient with DB mocked out, real OpenRouter."""
     from app.main import app
     from app.routers.goals import _active_agents
     _active_agents.clear()
