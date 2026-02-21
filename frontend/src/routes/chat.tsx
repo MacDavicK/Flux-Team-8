@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { useSimulation } from "~/agents/SimulationContext";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { ChatInput } from "~/components/chat/ChatInput";
@@ -32,16 +32,14 @@ function ChatPage() {
   const [agentState, setAgentState] = useState<AgentState>(AgentState.IDLE);
   const [goalContext, setGoalContext] = useState<GoalContext>({});
 
-  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const { stopEscalation } = useSimulation();
 
-  const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, []);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [scrollToBottom]);
+  const scrollToBottom = () => {
+    setTimeout(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    }, 50);
+  };
 
   const handleSendMessage = async (text: string) => {
     const userMessage: ChatMessage = {
@@ -52,6 +50,7 @@ function ChatPage() {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsThinking(true);
+    scrollToBottom();
 
     // Stop any pending escalations if the user responds
     stopEscalation();
@@ -101,6 +100,7 @@ function ChatPage() {
       };
 
       setMessages((prev) => [...prev, aiMessage]);
+      scrollToBottom();
     }, 1000);
   };
 

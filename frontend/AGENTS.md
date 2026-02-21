@@ -19,6 +19,7 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 - **Union Types**: Polymorphic content uses TypeScript union types (e.g., different message content types in `MessageContent`).
 - **Strict Typing**: All types use explicit optional markers (`?`) and avoid `any`.
 - **API Mocking**: MSW handles API mocking in development. Handlers are in `src/mocks/` organized by domain (e.g., `userHandlers.ts`, `tasksHandlers.ts`).
+- **SSR Safety**: This project uses TanStack Start with SSR. Browser-only globals (`document`, `window`, `navigator`) are unavailable in Node.js. Always use `isClient()` / `isServer()` from `~/utils/env` to guard such code. Never access browser globals at the module top level or synchronously during render.
 - **Data Fetching**: 
   - Page-level data: Fetched via TanStack Router `loader` functions (blocking, before page renders).
   - Component-level data: Fetched via `useEffect` with local state (non-blocking, shows loading states).
@@ -44,6 +45,13 @@ This file serves as a persistent memory for AI agents working on the Flux projec
 - **Type Imports**: Import types from `~/types` (e.g., `import { User, Task } from '~/types'`).
 - **Union Types**: Use union types for polymorphic content with strict type guards.
 - **Strict Fields**: Define strict required vs optional fields; use `?` for optional, never use `any`.
+- **SSR Safety**: NEVER access `document`, `window`, or `navigator` directly in services, utilities, or components without an SSR guard. ALWAYS use the helpers from `~/utils/env`:
+  ```typescript
+  import { isClient } from "~/utils/env";
+
+  if (!isClient()) return; // safe to use browser globals below
+  ```
+  Violating this causes a `ReferenceError: document is not defined` crash during server rendering.
 - **API Mocking**: 
   - All API endpoints must be mocked using MSW in development.
   - Create handlers in `src/mocks/{domain}Handlers.ts`.

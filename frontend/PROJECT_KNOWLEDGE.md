@@ -79,7 +79,8 @@ src/
 ├── styles/
 │   └── app.css         # Global styles & Tailwind @theme config
 ├── utils/              # Helper functions & constants
-│   ├── design-tokens.ts # (Deprecated? Checked, likely unused if CSS var based)
+│   ├── env.ts          # Execution context helpers (isClient, isServer)
+│   ├── date.ts         # Date formatting / manipulation helpers
 │   ├── cn.ts           # Class name merger utility
 │   └── seo.ts          # SEO meta tag generators
 └── routeTree.gen.ts    # Auto-generated route definition (DO NOT EDIT)
@@ -127,6 +128,16 @@ src/
   const profile = await userService.getProfile();
   ```
 - **Error Handling**: Services throw typed errors that can be caught by callers.
+
+### SSR Safety
+- **Context**: This project uses TanStack Start with SSR. Browser globals (`document`, `window`, `navigator`) are **not available** in Node.js during server rendering.
+- **Utility**: Use `isClient()` / `isServer()` from `~/utils/env` to guard any browser-only code:
+  ```typescript
+  import { isClient } from "~/utils/env";
+
+  if (!isClient()) return; // Safe to use document / window below
+  ```
+- **Rule**: Never access `document`, `window`, or `navigator` at the module's top level or synchronously during render. Always guard with `isClient()`.
 
 ### API Mocking
 - **MSW in Development**: All API endpoints are mocked using Mock Service Worker.

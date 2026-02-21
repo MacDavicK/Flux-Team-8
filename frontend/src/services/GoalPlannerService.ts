@@ -1,4 +1,5 @@
 import type { AgentResponse } from "~/types/notification";
+import type { GoalContext } from "~/types/goal";
 
 export type { GoalContext, PlanMilestone } from "~/types/goal";
 export type { AgentResponse };
@@ -8,11 +9,11 @@ class GoalPlannerService {
   async sendMessage(
     message: string,
     state: string,
-    context: any,
+    context: GoalContext,
   ): Promise<{
     response: AgentResponse;
     newState: string;
-    newContext: any;
+    newContext: GoalContext;
   }> {
     const response = await fetch("/api/goal-planner/message", {
       method: "POST",

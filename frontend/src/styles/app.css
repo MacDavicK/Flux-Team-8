@@ -547,3 +547,28 @@
 .animate-pulse-glow-opacity {
   animation: pulse-glow-opacity 4s ease-in-out infinite;
 }
+
+/* Input validation ring pulses */
+@keyframes pulse-ring-sage {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(92, 124, 102, 0);
+    --tw-ring-opacity: 0.6;
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(92, 124, 102, 0.1);
+    --tw-ring-opacity: 0.35;
+  }
+}
+
+@keyframes pulse-ring-error {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(194, 125, 102, 0);
+    --tw-ring-opacity: 0.6;
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(194, 125, 102, 0.1);
+    --tw-ring-opacity: 0.35;
+  }
+}

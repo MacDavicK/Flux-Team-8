@@ -31,8 +31,14 @@ const navItems: NavItem[] = [
   },
 ];
 
+const HIDDEN_ROUTES = ["/login", "/onboarding"];
+
 export function BottomNav() {
   const location = useLocation();
+
+  if (HIDDEN_ROUTES.includes(location.pathname)) {
+    return null;
+  }
 
   return (
     <nav className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-auto z-50">

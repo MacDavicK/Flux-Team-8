@@ -1,6 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Send, Sparkles } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { cn } from "~/utils/cn";
 
 interface ChatInputProps {
@@ -16,12 +16,14 @@ export function ChatInput({
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
+  const inputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (message.trim() && !disabled) {
       onSend(message.trim());
       setMessage("");
+      inputRef.current?.focus();
     }
   };
 
@@ -37,14 +39,15 @@ export function ChatInput({
     >
       <div
         className={cn(
-          "glass-bubble flex items-center gap-3 px-4 py-3",
-          "transition-all duration-200",
+          "glass-bubble flex items-center gap-3 px-4 py-3 min-h-[52px]",
+          "transition-shadow duration-200",
           isFocused && "shadow-lg ring-2 ring-sage/20",
         )}
       >
         <Sparkles className="w-5 h-5 text-sage/50 flex-shrink-0" />
 
         <input
+          ref={inputRef}
           type="text"
           value={message}
           onChange={(e) => setMessage(e.target.value)}
@@ -61,25 +64,27 @@ export function ChatInput({
           style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}
         />
 
-        <AnimatePresence>
-          {hasContent && (
-            <motion.button
-              type="submit"
-              initial={{ opacity: 0, scale: 0.5, x: -10 }}
-              animate={{ opacity: 1, scale: 1, x: 0 }}
-              exit={{ opacity: 0, scale: 0.5, x: -10 }}
-              whileTap={{ scale: 0.9 }}
-              className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center",
-                "bg-sage text-white transition-colors",
-                "hover:bg-sage-dark active:scale-95",
-              )}
-              disabled={disabled}
-            >
-              <Send className="w-4 h-4" />
-            </motion.button>
-          )}
-        </AnimatePresence>
+        <div className="w-8 h-8 flex-shrink-0">
+          <AnimatePresence>
+            {hasContent && (
+              <motion.button
+                type="submit"
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.5 }}
+                whileTap={{ scale: 0.9 }}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center",
+                  "bg-sage text-white transition-colors",
+                  "hover:bg-sage-dark active:scale-95",
+                )}
+                disabled={disabled}
+              >
+                <Send className="w-4 h-4" />
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
       </div>
     </motion.form>
   );

@@ -9,15 +9,15 @@ async function handleGoalPlannerMessage(request: Request) {
   const { message, state, context } = (await request.json()) as {
     message: string;
     state: string;
-    context: any;
+    context: Record<string, unknown>;
   };
 
   await delay(500);
 
   const input = message.toLowerCase();
   let newState = state;
-  const newContext = { ...context };
-  let response: any;
+  const newContext = { ...context } as Record<string, unknown>;
+  let response: Record<string, unknown> = {};
 
   // Decide which scenario we are in
   const isLocationScenario =
@@ -216,7 +216,7 @@ async function handleSimulationTrigger(request: Request) {
 
   await delay(500);
 
-  let response: any;
+  let response: Record<string, unknown> = {};
 
   if (trigger === "leaving_home") {
     response = {
@@ -248,6 +248,11 @@ async function handleSimulationTrigger(request: Request) {
         (task || "tomatoes") +
         ". Would you like to snooze this?",
       type: "call",
+    };
+  } else {
+    response = {
+      message: "Unknown trigger",
+      type: "text",
     };
   }
 

@@ -10,12 +10,24 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReflectionRouteImport } from './routes/reflection'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
 
 const ReflectionRoute = ReflectionRouteImport.update({
   id: '/reflection',
   path: '/reflection',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ChatRoute = ChatRouteImport.update({
@@ -32,30 +44,38 @@ const IndexRoute = IndexRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/reflection': typeof ReflectionRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/reflection': typeof ReflectionRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
+  '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/reflection': typeof ReflectionRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chat' | '/reflection'
+  fullPaths: '/' | '/chat' | '/login' | '/onboarding' | '/reflection'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chat' | '/reflection'
-  id: '__root__' | '/' | '/chat' | '/reflection'
+  to: '/' | '/chat' | '/login' | '/onboarding' | '/reflection'
+  id: '__root__' | '/' | '/chat' | '/login' | '/onboarding' | '/reflection'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChatRoute: typeof ChatRoute
+  LoginRoute: typeof LoginRoute
+  OnboardingRoute: typeof OnboardingRoute
   ReflectionRoute: typeof ReflectionRoute
 }
 
@@ -66,6 +86,20 @@ declare module '@tanstack/react-router' {
       path: '/reflection'
       fullPath: '/reflection'
       preLoaderRoute: typeof ReflectionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/chat': {
@@ -88,6 +122,8 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRoute,
+  LoginRoute: LoginRoute,
+  OnboardingRoute: OnboardingRoute,
   ReflectionRoute: ReflectionRoute,
 }
 export const routeTree = rootRouteImport

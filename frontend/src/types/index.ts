@@ -112,8 +112,21 @@ export {
 } from "./task";
 // User domain
 export type {
+  AuthStatusResponse,
+  Chronotype,
+  ExistingCommitment,
+  LocationLabels,
+  LoginRequest,
+  LoginResponse,
+  OnboardingChatResponse,
+  OnboardingProfile,
+  OnboardingStatusResponse,
+  OnboardingStep,
   Preference,
   Profile,
+  SignupRequest,
+  SignupResponse,
+  SleepWindow,
   User,
   UserEnergyAuraResponse,
   UserFocusDistributionResponse,
@@ -121,5 +134,6 @@ export type {
   UserStatsResponse,
   UserWeeklyInsightResponse,
   WeeklyStatsPill,
+  WorkHours,
 } from "./user";
 export { ColorTheme as UserColorTheme } from "./user";

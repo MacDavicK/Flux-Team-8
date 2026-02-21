@@ -1,6 +1,12 @@
 /// <reference types="vite/client" />
-import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import { useState } from "react";
+import {
+  createRootRoute,
+  HeadContent,
+  Scripts,
+  useLocation,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { SimulationProvider, useSimulation } from "~/agents/SimulationContext";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
 import { DemoPanel } from "~/components/demo/DemoPanel";
@@ -8,6 +14,7 @@ import { NotificationCenter } from "~/components/demo/NotificationCenter";
 import { DemoButton } from "~/components/flow/v2/DemoButton";
 import { NotFound } from "~/components/NotFound";
 import { SplashScreen } from "~/components/splash/SplashScreen";
+import { AuthProvider, useAuth } from "~/contexts/AuthContext";
 import { goalPlannerService } from "~/services/GoalPlannerService";
 import appCss from "~/styles/app.css?url";
 import { seo } from "~/utils/seo";
@@ -53,20 +60,45 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <SimulationProvider>
-      <RootDocument>{children}</RootDocument>
-    </SimulationProvider>
+    <AuthProvider>
+      <SimulationProvider>
+        <RootDocument>{children}</RootDocument>
+      </SimulationProvider>
+    </AuthProvider>
   );
 }
 
 import { FluxNotificationModal } from "~/components/modals/FluxNotificationModal";
 
 function RootDocument({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const location = useLocation();
   const [isDemoOpen, setIsDemoOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
   const { addNotification, setEscalationSpeed, startEscalation } =
     useSimulation();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+
+  const isFlowPage = location.pathname === "/";
+  const showDemoUI = isFlowPage && !showSplash;
+
+  useEffect(() => {
+    if (authLoading || showSplash) return;
+
+    const currentPath = window.location.pathname;
+
+    if (!isAuthenticated && currentPath !== "/login") {
+      navigate({ to: "/login" });
+    } else if (
+      isAuthenticated &&
+      user &&
+      !user.onboarded &&
+      currentPath !== "/onboarding"
+    ) {
+      navigate({ to: "/onboarding" });
+    }
+  }, [authLoading, isAuthenticated, user, showSplash, navigate]);
 
   const handleSplashComplete = () => {
     setShowSplash(false);
@@ -96,27 +128,31 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <main className="relative min-h-screen bg-offwhite overflow-x-hidden">
           {children}
 
-          <NotificationCenter />
+          {showDemoUI && (
+            <>
+              <NotificationCenter />
 
-          <DemoButton onClick={() => setIsDemoOpen(true)} />
+              <DemoButton onClick={() => setIsDemoOpen(true)} />
 
-          <DemoPanel
-            isOpen={isDemoOpen}
-            onClose={() => setIsDemoOpen(false)}
-            onTimeWarp={() => {
-              setIsDemoOpen(false);
-              setIsNotificationOpen(true);
-            }}
-            onTravelMode={() => console.log("Travel mode activated")}
-            onSimulateLeavingHome={handleSimulateLeavingHome}
-            onSimulateNearStore={handleSimulateNearStore}
-            onEscalationSpeedChange={setEscalationSpeed}
-          />
+              <DemoPanel
+                isOpen={isDemoOpen}
+                onClose={() => setIsDemoOpen(false)}
+                onTimeWarp={() => {
+                  setIsDemoOpen(false);
+                  setIsNotificationOpen(true);
+                }}
+                onTravelMode={() => console.log("Travel mode activated")}
+                onSimulateLeavingHome={handleSimulateLeavingHome}
+                onSimulateNearStore={handleSimulateNearStore}
+                onEscalationSpeedChange={setEscalationSpeed}
+              />
 
-          <FluxNotificationModal
-            isOpen={isNotificationOpen}
-            onClose={() => setIsNotificationOpen(false)}
-          />
+              <FluxNotificationModal
+                isOpen={isNotificationOpen}
+                onClose={() => setIsNotificationOpen(false)}
+              />
+            </>
+          )}
         </main>
         <Scripts />
       </body>
