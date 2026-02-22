@@ -8,6 +8,12 @@
 
 set -e
 
+# ---------- Flags ----------
+AUTO_YES=false
+if [ "${1:-}" = "--yes" ] || [ "${1:-}" = "-y" ]; then
+  AUTO_YES=true
+fi
+
 # ---------- Colored output helpers ----------
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -57,41 +63,87 @@ fi
 echo ""
 echo "--- Starting Supabase ---"
 
+CONTAINER_NAME="supabase_db_Flux-Team-8"
+
 if supabase status &> /dev/null 2>&1; then
-  info "Supabase is already running"
+  DB_RUNNING="$(docker inspect -f '{{.State.Running}}' "$CONTAINER_NAME" 2>/dev/null || echo "false")"
+  if [ "$DB_RUNNING" = "true" ]; then
+    info "Supabase is already running"
+  else
+    warn "Supabase is partially running but DB container is not healthy. Restarting stack..."
+    supabase stop >/dev/null 2>&1 || true
+    supabase start
+    info "Supabase local development stack restarted"
+  fi
 else
   echo "Starting Supabase (first run downloads ~2-3 GB of Docker images)..."
-  supabase start
-  info "Supabase local development stack started"
+  if supabase start; then
+    info "Supabase local development stack started"
+  else
+    warn "Supabase start failed (likely partial previous state). Forcing stop + retry..."
+    supabase stop >/dev/null 2>&1 || true
+
+    # Remove stale Supabase containers that can cause name-collision errors
+    STALE_CONTAINERS="$(docker ps -a --format '{{.Names}}' | awk '/^supabase_.*_Flux-Team-8$/ {print $1}')"
+    if [ -n "$STALE_CONTAINERS" ]; then
+      echo "$STALE_CONTAINERS" | xargs -I {} docker rm -f {} >/dev/null 2>&1 || true
+      warn "Removed stale Supabase containers and retrying startup..."
+    fi
+
+    supabase start
+    info "Supabase local development stack started (after recovery)"
+  fi
 fi
 
 # ---------- 4. Apply migrations ----------
 echo ""
 echo "--- Applying Migrations ---"
 
-CONTAINER_NAME="supabase_db_Flux-Team-8"
+# Apply every migration in lexical order (timestamp-prefixed files)
+for migration in $(ls supabase/migrations/*.sql | sort); do
+  migration_file="$(basename "$migration")"
+  docker cp "$migration" "$CONTAINER_NAME:/tmp/$migration_file"
+  docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U postgres -f "/tmp/$migration_file"
+  info "Applied migration: $migration_file"
+done
+info "All database migrations applied"
 
-# Migration script uses IF NOT EXISTS — safe to run every time
-docker cp supabase/migrations/*_create_mvp_tables.sql "$CONTAINER_NAME:/tmp/create_mvp_tables.sql"
-docker exec "$CONTAINER_NAME" psql -U postgres -f /tmp/create_mvp_tables.sql
-info "Database migrations applied"
-
-# ---------- 5. Seed test data ----------
+# ---------- 5. Truncate + seed test data ----------
 echo ""
-echo "--- Checking Test Data ---"
+echo "--- Seed Test Data (Truncate First) ---"
 
 SEED_FILE="supabase/scripts/seed_test_data.sql"
-USER_COUNT=$(docker exec "$CONTAINER_NAME" psql -U postgres -tAc "SELECT count(*) FROM users;")
+TRUNCATE_FILE="supabase/scripts/truncate_tables.sql"
 
-if [ "$USER_COUNT" -gt 0 ]; then
-  info "Test data already present ($USER_COUNT users) — skipping seed"
-elif [ -f "$SEED_FILE" ]; then
-  echo "Seeding test data..."
-  docker cp "$SEED_FILE" "$CONTAINER_NAME:/tmp/seed_test_data.sql"
-  docker exec "$CONTAINER_NAME" psql -U postgres -f /tmp/seed_test_data.sql
-  info "Test data seeded"
-else
+if [ ! -f "$SEED_FILE" ]; then
   warn "Seed file not found at $SEED_FILE — skipping"
+elif [ ! -f "$TRUNCATE_FILE" ]; then
+  warn "Truncate file not found at $TRUNCATE_FILE — skipping seed for safety"
+else
+  echo ""
+  warn "About to TRUNCATE all canonical tables and reseed test data."
+  warn "This will DELETE existing local data in Supabase."
+
+  CONFIRM="no"
+  if [ "$AUTO_YES" = true ]; then
+    CONFIRM="yes"
+  else
+    printf "Type 'yes' to continue: "
+    read -r CONFIRM
+  fi
+
+  if [ "$CONFIRM" = "yes" ]; then
+    echo "Truncating tables..."
+    docker cp "$TRUNCATE_FILE" "$CONTAINER_NAME:/tmp/truncate_tables.sql"
+    docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U postgres -f /tmp/truncate_tables.sql
+
+    echo "Seeding test data..."
+    docker cp "$SEED_FILE" "$CONTAINER_NAME:/tmp/seed_test_data.sql"
+    docker exec "$CONTAINER_NAME" psql -v ON_ERROR_STOP=1 -U postgres -f /tmp/seed_test_data.sql
+    info "Tables truncated and test data seeded"
+  else
+    warn "Seed skipped by user confirmation."
+  fi
 fi
 
 # ---------- 6. Done ----------
@@ -107,6 +159,8 @@ echo "  supabase status   — Show local URLs and keys"
 echo "  supabase stop     — Stop all Supabase containers"
 echo "  supabase start    — Restart (fast after first run)"
 echo "  supabase db reset — Reset database and re-apply migrations"
+echo "  bash scripts/supabase_setup.sh --yes  — Non-interactive truncate + seed"
+echo "  See validation:   supabase/scripts/VALIDATION_CHECKLIST.md"
 echo ""
 echo "Studio:  http://127.0.0.1:54323"
 echo "API:     http://127.0.0.1:54321/rest/v1"

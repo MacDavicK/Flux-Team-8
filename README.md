@@ -212,19 +212,23 @@ After `supabase start` (or as part of initial setup), run:
 # Apply migrations (creates all tables)
 supabase db reset
 
-# Load sample data for development
-docker cp supabase/scripts/seed_test_data.sql supabase_db_Flux-Team-8:/tmp/seed_test_data.sql
-docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/seed_test_data.sql
+# Preferred (safe): includes warning + confirmation, truncates first, then seeds
+bash scripts/supabase_setup.sh
+
+# Non-interactive CI/dev automation:
+bash scripts/supabase_setup.sh --yes
 ```
 
-This seeds 3 users, 4 goals, 8 milestones, 7 tasks, 3 conversations, and demo flags — enough to exercise every feature locally.
+This seeds canonical Flux-Claude objects: users, goals, tasks, patterns, conversations, and notification logs — enough to exercise local API and analytics flows.
 
 **Other database utility scripts:**
 
 | Script | Purpose | Command |
 |--------|---------|---------|
-| `truncate_tables.sql` | Delete all rows, keep schema | `docker cp supabase/scripts/truncate_tables.sql supabase_db_Flux-Team-8:/tmp/truncate_tables.sql && docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/truncate_tables.sql` |
-| `drop_tables.sql` | Drop all tables and enums | `docker cp supabase/scripts/drop_tables.sql supabase_db_Flux-Team-8:/tmp/drop_tables.sql && docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/drop_tables.sql` |
+| `truncate_tables.sql` | Delete all rows, keep schema | `read -p "This deletes all local DB data. Type yes to continue: " ans && [ "$ans" = "yes" ] && docker cp supabase/scripts/truncate_tables.sql supabase_db_Flux-Team-8:/tmp/truncate_tables.sql && docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/truncate_tables.sql` |
+| `drop_tables.sql` | Drop canonical tables + analytics views | `read -p "This drops tables/views from local DB. Type yes to continue: " ans && [ "$ans" = "yes" ] && docker cp supabase/scripts/drop_tables.sql supabase_db_Flux-Team-8:/tmp/drop_tables.sql && docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/drop_tables.sql` |
+
+Validation checklist: `supabase/scripts/VALIDATION_CHECKLIST.md`
 
 ### Manual Installation
 
@@ -253,9 +257,8 @@ cd ..
 supabase start
 supabase db reset
 
-# Seed test data (optional but recommended)
-docker cp supabase/scripts/seed_test_data.sql supabase_db_Flux-Team-8:/tmp/seed_test_data.sql
-docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/seed_test_data.sql
+# Seed test data (optional but recommended; prompts before destructive truncate)
+bash scripts/supabase_setup.sh
 ```
 
 ---
@@ -394,117 +397,132 @@ sequenceDiagram
 
 ## Database Schema
 
-### Custom Enum Types
-
-| Type | Values |
-|------|--------|
-| `task_state` | `scheduled`, `drifted`, `completed`, `missed` |
-| `task_priority` | `standard`, `important`, `must-not-miss` |
-| `trigger_type` | `time`, `on_leaving_home` |
-
 ### Tables
 
-**`users`** — User profiles and preferences.
+**`users`** — User identity and onboarding/preferences payloads.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | uuid | PK, auto-generated |
-| `name` | text | required |
 | `email` | text | required, unique |
-| `preferences` | jsonb | default `{}` |
-| `demo_mode` | boolean | default `false` |
+| `onboarded` | boolean | default `false` |
+| `profile` | jsonb | onboarding answers and schedule profile |
+| `notification_preferences` | jsonb | phone/WhatsApp/reminder/escalation settings |
 | `created_at` | timestamptz | default `now()` |
 
-**`goals`** — User goals with category and timeline.
+**`goals`** — Goal records with micro-goal pipeline support.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | uuid | PK, auto-generated |
 | `user_id` | uuid | FK → users, CASCADE |
 | `title` | text | required |
-| `category` | text | |
-| `timeline` | text | |
-| `status` | text | default `'active'` |
+| `description` | text | nullable |
+| `class_tags` | text[] | classifier tags |
+| `status` | text | CHECK: `active`, `completed`, `abandoned`, `pipeline` |
+| `parent_goal_id` | uuid | self-FK for pipeline chains, nullable |
+| `pipeline_order` | int | sequence in a chain, nullable |
+| `activated_at` | timestamptz | nullable |
+| `completed_at` | timestamptz | nullable |
+| `target_weeks` | int | default `6` |
+| `plan_json` | jsonb | full negotiated plan payload |
 | `created_at` | timestamptz | default `now()` |
 
-**`milestones`** — Weekly milestones within a goal.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | PK, auto-generated |
-| `goal_id` | uuid | FK → goals, CASCADE |
-| `week_number` | integer | required |
-| `title` | text | required |
-| `status` | text | default `'pending'` |
-| `created_at` | timestamptz | default `now()` |
-
-**`tasks`** — Time-blocked actions linked to goals and milestones.
+**`tasks`** — Time/location-triggered tasks for reminders and completion tracking.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | uuid | PK, auto-generated |
 | `user_id` | uuid | FK → users, CASCADE |
-| `goal_id` | uuid | FK → goals, CASCADE |
-| `milestone_id` | uuid | FK → milestones, CASCADE, **nullable** |
+| `goal_id` | uuid | FK → goals, nullable (`ON DELETE SET NULL`) |
 | `title` | text | required |
-| `start_time` | timestamptz | |
-| `end_time` | timestamptz | |
-| `state` | task_state | default `'scheduled'` |
-| `priority` | task_priority | default `'standard'` |
-| `trigger_type` | trigger_type | default `'time'` |
-| `is_recurring` | boolean | default `false` |
-| `calendar_event_id` | varchar(255) | **nullable**, indexed — external calendar sync |
+| `description` | text | nullable |
+| `status` | text | CHECK: `pending`, `done`, `missed`, `rescheduled`, `cancelled` |
+| `scheduled_at` | timestamptz | primary schedule timestamp |
+| `duration_minutes` | int | nullable |
+| `trigger_type` | text | CHECK: `time`, `location` |
+| `location_trigger` | text | nullable (e.g. `away_from_home`) |
+| `reminder_sent_at` | timestamptz | nullable |
+| `whatsapp_sent_at` | timestamptz | nullable |
+| `call_sent_at` | timestamptz | nullable |
+| `completed_at` | timestamptz | nullable |
+| `recurrence_rule` | text | nullable RRULE string |
+| `shared_with_goal_ids` | uuid[] | nullable multi-goal linkage |
 | `created_at` | timestamptz | default `now()` |
 
-**`conversations`** — AI conversation history per goal.
+**`patterns`** — Learned behavior summaries for scheduling optimization.
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | uuid | PK, auto-generated |
 | `user_id` | uuid | FK → users, CASCADE |
-| `goal_id` | uuid | FK → goals, CASCADE |
-| `messages` | jsonb | default `[]`, array of `{role, text}` objects |
-| `status` | text | default `'open'` |
+| `pattern_type` | text | e.g. `time_avoidance`, `completion_streak` |
+| `description` | text | human-readable summary |
+| `data` | jsonb | structured pattern payload |
+| `confidence` | float | 0.0-1.0 confidence |
 | `created_at` | timestamptz | default `now()` |
+| `updated_at` | timestamptz | default `now()`, auto-updated by trigger |
 
-**`demo_flags`** — Per-user demo mode controls (one row per user).
+**`conversations`** — LangGraph conversation thread metadata.
 
 | Column | Type | Notes |
 |--------|------|-------|
-| `user_id` | uuid | PK, FK → users, CASCADE |
-| `virtual_now` | timestamptz | simulated current time for demo |
-| `escalation_speed` | float | default `1.0` |
+| `id` | uuid | PK, auto-generated |
+| `user_id` | uuid | FK → users |
+| `langgraph_thread_id` | text | unique, required |
+| `context_type` | text | CHECK: `onboarding`, `goal`, `task`, `reschedule` |
+| `created_at` | timestamptz | default `now()` |
+| `last_message_at` | timestamptz | nullable |
+
+**`notification_log`** — Audit log for push/WhatsApp/call dispatch + responses.
+
+| Column | Type | Notes |
+|--------|------|-------|
+| `id` | uuid | PK, auto-generated |
+| `task_id` | uuid | FK → tasks |
+| `channel` | text | CHECK: `push`, `whatsapp`, `call` |
+| `sent_at` | timestamptz | nullable |
+| `response` | text | nullable (`done`, `reschedule`, `missed`, `no_response`) |
+| `responded_at` | timestamptz | nullable |
 
 ### Entity Relationships
 
 ```
 users
- ├── goals (1:N)
- │    ├── milestones (1:N)
- │    ├── tasks (1:N)
- │    └── conversations (1:N)
- ├── tasks (1:N)
- └── demo_flags (1:1)
+ ├── goals (1:N, ON DELETE CASCADE)
+ ├── tasks (1:N, ON DELETE CASCADE)
+ ├── patterns (1:N, ON DELETE CASCADE)
+ └── conversations (1:N)
+
+goals
+ └── tasks (1:N, ON DELETE SET NULL via tasks.goal_id)
+
+tasks
+ └── notification_log (1:N)
 ```
 
-All foreign keys use `ON DELETE CASCADE` — deleting a user removes all their data.
+### Materialized Views
 
-### Indexes
+- `user_weekly_stats`
+- `missed_by_category`
 
-Foreign key columns are indexed for query performance:
+### Indexes (key examples)
 
 - `idx_goals_user_id`
-- `idx_milestones_goal_id`
-- `idx_tasks_user_id`, `idx_tasks_goal_id`, `idx_tasks_milestone_id`, `idx_tasks_calendar_event_id`
-- `idx_conversations_user_id`, `idx_conversations_goal_id`
+- `idx_goals_parent_goal_id`
+- `idx_tasks_user_id`, `idx_tasks_goal_id`, `idx_tasks_status`, `idx_tasks_scheduled_at`
+- `idx_tasks_user_scheduled_status` (composite for `/tasks/today` and notifier polling)
+- `idx_patterns_user_id`, `idx_patterns_pattern_type`, `idx_patterns_updated_at`
+- `idx_conversations_user_id`, `idx_conversations_last_message_at`
+- `idx_notification_log_task_id`, `idx_notification_log_sent_at`, `idx_notification_log_response`
 
 ### Design Decisions
 
 - **UUIDs everywhere** — Supabase standard; avoids sequential ID leakage.
-- **PostgreSQL enums** for task state/priority/trigger — enforces valid values at the DB level.
-- **jsonb for preferences and messages** — flexible schema for evolving fields without migrations.
-- **`demo_flags` as a separate table** — keeps demo concerns out of the main `users` table; PK is `user_id` enforcing one row per user.
-- **`IF NOT EXISTS` guards** in the migration — safe to re-run without errors.
+- **CHECK constraints over custom enums** — easier migration evolution while preserving valid state sets.
+- **jsonb for profile/preferences/pattern payloads** — flexible evolution for agent-driven metadata.
+- **RLS enabled on all user-data tables** with owner-scoped policies.
+- **Legacy objects removed** (`milestones`, `demo_flags`, old enum types) to match canonical Flux-Claude schema.
 
 ---
 

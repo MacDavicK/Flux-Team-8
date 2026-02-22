@@ -3,7 +3,8 @@
 # Flux — Development Environment Setup (macOS / Linux)
 # Installs frontend and backend dependencies, copies .env files,
 # and validates that required tools (Node.js, Python) are present.
-# For Supabase setup, run: bash scripts/supabase_setup.sh
+# For Supabase setup (applies all migrations + canonical seed), run:
+# bash scripts/supabase_setup.sh
 # Usage:  bash scripts/setup.sh
 # ============================================================
 
@@ -108,6 +109,7 @@ echo "=============================="
 echo ""
 echo "Next steps:"
 echo "  1. Set up Supabase:  bash scripts/supabase_setup.sh"
+echo "     (applies all SQL migrations in supabase/migrations/)"
 echo "  2. Fill in API keys in backend/.env"
 echo "  3. Start frontend:   cd frontend && npm run dev"
 echo "  4. Start backend:    cd backend && source venv/bin/activate && make dev"
