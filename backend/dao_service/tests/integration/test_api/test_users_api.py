@@ -4,7 +4,7 @@ import pytest
 import pytest_asyncio
 from httpx import AsyncClient
 
-from tests.conftest import make_user_data
+from dao_service.tests.conftest import make_user_data
 
 
 @pytest.mark.asyncio

@@ -4,11 +4,11 @@
 #
 # Runs unit tests, integration tests, or both with coverage.
 #
-# Usage:
-#   bash scripts/run_tests.sh unit         # Unit tests only (no DB needed)
-#   bash scripts/run_tests.sh integration  # Integration tests (needs Supabase)
-#   bash scripts/run_tests.sh all          # Both with coverage report
-#   bash scripts/run_tests.sh              # Defaults to 'all'
+# Usage (from project root):
+#   bash backend/dao_service/scripts/run_tests.sh unit         # Unit tests only (no DB needed)
+#   bash backend/dao_service/scripts/run_tests.sh integration  # Integration tests (needs Supabase)
+#   bash backend/dao_service/scripts/run_tests.sh all          # Both with coverage report
+#   bash backend/dao_service/scripts/run_tests.sh              # Defaults to 'all'
 # ============================================================
 
 set -euo pipefail
@@ -29,7 +29,7 @@ MODE="${1:-all}"
 
 # Determine project paths
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
 
 cd "$BACKEND_DIR"
@@ -53,7 +53,7 @@ check_supabase() {
     if ! docker ps --format '{{.Names}}' | grep -q "$SUPABASE_CONTAINER"; then
         error "Supabase database container is not running ($SUPABASE_CONTAINER)."
         error "Start it with: cd $PROJECT_ROOT && supabase start"
-        error "Or run: bash scripts/setup_backend.sh"
+        error "Or run: bash backend/dao_service/scripts/setup_dao.sh"
         exit 1
     fi
     success "Supabase database is running"
@@ -70,18 +70,18 @@ case "$MODE" in
     unit)
         info "Running unit tests..."
         echo ""
-        pytest tests/unit/ -v --tb=short || EXIT_CODE=$?
+        pytest dao_service/tests/unit/ -v --tb=short || EXIT_CODE=$?
         ;;
     integration)
         check_supabase
         info "Running integration tests..."
         echo ""
-        pytest tests/integration/ -v --tb=short || EXIT_CODE=$?
+        pytest dao_service/tests/integration/ -v --tb=short || EXIT_CODE=$?
         ;;
     all)
         info "Running unit tests..."
         echo ""
-        pytest tests/unit/ -v --tb=short || EXIT_CODE=$?
+        pytest dao_service/tests/unit/ -v --tb=short || EXIT_CODE=$?
 
         if [ $EXIT_CODE -ne 0 ]; then
             error "Unit tests failed. Skipping integration tests."
@@ -90,19 +90,19 @@ case "$MODE" in
             check_supabase
             info "Running integration tests..."
             echo ""
-            pytest tests/integration/ -v --tb=short || EXIT_CODE=$?
+            pytest dao_service/tests/integration/ -v --tb=short || EXIT_CODE=$?
         fi
 
         if [ $EXIT_CODE -eq 0 ]; then
             echo ""
             info "Running full suite with coverage..."
             echo ""
-            pytest tests/ -v --cov=dao_service --cov-report=term-missing --tb=short || EXIT_CODE=$?
+            pytest dao_service/tests/ -v --cov=dao_service --cov-report=term-missing --tb=short || EXIT_CODE=$?
         fi
         ;;
     *)
         error "Unknown mode: $MODE"
-        echo "Usage: bash scripts/run_tests.sh [unit|integration|all]"
+        echo "Usage: bash backend/dao_service/scripts/run_tests.sh [unit|integration|all]"
         exit 1
         ;;
 esac

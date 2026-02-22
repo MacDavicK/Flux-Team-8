@@ -18,7 +18,8 @@
   "search.exclude": {
     "**/node_modules": true,
     "**/dist": true,
-    "**/.venv": true
+    "**/.venv": true,
+    "**/.claude": true
   },
   "vscode-nmake-tools.workspaceBuildDirectories": [
     "."
@@ -26,5 +27,11 @@
   "vscode-nmake-tools.installRazzleSourcesFormatterExtension": false,
   "vscode-nmake-tools.installOsRepoRustHelperExtension": false,
   "python-envs.defaultEnvManager": "ms-python.python:system",
-  "python-envs.pythonProjects": []
+  "python-envs.pythonProjects": [
+    { "projectFolder": "${workspaceFolder}/backend" }
+  ],
+
+  // Point Pylance at the backend venv and source root
+  "python.analysis.extraPaths": ["${workspaceFolder}/backend"],
+  "python.analysis.typeCheckingMode": "basic"
 }

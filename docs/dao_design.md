@@ -1,7 +1,7 @@
 # Flux Data Access Layer Design
 
-**Document Version**: 1.1
-**Date**: 2026-02-15
+**Document Version**: 1.2
+**Date**: 2026-02-22
 **Status**: Design Approved
 
 ---
@@ -51,7 +51,7 @@ This document outlines the architecture for Flux's **Data Access Microservice** 
 
 **Example**:
 ```python
-# app/core/database.py
+# dao_service/core/database.py
 class DatabaseSession(Protocol):
     async def __aenter__(self): ...
     async def __aexit__(self, exc_type, exc_val, exc_tb): ...
@@ -560,14 +560,13 @@ sequenceDiagram
 ### Core Dependencies
 
 ```python
-# backend/requirements.txt
-fastapi==0.115.0           # Async web framework with OpenAPI support
-uvicorn[standard]==0.32.0  # ASGI server
-sqlalchemy[asyncio]==2.0.35  # Modern ORM with async/await
-asyncpg==0.29.0            # Fastest async PostgreSQL driver
-alembic==1.13.3            # Database migration tool
-pydantic==2.9.2            # Fast validation and serialization
-pydantic-settings==2.6.0   # Environment variable management
+# backend/dao_service/requirements.txt
+fastapi==0.115.6           # Async web framework with OpenAPI support
+uvicorn[standard]==0.34.0  # ASGI server
+sqlalchemy[asyncio]==2.0.38  # Modern ORM with async/await
+asyncpg==0.31.0            # Fastest async PostgreSQL driver
+pydantic==2.10.4           # Fast validation and serialization
+pydantic-settings==2.7.1   # Environment variable management
 python-dotenv==1.0.1       # .env file loading
 python-json-logger==2.0.7  # Structured logging
 ```
@@ -586,7 +585,7 @@ python-json-logger==2.0.7  # Structured logging
 
 ```
 backend/
-├── dao_service/                          # Application root (DAO microservice)
+├── dao_service/                          # DAO microservice root
 │   ├── __init__.py
 │   ├── main.py                          # FastAPI application entry
 │   ├── config.py                        # Pydantic Settings
@@ -601,20 +600,20 @@ backend/
 │   │   ├── __init__.py
 │   │   ├── base.py                      # Declarative base, mixins
 │   │   ├── enums.py                     # Python Enum classes
-│   │   ├── user_model.py               # User ORM model
-│   │   ├── goal_model.py               # Goal ORM model
-│   │   ├── milestone_model.py          # Milestone ORM model
-│   │   ├── task_model.py               # Task ORM model (with calendar_event_id)
-│   │   ├── conversation_model.py       # Conversation ORM model
-│   │   └── demo_flag_model.py          # DemoFlag ORM model
+│   │   ├── user_model.py
+│   │   ├── goal_model.py
+│   │   ├── milestone_model.py
+│   │   ├── task_model.py                # Includes calendar_event_id
+│   │   ├── conversation_model.py
+│   │   └── demo_flag_model.py
 │   │
 │   ├── schemas/                         # Pydantic DTO layer
 │   │   ├── __init__.py
-│   │   ├── base.py                      # Base schemas, mixins
+│   │   ├── base.py
 │   │   ├── enums.py                     # Pydantic-compatible enums
 │   │   ├── pagination.py               # PaginatedResponse generic wrapper
 │   │   ├── error.py                    # ErrorDetail response schema
-│   │   ├── user.py                      # UserDTO, UserCreateDTO, UserUpdateDTO
+│   │   ├── user.py
 │   │   ├── goal.py                      # GoalDTO, GoalWithRelationsDTO
 │   │   ├── milestone.py
 │   │   ├── task.py                      # TaskDTO with calendar_event_id
@@ -623,8 +622,7 @@ backend/
 │   │
 │   ├── dao/                             # Data Access Object layer
 │   │   ├── __init__.py
-│   │   ├── dao_base.py                  # BaseDAOProtocol
-│   │   ├── dao_protocols.py             # Abstract DAO interfaces
+│   │   ├── dao_protocols.py             # Abstract DAO interfaces (Protocol-based)
 │   │   ├── dao_factory.py               # DaoFactoryProtocol
 │   │   ├── dao_registry.py              # Framework selection logic
 │   │   │
@@ -654,32 +652,51 @@ backend/
 │   │   ├── dao_milestone_service.py
 │   │   └── dao_conversation_service.py
 │   │
-│   └── api/                             # FastAPI routes
-│       ├── __init__.py
-│       ├── deps.py                      # Dependencies (get_db, verify_service_key)
-│       └── v1/
-│           ├── __init__.py
-│           ├── users_api.py
-│           ├── goals_api.py
-│           ├── tasks_api.py
-│           ├── milestones_api.py
-│           ├── conversations_api.py
-│           └── demo_flags_api.py
+│   ├── api/                             # FastAPI routes
+│   │   ├── __init__.py
+│   │   ├── deps.py                      # Dependencies (get_db, verify_service_key)
+│   │   └── v1/
+│   │       ├── __init__.py
+│   │       ├── users_api.py
+│   │       ├── goals_api.py
+│   │       ├── tasks_api.py
+│   │       ├── milestones_api.py
+│   │       ├── conversations_api.py
+│   │       └── demo_flags_api.py
+│   │
+│   ├── tests/                           # DAO-service tests (moved from backend/tests/)
+│   │   ├── __init__.py
+│   │   ├── conftest.py                  # PostgreSQL fixtures + data factories
+│   │   ├── unit/
+│   │   │   ├── __init__.py
+│   │   │   └── test_schemas/            # DTO validation tests (no DB)
+│   │   └── integration/
+│   │       ├── __init__.py
+│   │       └── test_api/                # API endpoint tests (needs Supabase)
+│   │
+│   ├── scripts/                         # DAO-service scripts
+│   │   ├── build_and_test.sh            # Full build + test pipeline with HTML report
+│   │   ├── run_tests.sh                 # Run tests only
+│   │   └── setup_dao.sh                 # Environment setup & dependency install
+│   │
+│   ├── requirements.txt                 # DAO-service production dependencies
+│   └── requirements-dev.txt             # DAO-service development/test dependencies
 │
-├── tests/
-│   ├── conftest.py                      # PostgreSQL fixtures + data factories
-│   ├── unit/
-│   │   └── test_schemas/                # DTO validation tests (no DB)
-│   └── integration/
-│       └── test_api/                    # API endpoint tests (needs Supabase)
+├── tests/                               # Legacy app/ tests (non-DAO)
+│   ├── conftest.py                      # Legacy fixtures only (app_client, mock_supabase)
+│   ├── test_goal_planner_agent.py
+│   ├── test_goal_service.py
+│   ├── test_goals_router.py
+│   └── test_schemas.py
 │
 ├── Dockerfile                           # Service-specific Docker image
 ├── .dockerignore
 ├── docker-compose.dao-service.yml       # Service-specific compose (internal network)
 ├── Makefile                             # Service-specific build commands
-├── requirements.txt                     # Production dependencies
-├── requirements-dev.txt                 # Development/test dependencies
-└── pyproject.toml                       # pytest configuration
+├── pytest.ini                           # testpaths = tests dao_service/tests
+├── pyproject.toml                       # pytest + tool configuration
+├── requirements.txt                     # Full backend production dependencies
+└── requirements-dev.txt                 # Full backend development dependencies
 ```
 
 ---
@@ -692,7 +709,7 @@ backend/
 
 **DatabaseSession Protocol** (enables ORM switching):
 ```python
-# app/core/database.py
+# dao_service/core/database.py
 from typing import Protocol
 
 class DatabaseSession(Protocol):
@@ -711,7 +728,7 @@ class DatabaseSession(Protocol):
 
 **SQLAlchemy Implementation**:
 ```python
-# app/core/database.py (continued)
+# dao_service/core/database.py (continued)
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
 from sqlalchemy.ext.asyncio import AsyncSession as SQLAlchemyAsyncSession
 
@@ -758,15 +775,15 @@ When switching from SQLAlchemy to another ORM (e.g., Tortoise):
 
 | Layer | Changes Required? | Details |
 |-------|:-:|---------|
-| ORM Models (`app/models/`) | **Yes** | Rewrite for target ORM |
-| DAO Implementations (`app/dao/impl/`) | **Yes** | New `impl/tortoise/` directory |
-| Database Connection (`app/core/database.py`) | **Yes** | Target ORM's connection setup |
-| DAO Factory (`app/dao/factories/`) | **Yes** | New `dao_tortoise_factory.py` |
-| DAO Registry (`app/dao/dao_registry.py`) | **Minimal** | Register new factory |
-| DAO Protocols (`app/dao/dao_protocols.py`) | **No** | Unchanged |
-| DTOs / Schemas (`app/schemas/`) | **No** | Unchanged |
-| Services (`app/services/`) | **No** | Unchanged |
-| API Layer (`app/api/`) | **No** | Unchanged |
+| ORM Models (`dao_service/models/`) | **Yes** | Rewrite for target ORM |
+| DAO Implementations (`dao_service/dao/impl/`) | **Yes** | New `impl/tortoise/` directory |
+| Database Connection (`dao_service/core/database.py`) | **Yes** | Target ORM's connection setup |
+| DAO Factory (`dao_service/dao/factories/`) | **Yes** | New `dao_tortoise_factory.py` |
+| DAO Registry (`dao_service/dao/dao_registry.py`) | **Minimal** | Register new factory |
+| DAO Protocols (`dao_service/dao/dao_protocols.py`) | **No** | Unchanged |
+| DTOs / Schemas (`dao_service/schemas/`) | **No** | Unchanged |
+| Services (`dao_service/services/`) | **No** | Unchanged |
+| API Layer (`dao_service/api/`) | **No** | Unchanged |
 
 The service layer, API layer, and DTOs require **zero changes** — that is the key achievement of this architecture.
 
@@ -778,7 +795,7 @@ The service layer, API layer, and DTOs require **zero changes** — that is the 
 
 **Task Model Example** (with calendar_event_id):
 ```python
-# app/models/task.py
+# dao_service/models/task_model.py
 from sqlalchemy import Column, String, ForeignKey, ENUM
 from sqlalchemy.orm import Mapped, relationship
 
@@ -814,7 +831,7 @@ class Task(Base, UUIDMixin, TimestampMixin):
 
 **Task DTO Pattern**:
 ```python
-# app/schemas/task.py
+# dao_service/schemas/task.py
 
 class TaskBase(BaseSchema):
     """Shared attributes."""
@@ -861,7 +878,7 @@ class TaskDTO(TaskBase, IDMixin, TimestampMixin):
 
 **Task DAO Protocol**:
 ```python
-# app/dao/dao_protocols.py
+# dao_service/dao/dao_protocols.py
 from typing import Protocol, List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
@@ -905,7 +922,7 @@ class TaskDAOProtocol(Protocol):
 
 **DaoTask Implementation**:
 ```python
-# app/dao/impl/sqlalchemy/dao_task.py
+# dao_service/dao/impl/sqlalchemy/dao_task.py
 from sqlalchemy import select, update as sql_update, func
 from sqlalchemy.ext.asyncio import AsyncSession as SQLAlchemyAsyncSession
 from dao_service.core.database import DatabaseSession
@@ -977,7 +994,7 @@ class DaoTask:
 
 **DaoTaskService Example**:
 ```python
-# app/services/dao_task_service.py
+# dao_service/services/dao_task_service.py
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
@@ -1053,7 +1070,7 @@ Services are injected via FastAPI's `Depends()` rather than instantiated per-req
 
 **Representative Endpoint Example** (same pattern applies to all endpoints):
 ```python
-# app/api/v1/tasks.py
+# dao_service/api/v1/tasks_api.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from dao_service.core.database import DatabaseSession
 from dao_service.api.deps import get_db, verify_service_key
@@ -1089,7 +1106,7 @@ All endpoints in the [Complete Endpoint Inventory](#complete-endpoint-inventory)
 
 **1. Abstract Factory Protocol**:
 ```python
-# app/dao/dao_factory.py
+# dao_service/dao/dao_factory.py
 class DaoFactoryProtocol(Protocol):
     def create_user_dao(self) -> UserDAOProtocol: ...
     def create_goal_dao(self) -> GoalDAOProtocol: ...
@@ -1099,15 +1116,15 @@ class DaoFactoryProtocol(Protocol):
 
 **2. SQLAlchemy Factory**:
 ```python
-# app/dao/factories/dao_sqlalchemy_factory.py
+# dao_service/dao/factories/dao_sqlalchemy_factory.py
 class DaoSqlalchemyFactory:
-    def create_task_dao(self) -> TaskDAOProtocol:
+    def create_task_dao(self) -> DaoTask:
         return DaoTask()  # SQLAlchemy implementation
 ```
 
 **3. Registry with Config-Based Selection**:
 ```python
-# app/dao/dao_registry.py
+# dao_service/dao/dao_registry.py
 from dao_service.config import settings, ORMFramework
 
 _FACTORY_REGISTRY: dict[ORMFramework, type[DaoFactoryProtocol]] = {
@@ -1135,7 +1152,7 @@ ORM_FRAMEWORK=tortoise  # Changed from 'sqlalchemy'
 ### Atomicity: Unit of Work Pattern
 
 ```python
-# app/repositories/dao_unit_of_work.py
+# dao_service/repositories/dao_unit_of_work.py
 class DaoUnitOfWork:
     def __init__(self, db: DatabaseSession):
         self.db = db
@@ -1185,17 +1202,17 @@ async with DaoUnitOfWork(db) as uow:
 ## Implementation Phases
 
 ### Phase 1: Foundation
-1. Create `app/config.py` - Pydantic Settings
-2. Create `app/core/database.py` - DatabaseSession protocol, async engine
-3. Create `app/models/base.py` - Base, mixins
-4. Create `app/models/enums.py` - Enum classes
+1. Create `dao_service/config.py` - Pydantic Settings
+2. Create `dao_service/core/database.py` - DatabaseSession protocol, async engine
+3. Create `dao_service/models/base.py` - Base, mixins
+4. Create `dao_service/models/enums.py` - Enum classes
 5. Test database connection
 
 **Validation**: Successfully connect to Supabase local instance.
 
 ### Phase 2: ORM Models
 **Prerequisites**: Phase 1 complete
-6. Create all ORM models
+6. Create all ORM models in `dao_service/models/`
 7. Initialize Alembic
 8. Create migration for `calendar_event_id` field
 9. Apply migration
@@ -1204,27 +1221,27 @@ async with DaoUnitOfWork(db) as uow:
 
 ### Phase 3: DTOs
 **Prerequisites**: Phase 2 complete
-10. Create `app/schemas/base.py` and all entity schemas
-11. Create `app/schemas/enums.py` (Pydantic versions)
-12. Write DTO validation tests
+10. Create `dao_service/schemas/base.py` and all entity schemas
+11. Create `dao_service/schemas/enums.py` (Pydantic versions)
+12. Write DTO validation tests in `dao_service/tests/unit/test_schemas/`
 
 **Validation**: Test DTO validation with pytest.
 
 ### Phase 4: DAO Layer
 **Prerequisites**: Phase 3 complete
-13. Create `app/dao/dao_protocols.py` (using DatabaseSession)
-14. Create `app/dao/dao_factory.py` (DaoFactoryProtocol)
-15. Create `app/dao/dao_registry.py`
-16. Create `app/dao/factories/dao_sqlalchemy_factory.py`
-17. Create all DAO implementations with `dao_` prefix
+13. Create `dao_service/dao/dao_protocols.py` (using DatabaseSession)
+14. Create `dao_service/dao/dao_factory.py` (DaoFactoryProtocol)
+15. Create `dao_service/dao/dao_registry.py`
+16. Create `dao_service/dao/factories/dao_sqlalchemy_factory.py`
+17. Create all DAO implementations in `dao_service/dao/impl/sqlalchemy/`
 18. Write unit tests
 
 **Validation**: DAO tests pass. Can switch frameworks via config.
 
 ### Phase 5: Unit of Work
 **Prerequisites**: Phase 4 complete
-19. Create `app/repositories/dao_unit_of_work.py`
-20. Write integration test for transactional operations
+19. Create `dao_service/repositories/dao_unit_of_work.py`
+20. Write integration test for transactional operations in `dao_service/tests/integration/`
 
 **Validation**: Test rollback behavior.
 
@@ -1236,9 +1253,9 @@ async with DaoUnitOfWork(db) as uow:
 
 ### Phase 7: API Layer
 **Prerequisites**: Phase 6 complete
-22. Create `app/api/deps.py` (get_db returns DatabaseSession)
-23. Create all v1 endpoints
-24. Create `app/main.py`
+22. Create `dao_service/api/deps.py` (get_db returns DatabaseSession)
+23. Create all v1 endpoints in `dao_service/api/v1/`
+24. Create `dao_service/main.py`
 
 **Validation**: Test endpoints with FastAPI TestClient.
 
@@ -1302,8 +1319,8 @@ Before working with the DAO service, ensure you have:
 3. **Supabase local instance** — running via `bash scripts/supabase_setup.sh`
 4. **Python 3.11+** — with a project-level virtual environment activated
 5. **Dependencies installed**:
-   - Production: `pip install -r backend/requirements.txt`
-   - Development/testing: `pip install -r backend/requirements-dev.txt`
+   - Production: `pip install -r backend/dao_service/requirements.txt`
+   - Development/testing: `pip install -r backend/dao_service/requirements-dev.txt`
 
 ### Quick Start: Running the DAO Service Locally
 
@@ -1364,30 +1381,34 @@ The Docker container connects to Supabase on the host via `host.docker.internal:
 
 ```bash
 # Unit tests only (no database needed, runs in ~0.02s)
-cd backend && make test-unit
+cd backend && pytest dao_service/tests/unit/ -v
 
 # Integration tests only (needs Supabase running)
-cd backend && make test-integration
+cd backend && pytest dao_service/tests/integration/ -v
 
-# Full test suite
-cd backend && make test
+# Full DAO test suite
+cd backend && pytest dao_service/tests/ -v
 
-# Full pipeline: build → unit tests → Docker deploy → integration tests → report
-bash scripts/build_and_test.sh
+# Full pipeline: build → unit tests → Docker deploy → integration tests → HTML/XML report
+bash backend/dao_service/scripts/build_and_test.sh
+
+# Tests only with HTML report (no Docker build)
+bash backend/dao_service/scripts/run_tests.sh
 ```
 
 **Test Architecture:**
-- **44 unit tests** — Pydantic DTO schema validation (no database)
-- **40 integration tests** — Full API endpoint testing against Supabase PostgreSQL
+- **44 unit tests** — Pydantic DTO schema validation (no database), located in `dao_service/tests/unit/`
+- **40 integration tests** — Full API endpoint testing against Supabase PostgreSQL, located in `dao_service/tests/integration/`
 - **Test isolation** — Each integration test gets a fresh session; tables are truncated between tests
 - **Async support** — Uses `pytest-asyncio` with session-scoped event loops
+- **Test discovery** — `pytest.ini` `testpaths` covers both `tests/` (legacy) and `dao_service/tests/`
 
 ### Calling the DAO Service from Python (Other Services)
 
 If another Flux service (Goal Planner, Scheduler, Observer) needs to call this service directly from Python, use `httpx.AsyncClient`. The integration tests demonstrate the exact pattern:
 
 ```python
-# Reference: backend/tests/integration/test_api/test_users_api.py
+# Reference: backend/dao_service/tests/integration/test_api/test_users_api.py
 
 import httpx
 
@@ -1434,8 +1455,8 @@ async def example_goal_creation_flow():
 ```
 
 **Key files to reference for calling patterns:**
-- `backend/tests/integration/test_api/test_tasks_api.py` — Scheduler endpoints (time range, bulk update, calendar sync)
-- `backend/tests/integration/test_api/test_goals_api.py` — Goal creation with structure
+- `backend/dao_service/tests/integration/test_api/test_tasks_api.py` — Scheduler endpoints (time range, bulk update, calendar sync)
+- `backend/dao_service/tests/integration/test_api/test_goals_api.py` — Goal creation with structure
 - `backend/dao_service/api/deps.py` — Authentication setup (`X-Flux-Service-Key`)
 
 ### Troubleshooting

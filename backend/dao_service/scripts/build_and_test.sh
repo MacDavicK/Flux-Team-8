@@ -11,9 +11,9 @@
 #   6. Runs integration tests
 #   7. Generates TEST_REPORT.md
 #
-# Usage:
-#   bash scripts/build_and_test.sh
-#   bash scripts/build_and_test.sh --cleanup    # Stop container after tests
+# Usage (from project root):
+#   bash backend/dao_service/scripts/build_and_test.sh
+#   bash backend/dao_service/scripts/build_and_test.sh --cleanup    # Stop container after tests
 # ============================================================
 
 set -uo pipefail
@@ -38,10 +38,11 @@ header()  { echo -e "\n${BOLD}═══ $1 ═══${NC}\n"; }
 
 # --- Paths ---
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 BACKEND_DIR="$PROJECT_ROOT/backend"
-REPORT_FILE="$BACKEND_DIR/TEST_REPORT.md"
-RESULTS_DIR="$BACKEND_DIR/test-results"
+DAO_SERVICE_DIR="$BACKEND_DIR/dao_service"
+REPORT_FILE="$DAO_SERVICE_DIR/TEST_REPORT.md"
+RESULTS_DIR="$DAO_SERVICE_DIR/test-results"
 SUPABASE_CONTAINER="supabase_db_Flux-Team-8"
 
 mkdir -p "$RESULTS_DIR"
@@ -103,7 +104,7 @@ else
         error "  1. Install Supabase CLI: brew install supabase/tap/supabase"
         error "  2. Navigate to project root: cd $PROJECT_ROOT"
         error "  3. Start Supabase: supabase start"
-        error "  4. Run setup script: bash scripts/supabase_setup.sh"
+        error "  4. Run setup script: bash backend/dao_service/scripts/setup_dao.sh"
         error ""
         error "Then re-run this script."
         record_step "Supabase check" "FAIL"
@@ -144,7 +145,7 @@ fi
 
 cd "$BACKEND_DIR"
 info "Installing production + dev dependencies..."
-pip install -q -r requirements.txt && pip install -q -r requirements-dev.txt
+pip install -q -r "$DAO_SERVICE_DIR/requirements.txt" && pip install -q -r "$DAO_SERVICE_DIR/requirements-dev.txt"
 if [ $? -eq 0 ]; then
     success "Dependencies installed"
     record_step "Dependencies" "PASS"
@@ -158,12 +159,11 @@ fi
 # STEP 5: Run unit tests
 # ============================================================
 header "Step 5: Run Unit Tests"
-UNIT_OUTPUT=$(pytest tests/unit/ -v --tb=short --junitxml="$RESULTS_DIR/unit.xml" 2>&1) || true
+UNIT_OUTPUT=$(pytest dao_service/tests/unit/ -v --tb=short --junitxml="$RESULTS_DIR/unit.xml" 2>&1)
 UNIT_EXIT=$?
 
-# Parse results from output
-UNIT_PASSED=$(echo "$UNIT_OUTPUT" | grep -oP '\d+ passed' | grep -oP '\d+' || echo "0")
-UNIT_FAILED=$(echo "$UNIT_OUTPUT" | grep -oP '\d+ failed' | grep -oP '\d+' || echo "0")
+UNIT_PASSED=$(echo "$UNIT_OUTPUT" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' || echo "0")
+UNIT_FAILED=$(echo "$UNIT_OUTPUT" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+' || echo "0")
 UNIT_TOTAL=$((UNIT_PASSED + UNIT_FAILED))
 
 echo "$UNIT_OUTPUT"
@@ -175,7 +175,6 @@ else
     error "Unit tests: $UNIT_FAILED failed out of $UNIT_TOTAL"
     record_step "Unit tests ($UNIT_PASSED/$UNIT_TOTAL passed)" "FAIL"
     warn "Skipping Docker build due to unit test failures."
-    # Continue to report generation
 fi
 
 # ============================================================
@@ -191,10 +190,9 @@ if [ $UNIT_EXIT -eq 0 ]; then
         error ""
         error "Check the Dockerfile and build output above."
         error "Common fixes:"
-        error "  - Verify requirements.txt has no syntax errors"
+        error "  - Verify dao_service/requirements.txt has no syntax errors"
         error "  - Ensure dao_service/ directory exists"
         record_step "Docker build" "FAIL"
-        # Continue to report
     fi
 fi
 
@@ -205,7 +203,6 @@ CONTAINER_DEPLOYED=false
 if [ $UNIT_EXIT -eq 0 ]; then
     header "Step 7: Deploy Container"
 
-    # Stop existing container if running
     docker-compose -f "$BACKEND_DIR/docker-compose.dao-service.yml" down 2>/dev/null || true
 
     if docker-compose -f "$BACKEND_DIR/docker-compose.dao-service.yml" up -d 2>&1; then
@@ -258,12 +255,11 @@ header "Step 9: Run Integration Tests"
 info "Truncating tables for clean test state..."
 docker exec "$SUPABASE_CONTAINER" psql -U postgres -c "TRUNCATE users CASCADE;" >/dev/null 2>&1
 
-INTEG_OUTPUT=$(pytest tests/integration/ -v --tb=short --junitxml="$RESULTS_DIR/integration.xml" 2>&1) || true
+INTEG_OUTPUT=$(pytest dao_service/tests/integration/ -v --tb=short --junitxml="$RESULTS_DIR/integration.xml" 2>&1)
 INTEG_EXIT=$?
 
-# Parse results
-INTEG_PASSED=$(echo "$INTEG_OUTPUT" | grep -oP '\d+ passed' | grep -oP '\d+' || echo "0")
-INTEG_FAILED=$(echo "$INTEG_OUTPUT" | grep -oP '\d+ failed' | grep -oP '\d+' || echo "0")
+INTEG_PASSED=$(echo "$INTEG_OUTPUT" | grep -oE '[0-9]+ passed' | grep -oE '[0-9]+' || echo "0")
+INTEG_FAILED=$(echo "$INTEG_OUTPUT" | grep -oE '[0-9]+ failed' | grep -oE '[0-9]+' || echo "0")
 INTEG_TOTAL=$((INTEG_PASSED + INTEG_FAILED))
 
 echo "$INTEG_OUTPUT"
@@ -347,13 +343,13 @@ cat >> "$REPORT_FILE" << EOF
 
 ## Files Modified
 
-- \`backend/dao_service/\` — Application code (renamed from \`app/\`)
-- \`backend/tests/conftest.py\` — PostgreSQL test fixtures
+- \`backend/dao_service/\` — Application code
+- \`backend/dao_service/tests/conftest.py\` — PostgreSQL test fixtures
 - \`backend/Dockerfile\` — Container image
 - \`backend/docker-compose.dao-service.yml\` — Service deployment
 
 ---
-*Report generated by \`scripts/build_and_test.sh\`*
+*Report generated by \`backend/dao_service/scripts/build_and_test.sh\`*
 EOF
 
 success "Test report generated: $REPORT_FILE"
@@ -398,7 +394,6 @@ fi
 
 echo ""
 
-# Exit with appropriate code
 if [ $TOTAL_FAILED -gt 0 ] || [ $UNIT_EXIT -ne 0 ] || [ ${INTEG_EXIT:-1} -ne 0 ]; then
     exit 1
 fi

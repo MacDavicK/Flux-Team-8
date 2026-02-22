@@ -69,3 +69,7 @@ dev-dist/
 
 # ---------- Files ----------
 *.pdf
+.python-version
+
+# ---------- Cursor / Claude internal ----------
+.claude/

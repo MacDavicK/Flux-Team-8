@@ -10,8 +10,8 @@
 #   - Docker Desktop running
 #   - Supabase running locally (port 54322)
 #
-# Usage:
-#   bash scripts/setup_backend.sh
+# Usage (from project root):
+#   bash backend/dao_service/scripts/setup_dao.sh
 # ============================================================
 
 set -euo pipefail
@@ -21,7 +21,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 info()    { echo -e "${BLUE}ℹ  $1${NC}"; }
 success() { echo -e "${GREEN}✓  $1${NC}"; }
@@ -34,9 +34,14 @@ echo "  Flux DAO Service — Environment Setup"
 echo "========================================"
 echo ""
 
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+BACKEND_DIR="$PROJECT_ROOT/backend"
+DAO_SERVICE_DIR="$BACKEND_DIR/dao_service"
+
 # --- Check Python 3.11+ ---
 info "Checking Python version..."
-PYTHON_VERSION=$(python3 --version 2>/dev/null | grep -oP '\d+\.\d+' | head -1)
+PYTHON_VERSION=$(python3 --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+' | head -1)
 PYTHON_MAJOR=$(echo "$PYTHON_VERSION" | cut -d. -f1)
 PYTHON_MINOR=$(echo "$PYTHON_VERSION" | cut -d. -f2)
 
@@ -79,10 +84,6 @@ else
     warn "Supabase container ($SUPABASE_CONTAINER) is not running."
     info "Attempting to start Supabase..."
 
-    # Try to find project root (where supabase/ directory is)
-    SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-    PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
     if [ -f "$PROJECT_ROOT/supabase/config.toml" ]; then
         cd "$PROJECT_ROOT"
         if supabase start 2>/dev/null; then
@@ -100,8 +101,7 @@ else
     else
         error "Cannot find supabase/config.toml in project root."
         error "Please start Supabase manually:"
-        error "  cd <project-root>"
-        error "  supabase start"
+        error "  cd $PROJECT_ROOT && supabase start"
         exit 1
     fi
 fi
@@ -119,15 +119,14 @@ fi
 
 # --- Install dependencies ---
 info "Installing production dependencies..."
-pip install -q -r backend/requirements.txt 2>/dev/null || pip install -q -r requirements.txt 2>/dev/null
+pip install -q -r "$DAO_SERVICE_DIR/requirements.txt"
 success "Production dependencies installed"
 
 info "Installing development dependencies..."
-pip install -q -r backend/requirements-dev.txt 2>/dev/null || pip install -q -r requirements-dev.txt 2>/dev/null
+pip install -q -r "$DAO_SERVICE_DIR/requirements-dev.txt"
 success "Development dependencies installed"
 
 # --- Create .env if missing ---
-BACKEND_DIR="$PROJECT_ROOT/backend"
 if [ ! -f "$BACKEND_DIR/.env" ]; then
     info "Creating .env from template..."
     cat > "$BACKEND_DIR/.env" << 'EOF'
@@ -146,8 +145,9 @@ success "Environment setup complete!"
 echo "========================================"
 echo ""
 info "Next steps:"
-echo "  1. Run unit tests:        cd backend && make test-unit"
-echo "  2. Run integration tests: cd backend && make test-integration"
-echo "  3. Start dev server:      cd backend && make dev"
-echo "  4. Open Swagger UI:       http://localhost:8000/docs"
+echo "  1. Run unit tests:        bash backend/dao_service/scripts/run_tests.sh unit"
+echo "  2. Run integration tests: bash backend/dao_service/scripts/run_tests.sh integration"
+echo "  3. Run full pipeline:     bash backend/dao_service/scripts/build_and_test.sh"
+echo "  4. Start dev server:      cd backend && uvicorn dao_service.main:app --reload"
+echo "  5. Open Swagger UI:       http://localhost:8000/docs"
 echo ""

@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from httpx import AsyncClient
 
-from tests.conftest import make_goal_data, make_task_data, make_user_data
+from dao_service.tests.conftest import make_goal_data, make_task_data, make_user_data
 
 
 @pytest.mark.asyncio

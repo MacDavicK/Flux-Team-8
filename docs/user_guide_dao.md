@@ -1,7 +1,7 @@
 # Flux DAO Service User Guide
 
-**Version**: 1.0  
-**Date**: 2026-02-15
+**Version**: 1.1  
+**Date**: 2026-02-22
 
 This guide explains how to use the Flux Data Access (DAO) Service from other microservices. The DAO Service is an internal microservice that provides data persistence and retrieval for all Flux AI agents (Goal Planner, Scheduler, Observer).
 
@@ -372,7 +372,7 @@ Use direct imports when the calling service runs **in the same Python process** 
 
 ```bash
 # Install DAO service dependencies
-pip install -r backend/requirements.txt
+pip install -r backend/dao_service/requirements.txt
 
 # Set environment variables
 export DATABASE_URL="postgresql+asyncpg://postgres:postgres@localhost:54322/postgres"
@@ -782,22 +782,22 @@ The DAO Service includes comprehensive unit and integration tests.
 cd backend
 
 # Install development dependencies
-make install-dev
+pip install -r dao_service/requirements-dev.txt
 
-# Run all tests
-make test
+# Run all DAO service tests
+pytest dao_service/tests/ -v
 
 # Run unit tests only (no database required, fast)
-make test-unit
+pytest dao_service/tests/unit/ -v
 
 # Run integration tests only (requires Supabase PostgreSQL)
-make test-integration
-
-# Run tests with verbose output
-pytest tests/ -v
+pytest dao_service/tests/integration/ -v
 
 # Run tests with coverage report
-pytest tests/ --cov=dao_service --cov-report=html
+pytest dao_service/tests/ --cov=dao_service --cov-report=html
+
+# Full pipeline: build → unit tests → Docker deploy → integration tests → HTML/XML report
+bash dao_service/scripts/build_and_test.sh
 ```
 
 ### Prerequisites for Integration Tests
@@ -809,7 +809,7 @@ pytest tests/ --cov=dao_service --cov-report=html
    ```
 3. **Database migrations applied**:
    ```bash
-   bash scripts/supabase_setup.sh
+   bash scripts/setup.sh
    ```
 
 ### Testing with REST API (Using Swagger UI)
@@ -855,7 +855,7 @@ docker-compose -f backend/docker-compose.dao-service.yml down
 Run the complete pipeline including Docker build and integration tests:
 
 ```bash
-bash scripts/build_and_test.sh
+bash backend/dao_service/scripts/build_and_test.sh
 ```
 
 This script:
@@ -863,7 +863,7 @@ This script:
 2. Builds the Docker image
 3. Deploys the container
 4. Runs integration tests against the containerized service
-5. Generates a test report
+5. Generates an HTML and JUnit XML test report in `backend/dao_service/reports/`
 
 ### Writing Your Own Tests
 
@@ -938,21 +938,21 @@ def test_task_create_dto_validation():
 
 ### Test Configuration
 
-The test suite uses these fixtures from `backend/tests/conftest.py`:
+The test suite uses these fixtures from `backend/dao_service/tests/conftest.py`:
 
 | Fixture | Scope | Description |
 |---------|-------|-------------|
-| `test_engine` | session | Async SQLAlchemy engine |
+| `test_engine` | session | Async SQLAlchemy engine (NullPool for tests) |
 | `setup_database` | session | Truncates tables before tests |
 | `db_session` | function | Fresh session per test |
-| `client` | function | Async HTTP client with auth bypass |
+| `client` | function | Async HTTP client with service-key auth bypass |
 
 ### Test Data Factories
 
 Use the factory functions for consistent test data:
 
 ```python
-from tests.conftest import make_user_data, make_goal_data, make_task_data
+from dao_service.tests.conftest import make_user_data, make_goal_data, make_task_data
 
 # Generate test data with defaults
 user_data = make_user_data()
@@ -1025,8 +1025,8 @@ psql "postgresql://postgres:postgres@localhost:54322/postgres" -c "TRUNCATE user
 - **OpenAPI Spec**: http://localhost:8000/openapi.json
 - **Swagger UI**: http://localhost:8000/docs
 - **ReDoc**: http://localhost:8000/redoc
-- **Design Document**: `docs/flux_data_access_layer_design.md`
-- **Test Examples**: `backend/tests/integration/test_api/`
+- **Design Document**: `docs/dao_design.md`
+- **Test Examples**: `backend/dao_service/tests/integration/test_api/`
 
 ---
 
