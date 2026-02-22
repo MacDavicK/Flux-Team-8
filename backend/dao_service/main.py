@@ -1,7 +1,9 @@
 """FastAPI application entry point."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from dao_service.api.v1 import (
     conversations_api,
@@ -26,6 +28,18 @@ app = FastAPI(
         {"name": "notification-log", "description": "Notification delivery logs"},
     ],
 )
+
+# --- Exception handlers ---
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    """Return 409 Conflict for unique/FK constraint violations instead of 500."""
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "A resource with a conflicting unique constraint already exists."},
+    )
+
 
 # Mount v1 routers
 app.include_router(users_api.router, prefix="/api/v1")

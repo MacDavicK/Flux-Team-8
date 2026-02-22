@@ -1,8 +1,8 @@
 # Flux Data Access Layer Design
 
-**Document Version**: 1.2
-**Date**: 2026-02-22
-**Status**: Design Approved
+**Document Version**: 1.3
+**Date**: 2026-02-23
+**Status**: Implementation Complete
 
 ---
 
@@ -86,13 +86,8 @@ async def create_task(db: DatabaseSession, task_data: TaskCreateDTO):
 # ✅ CORRECT - Data validation only
 class DaoTaskService:
     async def create_task(self, db: DatabaseSession, task_data: TaskCreateDTO):
-        # Check FK exists (prevents cryptic DB error)
-        if task_data.milestone_id:
-            milestone = await self.milestone_dao.get_by_id(db, task_data.milestone_id)
-            if not milestone:
-                raise ValueError(f"Milestone {task_data.milestone_id} not found")
-
-        # Create task - DTO already validated format
+        # DTO has already validated field formats (status, trigger_type, etc.)
+        # No business logic here — just persist
         return await self.task_dao.create(db, task_data)
 
 # ❌ WRONG - Business logic (belongs in Goal Planner service)
@@ -133,8 +128,8 @@ async def create_task(self, db: DatabaseSession, task_data: TaskCreateDTO):
 ### In Scope: Data Access Microservice
 
 This service provides REST API endpoints for:
-- **CRUD operations** on all entities (users, goals, milestones, tasks, conversations, demo_flags)
-- **Custom queries** for Scheduler (tasks by time range, bulk state updates)
+- **CRUD operations** on all entities (users, goals, tasks, conversations, patterns, notification_log)
+- **Custom queries** for Scheduler (tasks by time range, bulk status updates)
 - **Aggregations** for Observer (task statistics, pattern data)
 - **Transactional operations** via Unit of Work pattern
 
@@ -148,7 +143,7 @@ The following will be **separate microservices** calling this Data Access API:
 
 1. **Goal Planner Service** (separate codebase):
    - User intent parsing
-   - Goal decomposition into milestones/tasks
+   - Goal decomposition into tasks
    - Authorization (does user own this goal?)
    - Calls Data Access API via HTTP for persistence
 
@@ -186,21 +181,11 @@ The following will be **separate microservices** calling this Data Access API:
 |--------|------|---------|---------|----------|
 | GET | `/` | List goals with pagination | All | `PaginatedResponse[GoalDTO]` |
 | GET | `/{goal_id}` | Get single goal | All | `GoalDTO` |
-| GET | `/{goal_id}/full` | Get goal with milestones and tasks | Goal Planner | `GoalWithRelationsDTO` |
 | POST | `/` | Create goal | Goal Planner | `GoalDTO` |
-| POST | `/with-structure` | Create goal + milestones + tasks atomically | Goal Planner | `GoalWithRelationsDTO` |
 | PATCH | `/{goal_id}` | Update goal | Goal Planner | `GoalDTO` |
 | DELETE | `/{goal_id}` | Delete goal (cascade) | Goal Planner | `204 No Content` |
 
-#### Milestone Endpoints (`/api/v1/milestones`)
-
-| Method | Path | Purpose | Used By | Response |
-|--------|------|---------|---------|----------|
-| GET | `/` | List milestones with pagination | All | `PaginatedResponse[MilestoneDTO]` |
-| GET | `/{milestone_id}` | Get single milestone | All | `MilestoneDTO` |
-| POST | `/` | Create milestone | Goal Planner, Scheduler | `MilestoneDTO` |
-| PATCH | `/{milestone_id}` | Update milestone | Goal Planner, Scheduler | `MilestoneDTO` |
-| DELETE | `/{milestone_id}` | Delete milestone (cascade) | Goal Planner | `204 No Content` |
+**Goal statuses**: `active`, `completed`, `abandoned`, `pipeline`
 
 #### Task Endpoints (`/api/v1/tasks`)
 
@@ -212,9 +197,11 @@ The following will be **separate microservices** calling this Data Access API:
 | PATCH | `/{task_id}` | Update task | Goal Planner, Scheduler | `TaskDTO` |
 | DELETE | `/{task_id}` | Delete task | Goal Planner | `204 No Content` |
 | GET | `/by-timerange` | Get tasks in time window | Scheduler | `List[TaskDTO]` |
-| POST | `/bulk-update-state` | Bulk state updates | Scheduler | `BulkUpdateResponse` |
+| POST | `/bulk-update-state` | Bulk status updates | Scheduler | `BulkUpdateResponse` |
 | GET | `/statistics` | Task completion stats | Observer | `TaskStatisticsDTO` |
-| PATCH | `/{task_id}/calendar-event` | Update calendar link | Scheduler | `TaskDTO` |
+
+**Task statuses**: `pending`, `done`, `missed`, `rescheduled`, `cancelled`
+**Trigger types**: `time`, `location`
 
 #### Conversation Endpoints (`/api/v1/conversations`)
 
@@ -225,12 +212,29 @@ The following will be **separate microservices** calling this Data Access API:
 | POST | `/` | Create conversation | Goal Planner | `ConversationDTO` |
 | PATCH | `/{conversation_id}` | Update conversation | Goal Planner | `ConversationDTO` |
 
-#### Demo Flag Endpoints (`/api/v1/demo-flags`)
+**Context types**: `goal`, `task`, `onboarding`, `reschedule`
+
+#### Pattern Endpoints (`/api/v1/patterns`)
 
 | Method | Path | Purpose | Used By | Response |
 |--------|------|---------|---------|----------|
-| GET | `/{user_id}` | Get demo flags | Scheduler | `DemoFlagDTO` |
-| PUT | `/{user_id}` | Set/update demo flags | Goal Planner | `DemoFlagDTO` |
+| GET | `/` | List patterns with pagination | Observer | `PaginatedResponse[PatternDTO]` |
+| GET | `/{pattern_id}` | Get single pattern | Observer | `PatternDTO` |
+| POST | `/` | Record pattern | Observer | `PatternDTO` |
+| PATCH | `/{pattern_id}` | Update pattern | Observer | `PatternDTO` |
+| DELETE | `/{pattern_id}` | Delete pattern | Observer | `204 No Content` |
+
+#### Notification Log Endpoints (`/api/v1/notification-log`)
+
+| Method | Path | Purpose | Used By | Response |
+|--------|------|---------|---------|----------|
+| GET | `/` | List log entries | Scheduler | `PaginatedResponse[NotificationLogDTO]` |
+| GET | `/{id}` | Get log entry | Scheduler | `NotificationLogDTO` |
+| POST | `/` | Record notification | Scheduler | `NotificationLogDTO` |
+| PATCH | `/{id}` | Update log entry | Scheduler | `NotificationLogDTO` |
+| DELETE | `/{id}` | Delete log entry | Scheduler | `204 No Content` |
+
+**Channels**: `push`, `whatsapp`, `call`
 
 #### Operational Endpoints
 
@@ -243,17 +247,7 @@ The following will be **separate microservices** calling this Data Access API:
 
 ### Inter-Service Authentication
 
-While user authentication is handled by the calling services, the Data Access API verifies that requests originate from legitimate Flux microservices using API key authentication:
-
-- Each calling service includes an `X-Flux-Service-Key` header
-- Valid keys are loaded from environment configuration (`SERVICE_API_KEYS`)
-- Invalid or missing keys return `403 Forbidden`
-- The `verify_service_key` dependency is applied to all endpoints
-
-```bash
-# .env
-SERVICE_API_KEYS=["goal-planner-key-abc","scheduler-key-def","observer-key-ghi"]
-```
+The current implementation does not enforce API-key authentication on endpoints — all callers have open access on the internal network. A `verify_service_key` dependency placeholder exists in `api/deps.py` and can be activated by setting `SERVICE_API_KEYS` in the environment when inter-service authentication is required.
 
 ---
 
@@ -278,11 +272,10 @@ class ErrorDetail(BaseModel):
 | 201 Created | Successful POST | Task created |
 | 204 No Content | Successful DELETE | Task deleted |
 | 400 Bad Request | Malformed JSON | Invalid UUID format |
-| 403 Forbidden | Invalid service key | Missing X-Flux-Service-Key |
 | 404 Not Found | Entity doesn't exist | Task ID not found |
-| 422 Unprocessable Entity | Validation failure | FK constraint violation |
+| 409 Conflict | Unique constraint violation | Duplicate `langgraph_thread_id` |
+| 422 Unprocessable Entity | Validation failure | Invalid enum value |
 | 500 Internal Server Error | Database failure | Connection timeout |
-| 503 Service Unavailable | Service degraded | DB pool exhausted |
 
 ---
 
@@ -307,18 +300,15 @@ class PaginatedResponse(BaseModel, Generic[T]):
 ```python
 class BulkUpdateStateRequest(BaseModel):
     task_ids: List[UUID] = Field(..., min_length=1, max_length=100)
-    new_state: TaskState
+    new_status: str  # one of: pending, done, missed, rescheduled, cancelled
 
 class BulkUpdateResponse(BaseModel):
     updated_count: int
 
-class CalendarEventUpdateRequest(BaseModel):
-    calendar_event_id: str = Field(..., max_length=255)
-
 class TaskStatisticsDTO(BaseModel):
     user_id: UUID
     total_tasks: int
-    by_state: Dict[str, int]
+    by_status: Dict[str, int]
     completion_rate: float
 ```
 
@@ -326,9 +316,9 @@ class TaskStatisticsDTO(BaseModel):
 
 ## Interaction Flows
 
-### Flow 1: Goal Creation with Milestones and Tasks
+### Flow 1: Goal Creation with Tasks
 
-The Goal Planner service decomposes a user's goal into milestones and tasks, then persists the entire structure atomically via the Unit of Work pattern.
+The Goal Planner service decomposes a user's goal into tasks, then persists them via the Unit of Work pattern.
 
 ```mermaid
 sequenceDiagram
@@ -337,13 +327,11 @@ sequenceDiagram
     participant SVC as DaoGoalService
     participant UOW as DaoUnitOfWork
     participant DG as DaoGoal
-    participant DM as DaoMilestone
     participant DT as DaoTask
     participant DB as PostgreSQL
 
-    GP->>+API: POST /api/v1/goals/with-structure<br/>{goal, milestones, tasks}
-    API->>API: verify_service_key()
-    API->>+SVC: create_goal_with_structure(data)
+    GP->>+API: POST /api/v1/goals/<br/>{user_id, title, class_tags, target_weeks}
+    API->>+SVC: create_goal(data)
 
     SVC->>+UOW: Begin transaction
 
@@ -352,56 +340,34 @@ sequenceDiagram
     DB-->>-DG: goal_id
     DG-->>-UOW: GoalDTO
 
-    loop For each milestone
-        UOW->>+DM: create(db, MilestoneCreateDTO)
-        DM->>+DB: INSERT INTO milestones
-        DB-->>-DM: milestone_id
-        DM-->>-UOW: MilestoneDTO
-
-        loop For each task in milestone
-            UOW->>+DT: create(db, TaskCreateDTO)
-            DT->>+DB: INSERT INTO tasks
-            DB-->>-DT: task_id
-            DT-->>-UOW: TaskDTO
-        end
+    loop For each task
+        UOW->>+DT: create(db, TaskCreateDTO)
+        DT->>+DB: INSERT INTO tasks
+        DB-->>-DT: task_id
+        DT-->>-UOW: TaskDTO
     end
 
     UOW->>DB: COMMIT
-    UOW-->>-SVC: GoalWithRelationsDTO
-    SVC-->>-API: GoalWithRelationsDTO
+    UOW-->>-SVC: GoalDTO + List[TaskDTO]
+    SVC-->>-API: GoalDTO
     API-->>-GP: 201 Created
 ```
 
-### Flow 2: Standalone Milestone Update & Task Creation
+### Flow 2: Scheduler — Standalone Task Creation
 
-Not all writes go through the atomic goal-creation path. The Scheduler may need to update a milestone's status (e.g., mark it complete after all child tasks finish) or create a standalone task (e.g., a rescheduled drift-recovery task). The Goal Planner may also add individual tasks to an existing milestone during a follow-up conversation.
+The Scheduler creates a rescheduled task for a missed one.
 
 ```mermaid
 sequenceDiagram
     participant SC as Scheduler Service
     participant API as Data Access API
-    participant MSVC as DaoMilestoneService
-    participant DM as DaoMilestone
     participant TSVC as DaoTaskService
     participant DT as DaoTask
     participant DB as PostgreSQL
 
-    Note over SC: All child tasks for milestone completed.<br/>Update milestone status.
+    Note over SC: Missed task detected — create rescheduled replacement
 
-    SC->>+API: PATCH /api/v1/milestones/{milestone_id}<br/>{status: "completed"}
-    API->>API: verify_service_key()
-    API->>+MSVC: update_milestone(db, milestone_id, MilestoneUpdateDTO)
-    MSVC->>+DM: update(db, milestone_id, MilestoneUpdateDTO)
-    DM->>+DB: UPDATE milestones SET status='completed'<br/>WHERE id=milestone_id
-    DB-->>-DM: milestone row
-    DM-->>-MSVC: MilestoneDTO
-    MSVC-->>-API: MilestoneDTO
-    API-->>-SC: 200 OK — MilestoneDTO
-
-    Note over SC: Drift recovery — create<br/>a rescheduled task for missed one
-
-    SC->>+API: POST /api/v1/tasks<br/>{user_id, goal_id, milestone_id,<br/>title, start_time, end_time, state: "scheduled"}
-    API->>API: verify_service_key()
+    SC->>+API: POST /api/v1/tasks/<br/>{user_id, goal_id, title, status: "pending", trigger_type: "time"}
     API->>+TSVC: create_task(db, TaskCreateDTO)
     TSVC->>+DT: create(db, TaskCreateDTO)
     DT->>+DB: INSERT INTO tasks
@@ -411,9 +377,9 @@ sequenceDiagram
     API-->>-SC: 201 Created — TaskDTO
 ```
 
-### Flow 3: Scheduler — Time Range Query & Bulk State Update
+### Flow 3: Scheduler — Time Range Query & Bulk Status Update
 
-The Scheduler periodically queries tasks in a time window, runs drift detection logic, then bulk-updates drifted task states.
+The Scheduler periodically queries tasks in a time window, runs drift detection logic, then bulk-updates missed task statuses.
 
 ```mermaid
 sequenceDiagram
@@ -423,57 +389,28 @@ sequenceDiagram
     participant DAO as DaoTask
     participant DB as PostgreSQL
 
-    SC->>+API: GET /api/v1/tasks/by-timerange<br/>?user_id=X&start_time=T1&end_time=T2
-    API->>API: verify_service_key()
+    SC->>+API: GET /api/v1/tasks/by-timerange<br/>?user_id=X&start_at=T1&end_at=T2
     API->>+SVC: get_tasks_for_scheduling(user_id, T1, T2)
     SVC->>+DAO: get_tasks_by_user_and_timerange(...)
-    DAO->>+DB: SELECT FROM tasks<br/>WHERE user_id=X AND start_time BETWEEN T1,T2
+    DAO->>+DB: SELECT FROM tasks<br/>WHERE user_id=X AND scheduled_at BETWEEN T1,T2
     DB-->>-DAO: [task rows]
     DAO-->>-SVC: List[TaskDTO]
     SVC-->>-API: List[TaskDTO]
     API-->>-SC: 200 OK — List[TaskDTO]
 
-    Note over SC: Drift detection logic runs<br/>(business logic in Scheduler)
+    Note over SC: Missed-task detection logic runs<br/>(business logic in Scheduler)
 
-    SC->>+API: POST /api/v1/tasks/bulk-update-state<br/>{task_ids: [id1, id2], state: "drifted"}
-    API->>API: verify_service_key()
-    API->>+SVC: bulk_update_state([id1, id2], "drifted")
-    SVC->>+DAO: bulk_update_state([id1, id2], "drifted")
-    DAO->>+DB: UPDATE tasks SET state='drifted'<br/>WHERE id IN (id1, id2)
+    SC->>+API: POST /api/v1/tasks/bulk-update-state<br/>{task_ids: [id1, id2], new_status: "missed"}
+    API->>+SVC: bulk_update_status([id1, id2], "missed")
+    SVC->>+DAO: bulk_update_status([id1, id2], "missed")
+    DAO->>+DB: UPDATE tasks SET status='missed'<br/>WHERE id IN (id1, id2)
     DB-->>-DAO: 2 rows affected
     DAO-->>-SVC: 2
     SVC-->>-API: BulkUpdateResponse
     API-->>-SC: 200 OK — {updated_count: 2}
 ```
 
-### Flow 4: Scheduler — Calendar Event Synchronization
-
-The Scheduler first creates an event in Google Calendar, then persists the returned event ID in the Data Access service.
-
-```mermaid
-sequenceDiagram
-    participant SC as Scheduler Service
-    participant GCAL as Google Calendar API
-    participant API as Data Access API
-    participant SVC as DaoTaskService
-    participant DAO as DaoTask
-    participant DB as PostgreSQL
-
-    SC->>+GCAL: Create calendar event<br/>{summary, start, end}
-    GCAL-->>-SC: {id: "gcal_evt_abc123"}
-
-    SC->>+API: PATCH /api/v1/tasks/{task_id}/calendar-event<br/>{calendar_event_id: "gcal_evt_abc123"}
-    API->>API: verify_service_key()
-    API->>+SVC: update_calendar_event_id(task_id, "gcal_evt_abc123")
-    SVC->>+DAO: update_calendar_event_id(task_id, "gcal_evt_abc123")
-    DAO->>+DB: UPDATE tasks<br/>SET calendar_event_id='gcal_evt_abc123'<br/>WHERE id=task_id
-    DB-->>-DAO: task row
-    DAO-->>-SVC: TaskDTO
-    SVC-->>-API: TaskDTO
-    API-->>-SC: 200 OK — TaskDTO
-```
-
-### Flow 5: Observer — Task Statistics for Pattern Analysis
+### Flow 4: Observer — Task Statistics for Pattern Analysis
 
 The Observer queries aggregated task statistics to detect user behavior patterns (e.g., recurring drift on Monday mornings).
 
@@ -486,11 +423,10 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     OB->>+API: GET /api/v1/tasks/statistics<br/>?user_id=X&start_date=D1&end_date=D2
-    API->>API: verify_service_key()
     API->>+SVC: get_task_statistics(user_id, D1, D2)
     SVC->>+DAO: get_task_statistics(user_id, D1, D2)
-    DAO->>+DB: SELECT state, COUNT(*) FROM tasks<br/>WHERE user_id=X AND created_at BETWEEN D1,D2<br/>GROUP BY state
-    DB-->>-DAO: {scheduled:15, completed:42, drifted:8, missed:3}
+    DAO->>+DB: SELECT status, COUNT(*) FROM tasks<br/>WHERE user_id=X AND created_at BETWEEN D1,D2<br/>GROUP BY status
+    DB-->>-DAO: {pending:15, done:42, missed:8, rescheduled:3, cancelled:1}
     DAO-->>-SVC: TaskStatisticsDTO
     SVC-->>-API: TaskStatisticsDTO
     API-->>-OB: 200 OK — TaskStatisticsDTO
@@ -498,7 +434,7 @@ sequenceDiagram
     Note over OB: Pattern analysis runs<br/>(business logic in Observer)
 ```
 
-### Flow 6: Internal Layer Flow — Single CRUD Request
+### Flow 5: Internal Layer Flow — Single CRUD Request
 
 Shows how a request traverses all internal layers of the Data Access service.
 
@@ -513,9 +449,6 @@ sequenceDiagram
     participant DB as PostgreSQL
 
     Client->>+Router: POST /api/v1/tasks
-    Router->>+Deps: verify_service_key()
-    Deps-->>-Router: valid
-
     Router->>+Deps: get_db()
     Deps->>+ORM: AsyncSessionLocal()
     ORM-->>-Deps: session (as DatabaseSession)
@@ -525,15 +458,6 @@ sequenceDiagram
     Deps-->>-Router: DaoTaskService
 
     Router->>+Service: create_task(db, TaskCreateDTO)
-
-    opt milestone_id provided
-        Service->>+DAO: milestone_dao.get_by_id(milestone_id)
-        DAO->>+ORM: execute(select(Milestone))
-        ORM->>+DB: SELECT FROM milestones
-        DB-->>-ORM: row
-        ORM-->>-DAO: Milestone
-        DAO-->>-Service: MilestoneDTO
-    end
 
     Service->>+DAO: task_dao.create(db, TaskCreateDTO)
     DAO->>DAO: Cast db → SQLAlchemyAsyncSession
@@ -587,7 +511,7 @@ python-json-logger==2.0.7  # Structured logging
 backend/
 ├── dao_service/                          # DAO microservice root
 │   ├── __init__.py
-│   ├── main.py                          # FastAPI application entry
+│   ├── main.py                          # FastAPI app + global exception handlers
 │   ├── config.py                        # Pydantic Settings
 │   │
 │   ├── core/                            # Core infrastructure
@@ -599,26 +523,24 @@ backend/
 │   ├── models/                          # SQLAlchemy ORM layer
 │   │   ├── __init__.py
 │   │   ├── base.py                      # Declarative base, mixins
-│   │   ├── enums.py                     # Python Enum classes
 │   │   ├── user_model.py
 │   │   ├── goal_model.py
-│   │   ├── milestone_model.py
-│   │   ├── task_model.py                # Includes calendar_event_id
+│   │   ├── task_model.py
 │   │   ├── conversation_model.py
-│   │   └── demo_flag_model.py
+│   │   ├── pattern_model.py
+│   │   └── notification_log_model.py
 │   │
 │   ├── schemas/                         # Pydantic DTO layer
 │   │   ├── __init__.py
 │   │   ├── base.py
-│   │   ├── enums.py                     # Pydantic-compatible enums
-│   │   ├── pagination.py               # PaginatedResponse generic wrapper
-│   │   ├── error.py                    # ErrorDetail response schema
+│   │   ├── pagination.py                # PaginatedResponse generic wrapper
+│   │   ├── error.py                     # ErrorDetail response schema
 │   │   ├── user.py
-│   │   ├── goal.py                      # GoalDTO, GoalWithRelationsDTO
-│   │   ├── milestone.py
-│   │   ├── task.py                      # TaskDTO with calendar_event_id
+│   │   ├── goal.py
+│   │   ├── task.py                      # TaskDTO, BulkUpdateStateRequest, TaskStatisticsDTO
 │   │   ├── conversation.py
-│   │   └── demo_flag.py
+│   │   ├── pattern.py
+│   │   └── notification_log.py
 │   │
 │   ├── dao/                             # Data Access Object layer
 │   │   ├── __init__.py
@@ -635,10 +557,10 @@ backend/
 │   │           ├── __init__.py
 │   │           ├── dao_user.py
 │   │           ├── dao_goal.py
-│   │           ├── dao_milestone.py
-│   │           ├── dao_task.py          # Extended queries (time range, bulk update)
+│   │           ├── dao_task.py          # Extended queries (time range, bulk update, statistics)
 │   │           ├── dao_conversation.py
-│   │           └── dao_demo_flag.py
+│   │           ├── dao_pattern.py
+│   │           └── dao_notification_log.py
 │   │
 │   ├── repositories/                    # Repository pattern
 │   │   ├── __init__.py
@@ -649,54 +571,45 @@ backend/
 │   │   ├── dao_user_service.py
 │   │   ├── dao_goal_service.py
 │   │   ├── dao_task_service.py
-│   │   ├── dao_milestone_service.py
-│   │   └── dao_conversation_service.py
+│   │   ├── dao_conversation_service.py
+│   │   ├── dao_pattern_service.py
+│   │   └── dao_notification_log_service.py
 │   │
 │   ├── api/                             # FastAPI routes
 │   │   ├── __init__.py
-│   │   ├── deps.py                      # Dependencies (get_db, verify_service_key)
+│   │   ├── deps.py                      # Dependencies (get_db, service factories)
 │   │   └── v1/
 │   │       ├── __init__.py
 │   │       ├── users_api.py
 │   │       ├── goals_api.py
 │   │       ├── tasks_api.py
-│   │       ├── milestones_api.py
 │   │       ├── conversations_api.py
-│   │       └── demo_flags_api.py
+│   │       ├── patterns_api.py
+│   │       └── notification_log_api.py
 │   │
-│   ├── tests/                           # DAO-service tests (moved from backend/tests/)
+│   ├── tests/
 │   │   ├── __init__.py
 │   │   ├── conftest.py                  # PostgreSQL fixtures + data factories
 │   │   ├── unit/
-│   │   │   ├── __init__.py
-│   │   │   └── test_schemas/            # DTO validation tests (no DB)
+│   │   │   ├── test_dao/                # DAO unit tests (mock DB session)
+│   │   │   └── test_services/           # Service unit tests (mock DAO)
 │   │   └── integration/
-│   │       ├── __init__.py
 │   │       └── test_api/                # API endpoint tests (needs Supabase)
 │   │
-│   ├── scripts/                         # DAO-service scripts
-│   │   ├── build_and_test.sh            # Full build + test pipeline with HTML report
-│   │   ├── run_tests.sh                 # Run tests only
+│   ├── scripts/
+│   │   ├── build_and_test.sh            # Full pipeline: Docker build + all tests + report
+│   │   ├── run_tests.sh                 # Run unit/integration/all tests with coverage
 │   │   └── setup_dao.sh                 # Environment setup & dependency install
 │   │
-│   ├── requirements.txt                 # DAO-service production dependencies
-│   └── requirements-dev.txt             # DAO-service development/test dependencies
+│   ├── requirements.txt                 # Production dependencies
+│   └── requirements-dev.txt             # Development/test dependencies
 │
-├── tests/                               # Legacy app/ tests (non-DAO)
-│   ├── conftest.py                      # Legacy fixtures only (app_client, mock_supabase)
-│   ├── test_goal_planner_agent.py
-│   ├── test_goal_service.py
-│   ├── test_goals_router.py
-│   └── test_schemas.py
-│
-├── Dockerfile                           # Service-specific Docker image
+├── Dockerfile                           # Docker image
 ├── .dockerignore
-├── docker-compose.dao-service.yml       # Service-specific compose (internal network)
-├── Makefile                             # Service-specific build commands
-├── pytest.ini                           # testpaths = tests dao_service/tests
-├── pyproject.toml                       # pytest + tool configuration
-├── requirements.txt                     # Full backend production dependencies
-└── requirements-dev.txt                 # Full backend development dependencies
+├── docker-compose.dao-service.yml       # Service compose (internal network)
+├── Makefile
+├── pytest.ini
+└── pyproject.toml
 ```
 
 ---
@@ -793,34 +706,31 @@ The service layer, API layer, and DTOs require **zero changes** — that is the 
 
 **Purpose**: Map database tables to Python objects.
 
-**Task Model Example** (with calendar_event_id):
+**Task Model Example**:
 ```python
 # dao_service/models/task_model.py
-from sqlalchemy import Column, String, ForeignKey, ENUM
 from sqlalchemy.orm import Mapped, relationship
 
 class Task(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "tasks"
 
-    user_id: Mapped[UUID] = ForeignKey("users.id", ondelete="CASCADE")
-    goal_id: Mapped[UUID] = ForeignKey("goals.id", ondelete="CASCADE")
-    milestone_id: Mapped[Optional[UUID]] = ForeignKey("milestones.id", ondelete="CASCADE")
+    user_id: Mapped[UUID]           # FK → users.id CASCADE
+    goal_id: Mapped[Optional[UUID]] # FK → goals.id CASCADE (nullable)
 
     title: Mapped[str]
-    start_time: Mapped[Optional[datetime]]
-    end_time: Mapped[Optional[datetime]]
-
-    state: Mapped[TaskStateEnum] = ENUM(TaskStateEnum, create_type=False)
-    priority: Mapped[TaskPriorityEnum] = ENUM(TaskPriorityEnum, create_type=False)
-    trigger_type: Mapped[TriggerTypeEnum] = ENUM(TriggerTypeEnum, create_type=False)
-
-    is_recurring: Mapped[bool]
-    calendar_event_id: Mapped[Optional[str]] = Column(String(255), index=True)
+    description: Mapped[Optional[str]]
+    status: Mapped[str]             # pending | done | missed | rescheduled | cancelled
+    scheduled_at: Mapped[Optional[datetime]]
+    duration_minutes: Mapped[Optional[int]]
+    trigger_type: Mapped[str]       # time | location
+    location_trigger: Mapped[Optional[str]]
+    recurrence_rule: Mapped[Optional[str]]
+    completed_at: Mapped[Optional[datetime]]
 
     # Relationships
     user: Mapped["User"] = relationship(back_populates="tasks")
-    goal: Mapped["Goal"] = relationship(back_populates="tasks")
-    milestone: Mapped[Optional["Milestone"]] = relationship(back_populates="tasks")
+    goal: Mapped[Optional["Goal"]] = relationship(back_populates="tasks")
+    notification_logs: Mapped[List["NotificationLog"]] = relationship(back_populates="task")
 ```
 
 ---
@@ -833,40 +743,37 @@ class Task(Base, UUIDMixin, TimestampMixin):
 ```python
 # dao_service/schemas/task.py
 
+TASK_STATUS_VALUES = {"pending", "done", "missed", "rescheduled", "cancelled"}
+TRIGGER_TYPE_VALUES = {"time", "location"}
+
 class TaskBase(BaseSchema):
     """Shared attributes."""
     title: str = Field(..., min_length=1, max_length=500)
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    state: TaskState = TaskState.SCHEDULED
-    priority: TaskPriority = TaskPriority.STANDARD
-
-    @field_validator("end_time")
-    def validate_end_after_start(cls, v, info):
-        if v and info.data.get("start_time") and v < info.data["start_time"]:
-            raise ValueError("end_time must be after start_time")
-        return v
+    status: str = "pending"          # validated against TASK_STATUS_VALUES
+    scheduled_at: Optional[datetime] = None
+    duration_minutes: Optional[int] = Field(default=None, ge=1)
+    trigger_type: str = "time"       # validated against TRIGGER_TYPE_VALUES
+    location_trigger: Optional[str] = None
+    recurrence_rule: Optional[str] = None
+    completed_at: Optional[datetime] = None
 
 class TaskCreateDTO(TaskBase):
     """For creation requests."""
     user_id: UUID
-    goal_id: UUID
-    milestone_id: Optional[UUID] = None
+    goal_id: Optional[UUID] = None
 
 class TaskUpdateDTO(BaseSchema):
-    """For updates - all fields optional."""
+    """For updates — all fields optional."""
     title: Optional[str] = None
-    start_time: Optional[datetime] = None
-    state: Optional[TaskState] = None
-    calendar_event_id: Optional[str] = None
+    status: Optional[str] = None
+    scheduled_at: Optional[datetime] = None
+    goal_id: Optional[UUID] = None
 
-class TaskDTO(TaskBase, IDMixin, TimestampMixin):
+class TaskDTO(TaskBase):
     """Complete response schema."""
     id: UUID
     user_id: UUID
-    goal_id: UUID
-    milestone_id: Optional[UUID] = None
-    calendar_event_id: Optional[str] = None
+    goal_id: Optional[UUID] = None
     created_at: datetime
 ```
 
@@ -897,15 +804,11 @@ class TaskDAOProtocol(Protocol):
 
     # Custom methods for Scheduler microservice
     async def get_tasks_by_user_and_timerange(
-        self, db: DatabaseSession, user_id: UUID, start_time: datetime, end_time: datetime
+        self, db: DatabaseSession, user_id: UUID, start_at: datetime, end_at: datetime
     ) -> List[TaskDTO]: ...
 
-    async def update_calendar_event_id(
-        self, db: DatabaseSession, task_id: UUID, calendar_event_id: str
-    ) -> Optional[TaskDTO]: ...
-
-    async def bulk_update_state(
-        self, db: DatabaseSession, task_ids: List[UUID], new_state: TaskState
+    async def bulk_update_status(
+        self, db: DatabaseSession, task_ids: List[UUID], new_status: str
     ) -> int: ...
 
     # Custom methods for Observer microservice
@@ -951,16 +854,16 @@ class DaoTask:
         return TaskDTO.model_validate(db_obj) if db_obj else None
 
     async def get_tasks_by_user_and_timerange(
-        self, db: DatabaseSession, user_id: UUID, start_time: datetime, end_time: datetime
+        self, db: DatabaseSession, user_id: UUID, start_at: datetime, end_at: datetime
     ) -> List[TaskDTO]:
         session: SQLAlchemyAsyncSession = db
 
         stmt = (
             select(Task)
             .where(Task.user_id == user_id)
-            .where(Task.start_time >= start_time)
-            .where(Task.start_time <= end_time)
-            .order_by(Task.start_time)
+            .where(Task.scheduled_at >= start_at)
+            .where(Task.scheduled_at <= end_at)
+            .order_by(Task.scheduled_at)
         )
         result = await session.execute(stmt)
         tasks = result.scalars().all()
@@ -973,16 +876,16 @@ class DaoTask:
 
         stmt = (
             select(
-                Task.state,
+                Task.status,
                 func.count(Task.id).label("count"),
             )
             .where(Task.user_id == user_id)
             .where(Task.created_at >= start_date)
             .where(Task.created_at <= end_date)
-            .group_by(Task.state)
+            .group_by(Task.status)
         )
         result = await session.execute(stmt)
-        stats = {row.state.value: row.count for row in result}
+        stats = {row.status: row.count for row in result}
         return stats
 ```
 
@@ -1001,8 +904,8 @@ from datetime import datetime
 
 from dao_service.core.database import DatabaseSession
 from dao_service.schemas.task import TaskDTO, TaskCreateDTO, TaskUpdateDTO
-from dao_service.dao.dao_registry import get_task_dao, get_milestone_dao
-from dao_service.dao.dao_protocols import TaskDAOProtocol, MilestoneDAOProtocol
+from dao_service.dao.dao_registry import get_task_dao
+from dao_service.dao.dao_protocols import TaskDAOProtocol
 
 class DaoTaskService:
     """
@@ -1011,13 +914,11 @@ class DaoTaskService:
     Responsibilities:
     - Data format validation (Pydantic handles this)
     - Technical limits (pagination cap)
-    - Optional FK existence checks
     - NO business logic (that belongs in Goal Planner/Scheduler/Observer)
     """
 
     def __init__(self):
         self.task_dao: TaskDAOProtocol = get_task_dao()
-        self.milestone_dao: MilestoneDAOProtocol = get_milestone_dao()
 
     async def get_tasks(
         self, db: DatabaseSession, skip: int = 0, limit: int = 100
@@ -1031,32 +932,23 @@ class DaoTaskService:
         self, db: DatabaseSession, task_data: TaskCreateDTO
     ) -> TaskDTO:
         """
-        Create task with data integrity validation only.
-
-        Data Integrity:
-        - ✅ Check milestone exists (prevents cryptic FK error)
+        Create task — data format validation only.
 
         Business Logic NOT Here:
         - ❌ Does goal belong to user? (Goal Planner service checks)
         - ❌ Should task be created now? (Goal Planner service decides)
         """
-        # Optional: Check milestone exists
-        if task_data.milestone_id:
-            milestone = await self.milestone_dao.get_by_id(db, task_data.milestone_id)
-            if not milestone:
-                raise ValueError(f"Milestone {task_data.milestone_id} not found")
-
         return await self.task_dao.create(db, task_data)
 
     async def get_tasks_for_scheduling(
-        self, db: DatabaseSession, user_id: UUID, start_time: datetime, end_time: datetime
+        self, db: DatabaseSession, user_id: UUID, start_at: datetime, end_at: datetime
     ) -> List[TaskDTO]:
         """
         Data retrieval for Scheduler microservice.
-        NO scheduling logic here - just query execution.
+        NO scheduling logic here — just query execution.
         """
         return await self.task_dao.get_tasks_by_user_and_timerange(
-            db, user_id, start_time, end_time
+            db, user_id, start_at, end_at
         )
 ```
 
@@ -1071,9 +963,9 @@ Services are injected via FastAPI's `Depends()` rather than instantiated per-req
 **Representative Endpoint Example** (same pattern applies to all endpoints):
 ```python
 # dao_service/api/v1/tasks_api.py
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from dao_service.core.database import DatabaseSession
-from dao_service.api.deps import get_db, verify_service_key
+from dao_service.api.deps import get_db
 from dao_service.schemas.task import TaskDTO, TaskCreateDTO
 from dao_service.services.dao_task_service import DaoTaskService
 
@@ -1087,7 +979,6 @@ async def create_task(
     task_data: TaskCreateDTO,
     db: DatabaseSession = Depends(get_db),
     service: DaoTaskService = Depends(get_task_service),
-    _: str = Depends(verify_service_key),
 ):
     """Create a new task."""
     try:
@@ -1111,7 +1002,9 @@ class DaoFactoryProtocol(Protocol):
     def create_user_dao(self) -> UserDAOProtocol: ...
     def create_goal_dao(self) -> GoalDAOProtocol: ...
     def create_task_dao(self) -> TaskDAOProtocol: ...
-    # ... other DAOs
+    def create_conversation_dao(self) -> ConversationDAOProtocol: ...
+    def create_pattern_dao(self) -> PatternDAOProtocol: ...
+    def create_notification_log_dao(self) -> NotificationLogDAOProtocol: ...
 ```
 
 **2. SQLAlchemy Factory**:
@@ -1160,7 +1053,9 @@ class DaoUnitOfWork:
         self.users = factory.create_user_dao()
         self.goals = factory.create_goal_dao()
         self.tasks = factory.create_task_dao()
-        # ... other DAOs
+        self.conversations = factory.create_conversation_dao()
+        self.patterns = factory.create_pattern_dao()
+        self.notification_logs = factory.create_notification_log_dao()
 
     async def __aenter__(self):
         return self
@@ -1176,7 +1071,6 @@ class DaoUnitOfWork:
 ```python
 async with DaoUnitOfWork(db) as uow:
     goal = await uow.goals.create(db, goal_data)
-    milestone = await uow.milestones.create(db, milestone_data)
     task = await uow.tasks.create(db, task_data)
     # If ANY operation fails, ALL are rolled back
 ```
@@ -1344,13 +1238,12 @@ Use this flow to try the API interactively via Swagger UI:
 
 4. **Open Swagger UI:** http://localhost:8000/docs
 
-5. **Authenticate requests:** All endpoints require the `X-Flux-Service-Key` header. In Swagger UI, click the "Authorize" button and enter: `goal-planner-key-abc`
-
-6. **Try a basic flow via Swagger:**
+5. **Try a basic flow via Swagger:**
    - **POST** `/api/v1/users/` — Create a user (returns user with `id`)
    - **POST** `/api/v1/goals/` — Create a goal using the user's `id`
    - **POST** `/api/v1/tasks/` — Create a task linked to the user and goal
-   - **GET** `/api/v1/goals/{goal_id}/full` — View goal with milestones and tasks
+   - **GET** `/api/v1/tasks/by-timerange` — Query tasks in a time window
+   - **GET** `/api/v1/tasks/statistics` — View completion statistics
 
 7. **Other documentation endpoints:**
    - ReDoc: http://localhost:8000/redoc
@@ -1362,8 +1255,8 @@ Use this flow to try the API interactively via Swagger UI:
 # Build the Docker image
 docker build -t flux-dao-service backend/
 
-# Deploy using docker-compose
-docker-compose -f backend/docker-compose.dao-service.yml up -d
+# Deploy using docker compose
+docker compose -f backend/docker-compose.dao-service.yml up -d
 
 # Verify it's running
 curl http://localhost:8000/health
@@ -1372,7 +1265,7 @@ curl http://localhost:8000/health
 open http://localhost:8000/docs
 
 # Stop
-docker-compose -f backend/docker-compose.dao-service.yml down
+docker compose -f backend/docker-compose.dao-service.yml down
 ```
 
 The Docker container connects to Supabase on the host via `host.docker.internal:54322`.
@@ -1397,9 +1290,9 @@ bash backend/dao_service/scripts/run_tests.sh
 ```
 
 **Test Architecture:**
-- **44 unit tests** — Pydantic DTO schema validation (no database), located in `dao_service/tests/unit/`
-- **40 integration tests** — Full API endpoint testing against Supabase PostgreSQL, located in `dao_service/tests/integration/`
-- **Test isolation** — Each integration test gets a fresh session; tables are truncated between tests
+- **103 unit tests** — DAO CRUD tests (mock DB session) + service tests (mock DAO), no database required, located in `dao_service/tests/unit/`
+- **49 integration tests** — Full API endpoint testing against Supabase PostgreSQL, located in `dao_service/tests/integration/`
+- **Test isolation** — Tables truncated at session start; each test uses a fresh ASGI client
 - **Async support** — Uses `pytest-asyncio` with session-scoped event loops
 - **Test discovery** — `pytest.ini` `testpaths` covers both `tests/` (legacy) and `dao_service/tests/`
 
@@ -1413,43 +1306,41 @@ If another Flux service (Goal Planner, Scheduler, Observer) needs to call this s
 import httpx
 
 DAO_SERVICE_URL = "http://flux-dao-service:8000"  # Docker internal network
-SERVICE_KEY = "goal-planner-key-abc"               # From SERVICE_API_KEYS config
-
-headers = {"X-Flux-Service-Key": SERVICE_KEY}
 
 async def example_goal_creation_flow():
-    async with httpx.AsyncClient(base_url=DAO_SERVICE_URL, headers=headers) as client:
+    async with httpx.AsyncClient(base_url=DAO_SERVICE_URL) as client:
         # 1. Create a user
         user_resp = await client.post("/api/v1/users/", json={
-            "name": "Jane Doe",
             "email": "jane@example.com",
+            "onboarded": False,
         })
         user_id = user_resp.json()["id"]
 
-        # 2. Create a goal with milestones and tasks in one call
-        goal_resp = await client.post("/api/v1/goals/with-structure", json={
+        # 2. Create a goal
+        goal_resp = await client.post("/api/v1/goals/", json={
             "user_id": user_id,
             "title": "Run a marathon",
-            "category": "health",
-            "timeline": "12 weeks",
-            "milestones": [
-                {
-                    "week_number": 1,
-                    "title": "Build base fitness",
-                    "tasks": [
-                        {"title": "Run 5km", "trigger_type": "time"},
-                        {"title": "Stretch routine", "trigger_type": "time"},
-                    ],
-                },
-            ],
+            "class_tags": ["health"],
+            "target_weeks": 12,
+            "status": "active",
         })
-        goal = goal_resp.json()
-        print(f"Created goal: {goal['id']} with {len(goal['milestones'])} milestones")
+        goal_id = goal_resp.json()["id"]
+        print(f"Created goal: {goal_id}")
 
-        # 3. Query tasks by time range (used by Scheduler)
+        # 3. Create tasks linked to the goal
+        for title in ["Run 5km", "Stretch routine"]:
+            await client.post("/api/v1/tasks/", json={
+                "user_id": user_id,
+                "goal_id": goal_id,
+                "title": title,
+                "trigger_type": "time",
+            })
+
+        # 4. Query tasks by time range (used by Scheduler)
         tasks_resp = await client.get("/api/v1/tasks/by-timerange", params={
-            "start": "2026-03-01T00:00:00+00:00",
-            "end": "2026-03-07T23:59:59+00:00",
+            "user_id": user_id,
+            "start_at": "2026-03-01T00:00:00+00:00",
+            "end_at": "2026-03-07T23:59:59+00:00",
         })
         tasks = tasks_resp.json()
 ```
@@ -1467,7 +1358,7 @@ async def example_goal_creation_flow():
 | `asyncpg` build fails | Install binary wheel: `pip install --only-binary=:all: asyncpg` |
 | Docker build fails | Ensure Docker Desktop is running and you're in the project root |
 | Tests fail with `TRUNCATE` error | Supabase migration not applied. Run `bash scripts/supabase_setup.sh` |
-| `X-Flux-Service-Key` 401 error | Pass header `X-Flux-Service-Key: goal-planner-key-abc` |
+| `409 Conflict` on create | Duplicate unique field (e.g., `langgraph_thread_id`). Use a different value. |
 
 ---
 
@@ -1520,9 +1411,10 @@ app = FastAPI(
     openapi_tags=[
         {"name": "users", "description": "User operations"},
         {"name": "goals", "description": "Goal management"},
-        {"name": "tasks", "description": "Task operations"},
-        {"name": "milestones", "description": "Milestone management"},
+        {"name": "tasks", "description": "Task operations (includes Scheduler & Observer endpoints)"},
         {"name": "conversations", "description": "Conversation history"},
+        {"name": "patterns", "description": "Behavioral pattern signals"},
+        {"name": "notification-log", "description": "Notification delivery logs"},
     ]
 )
 
@@ -1546,7 +1438,7 @@ This design provides a **scalable, framework-agnostic, enterprise-grade** Data A
 ✅ **OpenAPI Compliant**: Auto-generated documentation with FastAPI
 ✅ **Test Coverage**: Comprehensive unit, integration, and E2E tests
 
-**Implementation Complete**: 84 tests passing (44 unit + 40 integration) against Supabase PostgreSQL. Dockerized as an internal microservice on the `flux-internal` network.
+**Implementation Complete**: 152 tests passing (103 unit + 49 integration) against Supabase PostgreSQL. Dockerized as an internal microservice on the `flux-internal` network.
 
 ---
 

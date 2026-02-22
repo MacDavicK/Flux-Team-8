@@ -127,13 +127,13 @@ If you prefer containerised development or want to spin up PostgreSQL without in
 ### Start all services
 
 ```bash
-docker-compose up
+docker compose up
 ```
 
 ### Start only the database
 
 ```bash
-docker-compose up db
+docker compose up db
 ```
 
 This gives you a PostgreSQL 15 instance on port 5432 with credentials:
@@ -144,7 +144,7 @@ This gives you a PostgreSQL 15 instance on port 5432 with credentials:
 ### Stop and remove volumes
 
 ```bash
-docker-compose down -v
+docker compose down -v
 ```
 
 ---

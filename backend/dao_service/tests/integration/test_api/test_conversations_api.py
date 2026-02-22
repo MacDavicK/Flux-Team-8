@@ -96,6 +96,7 @@ class TestConversationEndpoints:
         first_resp = await client.post("/api/v1/conversations/", json=data)
         assert first_resp.status_code == 201
 
-        # Current API does not normalize DB integrity errors to HTTP yet.
-        with pytest.raises(Exception):
-            await client.post("/api/v1/conversations/", json=data)
+        # langgraph_thread_id has a UNIQUE constraint in the DB.
+        # The global IntegrityError handler normalises this to 409 Conflict.
+        second_resp = await client.post("/api/v1/conversations/", json=data)
+        assert second_resp.status_code == 409

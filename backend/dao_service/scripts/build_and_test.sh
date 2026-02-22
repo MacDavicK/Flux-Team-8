@@ -203,17 +203,17 @@ CONTAINER_DEPLOYED=false
 if [ $UNIT_EXIT -eq 0 ]; then
     header "Step 7: Deploy Container"
 
-    docker-compose -f "$BACKEND_DIR/docker-compose.dao-service.yml" down 2>/dev/null || true
+    docker compose -f "$BACKEND_DIR/docker-compose.dao-service.yml" down 2>/dev/null || true
 
-    if docker-compose -f "$BACKEND_DIR/docker-compose.dao-service.yml" up -d 2>&1; then
+    if docker compose -f "$BACKEND_DIR/docker-compose.dao-service.yml" up -d 2>&1; then
         success "Container deployed: flux-dao-service"
         record_step "Container deployment" "PASS"
         CONTAINER_DEPLOYED=true
     else
         error "Failed to deploy container."
         error ""
-        error "Check docker-compose output above."
-        error "Try: docker-compose -f backend/docker-compose.dao-service.yml logs"
+        error "Check docker compose output above."
+        error "Try: docker compose -f backend/docker-compose.dao-service.yml logs"
         record_step "Container deployment" "FAIL"
     fi
 fi
@@ -359,7 +359,7 @@ success "Test report generated: $REPORT_FILE"
 # ============================================================
 if [ "$CLEANUP" = true ] && [ "$CONTAINER_DEPLOYED" = true ]; then
     header "Step 11: Cleanup"
-    docker-compose -f "$BACKEND_DIR/docker-compose.dao-service.yml" down 2>/dev/null
+    docker compose -f "$BACKEND_DIR/docker-compose.dao-service.yml" down 2>/dev/null
     success "Container stopped and removed"
 fi
 
@@ -389,7 +389,7 @@ echo ""
 if [ "$CONTAINER_DEPLOYED" = true ] && [ "$CLEANUP" = false ]; then
     info "DAO service is running at http://localhost:8000"
     info "Swagger UI: http://localhost:8000/docs"
-    info "To stop: docker-compose -f backend/docker-compose.dao-service.yml down"
+    info "To stop: docker compose -f backend/docker-compose.dao-service.yml down"
 fi
 
 echo ""

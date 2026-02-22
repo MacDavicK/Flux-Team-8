@@ -92,6 +92,15 @@ else
   info "Backend dependencies installed in venv"
 fi
 
+if [ -f dao_service/requirements.txt ]; then
+  pip install --quiet -r dao_service/requirements.txt
+  info "DAO service production dependencies installed"
+fi
+if [ -f dao_service/requirements-dev.txt ]; then
+  pip install --quiet -r dao_service/requirements-dev.txt
+  info "DAO service dev/test dependencies installed"
+fi
+
 if [ ! -f .env ]; then
   cp .env.example .env
   info "Created backend/.env from .env.example"
@@ -114,4 +123,8 @@ echo "  2. Fill in API keys in backend/.env"
 echo "  3. Start frontend:   cd frontend && npm run dev"
 echo "  4. Start backend:    cd backend && source venv/bin/activate && make dev"
 echo "  5. Open http://localhost:5173 in your browser"
+echo ""
+echo "DAO Service tests:"
+echo "  cd backend && pytest dao_service/tests/unit/ -v         # unit tests (no DB needed)"
+echo "  cd backend && pytest dao_service/tests/integration/ -v  # integration tests (needs Supabase)"
 echo ""

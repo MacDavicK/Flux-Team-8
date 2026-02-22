@@ -88,13 +88,6 @@ case "$MODE" in
         else
             echo ""
             check_supabase
-            info "Running integration tests..."
-            echo ""
-            pytest dao_service/tests/integration/ -v --tb=short || EXIT_CODE=$?
-        fi
-
-        if [ $EXIT_CODE -eq 0 ]; then
-            echo ""
             info "Running full suite with coverage..."
             echo ""
             pytest dao_service/tests/ -v --cov=dao_service --cov-report=term-missing --tb=short || EXIT_CODE=$?

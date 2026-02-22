@@ -18,7 +18,7 @@ class Conversation(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "conversations"
 
     user_id: Mapped[UUID] = mapped_column(
-        PG_UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False
+        PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False
     )
     langgraph_thread_id: Mapped[str] = mapped_column(Text, nullable=False, unique=True)
     context_type: Mapped[str] = mapped_column(Text, nullable=False)
