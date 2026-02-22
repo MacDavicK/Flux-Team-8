@@ -10,43 +10,38 @@ from dao_service.schemas.user import UserCreateDTO, UserUpdateDTO
 
 class TestUserCreateDTO:
     def test_valid_user(self):
-        dto = UserCreateDTO(name="Alice", email="alice@flux.ai")
-        assert dto.name == "Alice"
-        assert dto.preferences == {}
-        assert dto.demo_mode is False
-
-    def test_empty_name_rejected(self):
-        with pytest.raises(ValidationError):
-            UserCreateDTO(name="", email="alice@flux.ai")
+        dto = UserCreateDTO(email="alice@flux.ai")
+        assert dto.email == "alice@flux.ai"
+        assert dto.onboarded is False
 
     def test_empty_email_rejected(self):
         with pytest.raises(ValidationError):
-            UserCreateDTO(name="Alice", email="")
+            UserCreateDTO(email="")
 
-    def test_name_exceeds_max_length(self):
+    def test_email_max_length_rejected(self):
         with pytest.raises(ValidationError):
-            UserCreateDTO(name="x" * 256, email="alice@flux.ai")
+            UserCreateDTO(email=("x" * 256))
 
-    def test_custom_preferences(self):
+    def test_profile_and_notification_preferences_allowed(self):
         dto = UserCreateDTO(
-            name="Bob",
-            email="bob@flux.ai",
-            preferences={"theme": "dark", "notifications": True},
+            email="prefs@flux.ai",
+            profile={"name": "Alice"},
+            notification_preferences={"whatsapp_opted_in": True},
         )
-        assert dto.preferences["theme"] == "dark"
+        assert dto.profile == {"name": "Alice"}
+        assert dto.notification_preferences == {"whatsapp_opted_in": True}
 
 
 class TestUserUpdateDTO:
     def test_empty_update_allowed(self):
         dto = UserUpdateDTO()
-        assert dto.name is None
         assert dto.email is None
 
     def test_partial_update(self):
-        dto = UserUpdateDTO(name="Updated Name")
-        assert dto.name == "Updated Name"
+        dto = UserUpdateDTO(onboarded=True)
+        assert dto.onboarded is True
         assert dto.email is None
 
-    def test_empty_name_rejected_on_update(self):
+    def test_invalid_empty_email_rejected(self):
         with pytest.raises(ValidationError):
-            UserUpdateDTO(name="")
+            UserUpdateDTO(email="")

@@ -8,12 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 
 from dao_service.api.deps import get_db, get_task_service, verify_service_key
 from dao_service.core.database import DatabaseSession
-from dao_service.core.exceptions import ForeignKeyError
 from dao_service.schemas.pagination import PaginatedResponse
 from dao_service.schemas.task import (
     BulkUpdateResponse,
     BulkUpdateStateRequest,
-    CalendarEventUpdateRequest,
     TaskCreateDTO,
     TaskDTO,
     TaskStatisticsDTO,
@@ -47,13 +45,13 @@ async def list_tasks(
 @router.get("/by-timerange", response_model=List[TaskDTO])
 async def get_tasks_by_timerange(
     user_id: UUID,
-    start_time: datetime,
-    end_time: datetime,
+    start_at: datetime,
+    end_at: datetime,
     db: DatabaseSession = Depends(get_db),
     service: DaoTaskService = Depends(get_task_service),
     _: str = Depends(verify_service_key),
 ):
-    return await service.get_tasks_for_scheduling(db, user_id, start_time, end_time)
+    return await service.get_tasks_for_scheduling(db, user_id, start_at, end_at)
 
 
 @router.get("/statistics", response_model=TaskStatisticsDTO)
@@ -88,10 +86,7 @@ async def create_task(
     service: DaoTaskService = Depends(get_task_service),
     _: str = Depends(verify_service_key),
 ):
-    try:
-        return await service.create_task(db, data)
-    except ForeignKeyError as e:
-        raise HTTPException(status_code=422, detail=str(e))
+    return await service.create_task(db, data)
 
 
 @router.patch("/{task_id}", response_model=TaskDTO)
@@ -127,19 +122,5 @@ async def bulk_update_task_state(
     service: DaoTaskService = Depends(get_task_service),
     _: str = Depends(verify_service_key),
 ):
-    count = await service.bulk_update_state(db, data.task_ids, data.new_state)
+    count = await service.bulk_update_status(db, data.task_ids, data.new_status)
     return BulkUpdateResponse(updated_count=count)
-
-
-@router.patch("/{task_id}/calendar-event", response_model=TaskDTO)
-async def update_calendar_event_id(
-    task_id: UUID,
-    data: CalendarEventUpdateRequest,
-    db: DatabaseSession = Depends(get_db),
-    service: DaoTaskService = Depends(get_task_service),
-    _: str = Depends(verify_service_key),
-):
-    result = await service.update_calendar_event_id(db, task_id, data.calendar_event_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
-    return result

@@ -14,8 +14,8 @@ class TestUserEndpoints:
         resp = await client.post("/api/v1/users/", json=data)
         assert resp.status_code == 201
         body = resp.json()
-        assert body["name"] == data["name"]
         assert body["email"] == data["email"]
+        assert body["onboarded"] is False
         assert "id" in body
         assert "created_at" in body
 
@@ -57,15 +57,15 @@ class TestUserEndpoints:
 
         update_resp = await client.patch(
             f"/api/v1/users/{user_id}",
-            json={"name": "Updated Name"},
+            json={"onboarded": True},
         )
         assert update_resp.status_code == 200
-        assert update_resp.json()["name"] == "Updated Name"
+        assert update_resp.json()["onboarded"] is True
 
     async def test_update_user_not_found(self, client: AsyncClient):
         resp = await client.patch(
             "/api/v1/users/00000000-0000-0000-0000-000000000000",
-            json={"name": "Ghost"},
+            json={"onboarded": True},
         )
         assert resp.status_code == 404
 
@@ -84,6 +84,6 @@ class TestUserEndpoints:
         resp = await client.delete("/api/v1/users/00000000-0000-0000-0000-000000000000")
         assert resp.status_code == 404
 
-    async def test_create_user_invalid_empty_name(self, client: AsyncClient):
-        resp = await client.post("/api/v1/users/", json={"name": "", "email": "x@y.z"})
+    async def test_create_user_invalid_empty_email(self, client: AsyncClient):
+        resp = await client.post("/api/v1/users/", json={"email": ""})
         assert resp.status_code == 422

@@ -35,10 +35,6 @@ def get_goal_dao():
     return get_dao_factory().create_goal_dao()
 
 
-def get_milestone_dao():
-    return get_dao_factory().create_milestone_dao()
-
-
 def get_task_dao():
     return get_dao_factory().create_task_dao()
 
@@ -47,5 +43,9 @@ def get_conversation_dao():
     return get_dao_factory().create_conversation_dao()
 
 
-def get_demo_flag_dao():
-    return get_dao_factory().create_demo_flag_dao()
+def get_pattern_dao():
+    return get_dao_factory().create_pattern_dao()
+
+
+def get_notification_log_dao():
+    return get_dao_factory().create_notification_log_dao()

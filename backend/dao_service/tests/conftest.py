@@ -2,7 +2,7 @@
 Shared fixtures for dao_service tests.
 
 Uses local Supabase PostgreSQL (port 54322) for integration tests.
-Database tables are created by Supabase migration (20260213145903_create_mvp_tables.sql).
+Database tables are created by Supabase migrations.
 
 Clean-state pattern:
 - Each test gets a fresh database session
@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from dao_service.models.base import Base
-from dao_service.models import Conversation, DemoFlag, Goal, Milestone, Task, User  # noqa: F401
+from dao_service.models import Conversation, Goal, NotificationLog, Pattern, Task, User  # noqa: F401
 from dao_service.core.database import get_db
 from dao_service.api.deps import verify_service_key
 from dao_service.main import app
@@ -104,10 +104,15 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 def make_user_data(**overrides) -> dict:
     """Generate user creation data with sensible defaults."""
     defaults = {
-        "name": f"Test User {uuid4().hex[:6]}",
         "email": f"test-{uuid4().hex[:8]}@flux.test",
-        "preferences": {},
-        "demo_mode": False,
+        "onboarded": False,
+        "profile": {},
+        "notification_preferences": {
+            "phone_number": None,
+            "whatsapp_opted_in": False,
+            "reminder_lead_minutes": 10,
+            "escalation_window_minutes": 2,
+        },
     }
     defaults.update(overrides)
     return defaults
@@ -118,36 +123,24 @@ def make_goal_data(user_id: str, **overrides) -> dict:
     defaults = {
         "user_id": user_id,
         "title": f"Test Goal {uuid4().hex[:6]}",
-        "category": "health",
-        "timeline": "4 weeks",
+        "description": "Test goal description",
+        "class_tags": ["Health"],
         "status": "active",
+        "target_weeks": 6,
     }
     defaults.update(overrides)
     return defaults
 
 
-def make_milestone_data(goal_id: str, **overrides) -> dict:
-    """Generate milestone creation data."""
-    defaults = {
-        "goal_id": goal_id,
-        "week_number": 1,
-        "title": f"Test Milestone {uuid4().hex[:6]}",
-        "status": "pending",
-    }
-    defaults.update(overrides)
-    return defaults
-
-
-def make_task_data(user_id: str, goal_id: str, **overrides) -> dict:
+def make_task_data(user_id: str, goal_id: str | None = None, **overrides) -> dict:
     """Generate task creation data."""
     defaults = {
         "user_id": user_id,
         "goal_id": goal_id,
         "title": f"Test Task {uuid4().hex[:6]}",
-        "state": "scheduled",
-        "priority": "standard",
+        "status": "pending",
         "trigger_type": "time",
-        "is_recurring": False,
+        "duration_minutes": 30,
     }
     defaults.update(overrides)
     return defaults

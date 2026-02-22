@@ -5,9 +5,9 @@ from sqlalchemy import text
 
 from dao_service.api.v1 import (
     conversations_api,
-    demo_flags_api,
     goals_api,
-    milestones_api,
+    notification_log_api,
+    patterns_api,
     tasks_api,
     users_api,
 )
@@ -21,9 +21,9 @@ app = FastAPI(
         {"name": "users", "description": "User operations"},
         {"name": "goals", "description": "Goal management"},
         {"name": "tasks", "description": "Task operations (includes Scheduler & Observer endpoints)"},
-        {"name": "milestones", "description": "Milestone management"},
         {"name": "conversations", "description": "Conversation history"},
-        {"name": "demo-flags", "description": "Demo/simulation flags"},
+        {"name": "patterns", "description": "Behavioral pattern signals"},
+        {"name": "notification-log", "description": "Notification delivery logs"},
     ],
 )
 
@@ -31,9 +31,9 @@ app = FastAPI(
 app.include_router(users_api.router, prefix="/api/v1")
 app.include_router(goals_api.router, prefix="/api/v1")
 app.include_router(tasks_api.router, prefix="/api/v1")
-app.include_router(milestones_api.router, prefix="/api/v1")
 app.include_router(conversations_api.router, prefix="/api/v1")
-app.include_router(demo_flags_api.router, prefix="/api/v1")
+app.include_router(patterns_api.router, prefix="/api/v1")
+app.include_router(notification_log_api.router, prefix="/api/v1")
 
 
 # --- Operational endpoints ---
