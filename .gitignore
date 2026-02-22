@@ -70,3 +70,4 @@ dev-dist/
 
 # ---------- Cursor / Claude internal ----------
 .claude/
+.claude
