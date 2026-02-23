@@ -4,16 +4,31 @@ from datetime import datetime
 from typing import List, Optional
 from uuid import UUID
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
 from dao_service.schemas.base import BaseSchema
+
+GOAL_STATUS_VALUES = {"active", "completed", "abandoned", "pipeline"}
 
 
 class GoalBase(BaseSchema):
     title: str = Field(..., min_length=1, max_length=500)
-    category: Optional[str] = None
-    timeline: Optional[str] = None
+    description: Optional[str] = None
+    class_tags: Optional[List[str]] = None
     status: str = "active"
+    parent_goal_id: Optional[UUID] = None
+    pipeline_order: Optional[int] = None
+    activated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    target_weeks: int = Field(default=6, ge=1)
+    plan_json: Optional[dict] = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        if value not in GOAL_STATUS_VALUES:
+            raise ValueError(f"status must be one of: {sorted(GOAL_STATUS_VALUES)}")
+        return value
 
 
 class GoalCreateDTO(GoalBase):
@@ -22,68 +37,25 @@ class GoalCreateDTO(GoalBase):
 
 class GoalUpdateDTO(BaseSchema):
     title: Optional[str] = Field(None, min_length=1, max_length=500)
-    category: Optional[str] = None
-    timeline: Optional[str] = None
+    description: Optional[str] = None
+    class_tags: Optional[List[str]] = None
     status: Optional[str] = None
+    parent_goal_id: Optional[UUID] = None
+    pipeline_order: Optional[int] = None
+    activated_at: Optional[datetime] = None
+    completed_at: Optional[datetime] = None
+    target_weeks: Optional[int] = Field(default=None, ge=1)
+    plan_json: Optional[dict] = None
+
+    @field_validator("status")
+    @classmethod
+    def validate_status(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None and value not in GOAL_STATUS_VALUES:
+            raise ValueError(f"status must be one of: {sorted(GOAL_STATUS_VALUES)}")
+        return value
 
 
 class GoalDTO(GoalBase):
     id: UUID
     user_id: UUID
     created_at: datetime
-
-
-class MilestoneInGoalDTO(BaseSchema):
-    """Inline milestone for GoalWithRelationsDTO."""
-
-    id: UUID
-    week_number: int
-    title: str
-    status: str
-    created_at: datetime
-
-
-class TaskInGoalDTO(BaseSchema):
-    """Inline task for GoalWithRelationsDTO."""
-
-    id: UUID
-    title: str
-    state: str
-    priority: str
-    milestone_id: Optional[UUID] = None
-    created_at: datetime
-
-
-class GoalWithRelationsDTO(GoalDTO):
-    """Goal with nested milestones and tasks."""
-
-    milestones: List[MilestoneInGoalDTO] = []
-    tasks: List[TaskInGoalDTO] = []
-
-
-class GoalStructureCreateDTO(BaseSchema):
-    """Request body for creating a goal with milestones and tasks atomically."""
-
-    goal: GoalCreateDTO
-    milestones: List["MilestoneStructureDTO"] = []
-
-
-class MilestoneStructureDTO(BaseSchema):
-    """Milestone with inline tasks for atomic creation."""
-
-    week_number: int = Field(..., ge=1)
-    title: str = Field(..., min_length=1, max_length=500)
-    status: str = "pending"
-    tasks: List["TaskStructureDTO"] = []
-
-
-class TaskStructureDTO(BaseSchema):
-    """Task data for inline creation within a milestone."""
-
-    title: str = Field(..., min_length=1, max_length=500)
-    start_time: Optional[datetime] = None
-    end_time: Optional[datetime] = None
-    state: str = "scheduled"
-    priority: str = "standard"
-    trigger_type: str = "time"
-    is_recurring: bool = False

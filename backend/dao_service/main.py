@@ -1,13 +1,15 @@
 """FastAPI application entry point."""
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 
 from dao_service.api.v1 import (
     conversations_api,
-    demo_flags_api,
     goals_api,
-    milestones_api,
+    notification_log_api,
+    patterns_api,
     tasks_api,
     users_api,
 )
@@ -21,19 +23,31 @@ app = FastAPI(
         {"name": "users", "description": "User operations"},
         {"name": "goals", "description": "Goal management"},
         {"name": "tasks", "description": "Task operations (includes Scheduler & Observer endpoints)"},
-        {"name": "milestones", "description": "Milestone management"},
         {"name": "conversations", "description": "Conversation history"},
-        {"name": "demo-flags", "description": "Demo/simulation flags"},
+        {"name": "patterns", "description": "Behavioral pattern signals"},
+        {"name": "notification-log", "description": "Notification delivery logs"},
     ],
 )
+
+# --- Exception handlers ---
+
+
+@app.exception_handler(IntegrityError)
+async def integrity_error_handler(request: Request, exc: IntegrityError) -> JSONResponse:
+    """Return 409 Conflict for unique/FK constraint violations instead of 500."""
+    return JSONResponse(
+        status_code=409,
+        content={"detail": "A resource with a conflicting unique constraint already exists."},
+    )
+
 
 # Mount v1 routers
 app.include_router(users_api.router, prefix="/api/v1")
 app.include_router(goals_api.router, prefix="/api/v1")
 app.include_router(tasks_api.router, prefix="/api/v1")
-app.include_router(milestones_api.router, prefix="/api/v1")
 app.include_router(conversations_api.router, prefix="/api/v1")
-app.include_router(demo_flags_api.router, prefix="/api/v1")
+app.include_router(patterns_api.router, prefix="/api/v1")
+app.include_router(notification_log_api.router, prefix="/api/v1")
 
 
 # --- Operational endpoints ---
