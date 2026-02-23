@@ -115,3 +115,45 @@ class TaskRecord(BaseModel):
     state: TaskState = TaskState.SCHEDULED
     priority: TaskPriority = TaskPriority.STANDARD
     is_recurring: bool = False
+
+
+# ── Scheduler Models ───────────────────────────────────────
+
+class SchedulerSuggestRequest(BaseModel):
+    """Body for POST /scheduler/suggest"""
+    event_id: str = Field(..., description="UUID of the drifted task")
+
+
+class RescheduleSuggestion(BaseModel):
+    """A single reschedule option."""
+    new_start: datetime
+    new_end: datetime
+    label: str = Field(..., description="Human-readable label, e.g. '5:00 PM Today'")
+    rationale: str = Field(..., description="Why this slot was chosen")
+
+
+class SchedulerSuggestResponse(BaseModel):
+    """Returned by POST /scheduler/suggest"""
+    event_id: str
+    task_title: str
+    suggestions: list[RescheduleSuggestion]
+    skip_option: bool = True
+    ai_message: str = Field(..., description="Conversational message, e.g. 'Gym drifted. I can do:'")
+
+
+class SchedulerApplyRequest(BaseModel):
+    """Body for POST /scheduler/apply"""
+    event_id: str = Field(..., description="UUID of the task to reschedule")
+    action: str = Field(..., description="'reschedule' or 'skip'")
+    new_start: Optional[datetime] = None
+    new_end: Optional[datetime] = None
+
+
+class SchedulerApplyResponse(BaseModel):
+    """Returned by POST /scheduler/apply"""
+    event_id: str
+    action: str
+    new_state: TaskState
+    new_start: Optional[datetime] = None
+    new_end: Optional[datetime] = None
+    message: str
