@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import type { EventType } from "~/types/event";
 import { cn } from "~/utils/cn";
+
+export type EventType = "sage" | "terra" | "stone";
 
 interface TimelineEventProps {
   title: string;
@@ -10,6 +11,8 @@ interface TimelineEventProps {
   type: EventType;
   avatars?: string[];
   isLast?: boolean;
+  isDrifted?: boolean;
+  onShuffle?: () => void;
 }
 
 export function TimelineEvent({
@@ -18,6 +21,9 @@ export function TimelineEvent({
   time,
   period,
   type,
+  avatars,
+  isDrifted,
+  onShuffle,
 }: TimelineEventProps) {
   const typeClasses = {
     sage: "glass-pebble-sage rounded-tl-md",
@@ -37,10 +43,28 @@ export function TimelineEvent({
         transition={{ duration: 0.3, ease: "easeOut" }}
         whileHover={{ scale: 1.02 }}
         className={cn(
-          "flex-1 p-5 rounded-[1.5rem] transition-transform",
+          "flex-1 p-5 rounded-[1.5rem] transition-transform relative",
           typeClasses[type],
+          isDrifted && "shadow-[0_0_15px_rgba(194,125,102,0.4)]",
         )}
       >
+        {isDrifted && (
+          <>
+            <div className="absolute top-2 right-2 w-2 h-2 rounded-full bg-terracotta animate-pulse" />
+            {onShuffle && (
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onShuffle();
+                }}
+                className="absolute top-2 right-8 px-2 py-1 rounded-lg text-xs font-medium text-terracotta bg-terracotta/10 hover:bg-terracotta/20 transition-colors"
+              >
+                Shuffle?
+              </button>
+            )}
+          </>
+        )}
         <h3 className="text-lg font-semibold text-charcoal mb-1 pt-0">
           {title}
         </h3>
