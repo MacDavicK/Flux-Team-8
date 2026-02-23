@@ -17,6 +17,7 @@ import json
 import logging
 from typing import Any, Optional
 
+import httpx
 from openai import AsyncOpenAI
 
 from app.config import settings
@@ -145,6 +146,7 @@ class GoalPlannerAgent:
         self._client = AsyncOpenAI(
             api_key=settings.open_router_api_key,
             base_url=settings.openrouter_base_url,
+            http_client=httpx.AsyncClient(trust_env=False),
         )
         self._model = settings.openai_model
         self._sources: list[dict] = []
@@ -328,8 +330,6 @@ class GoalPlannerAgent:
         self.state = ConversationState.AWAITING_CONFIRMATION
 
         # Generate the plan (with RAG if available)
-        plan = await self._generate_plan()
-        # Generate the plan using a dedicated prompt (now RAG-enhanced)
         plan, sources = await self._generate_plan()
         self.plan = plan
         self._sources = sources
@@ -355,7 +355,6 @@ class GoalPlannerAgent:
             "state": self.state,
             "suggested_action": "Looks good!",
             "plan": plan,
-            "sources": getattr(self, "_sources", []),
             "sources": sources,
         }
 
@@ -373,7 +372,6 @@ class GoalPlannerAgent:
                 "state": self.state,
                 "suggested_action": None,
                 "plan": self.plan,
-                "sources": getattr(self, "_sources", []),
                 "sources": self._sources,
             }
         else:
@@ -387,7 +385,6 @@ class GoalPlannerAgent:
                 "state": self.state,
                 "suggested_action": None,
                 "plan": self.plan,
-                "sources": getattr(self, "_sources", []),
                 "sources": self._sources,
             }
 
@@ -415,56 +412,6 @@ class GoalPlannerAgent:
             # Fallback responses so the conversation doesn't break
             return self._fallback_response()
 
-    async def _generate_plan(self) -> list[PlanMilestone]:
-        """Ask GPT-4o-mini to generate a structured 6-week plan.
-
-        If RAG content is available, injects expert article context into the
-        prompt and includes source citations. Falls back gracefully if RAG
-        retrieval fails or returns no relevant content.
-        """
-        # --- RAG retrieval (non-blocking) ---
-        rag_context = ""
-        self._sources = []
-        self._rag_available = False
-
-        try:
-            # Build a composite query from the gathered context
-            query_parts = [
-                self.context.get("goal", ""),
-                self.context.get("preferences", ""),
-                self.context.get("target", ""),
-            ]
-            query = " ".join(part for part in query_parts if part)
-
-            if query.strip():
-                chunks = await asyncio.to_thread(rag_service.retrieve, query)
-                rag_context = await asyncio.to_thread(
-                    rag_service.format_rag_context, chunks
-                )
-
-                if rag_context:
-                    self._rag_available = True
-                    # Extract unique sources for the response
-                    seen = set()
-                    for chunk in chunks:
-                        key = (chunk["title"], chunk["source"])
-                        if key not in seen and chunk["score"] > settings.rag_relevance_threshold:
-                            seen.add(key)
-                            self._sources.append({
-                                "title": chunk["title"],
-                                "source": chunk["source"],
-                            })
-                    logger.info(
-                        "RAG context injected: %d chars, %d sources",
-                        len(rag_context), len(self._sources),
-                    )
-                else:
-                    logger.info("RAG retrieval returned no relevant chunks for: %s", query[:80])
-
-        except Exception as e:
-            logger.warning("RAG retrieval failed (proceeding without): %s", e)
-
-        # --- Build prompt ---
     async def _generate_plan(self) -> tuple[list[PlanMilestone], list[dict]]:
         """Ask the LLM to generate a structured 6-week plan, grounded in RAG content.
 
@@ -474,6 +421,7 @@ class GoalPlannerAgent:
         """
         sources: list[dict] = []
         rag_section = "\n"
+        formatted = ""
 
         # --- RAG retrieval (blocking I/O → run in thread) ---------------
         try:
@@ -503,13 +451,16 @@ class GoalPlannerAgent:
             logger.warning("RAG retrieval failed (will generate without): %s", e)
 
         # --- Plan generation --------------------------------------------
+        self._rag_available = bool(sources)
+        self._sources = sources
+
         try:
-            if rag_context:
+            if formatted:
                 expert_context_section = (
                     "## Expert Content\n\n"
                     "The following excerpts come from curated, expert-reviewed articles. "
                     "Use them as the primary basis for your plan.\n\n"
-                    f"{rag_context}"
+                    f"{formatted}"
                 )
                 rag_rules = RAG_RULES
             else:
@@ -553,19 +504,13 @@ class GoalPlannerAgent:
             if llm_sources:
                 self._sources = llm_sources
 
-            return milestones
+            return (milestones, self._sources)
 
         except Exception as e:
             logger.error("Plan generation failed: %s", e)
-            # Fallback plan is generic; do not claim it was based on RAG/sources
             self._rag_available = False
             self._sources = []
-            return self._fallback_plan()
-            return milestones, sources
-
-        except Exception as e:
-            logger.error(f"Plan generation failed: {e}")
-            return self._fallback_plan(), []
+            return (self._fallback_plan(), [])
 
     # ── Fallbacks ───────────────────────────────────────────
 
