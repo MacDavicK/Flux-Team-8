@@ -1,13 +1,12 @@
--- Drop all Flux MVP tables and custom enum types
--- Order matters: drop dependent tables first to respect foreign keys
+-- Drop all Flux-Claude canonical tables/views
+-- Order matters: drop dependent objects first.
 
-DROP TABLE IF EXISTS demo_flags CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS missed_by_category CASCADE;
+DROP MATERIALIZED VIEW IF EXISTS user_weekly_stats CASCADE;
+
+DROP TABLE IF EXISTS notification_log CASCADE;
 DROP TABLE IF EXISTS conversations CASCADE;
+DROP TABLE IF EXISTS patterns CASCADE;
 DROP TABLE IF EXISTS tasks CASCADE;
-DROP TABLE IF EXISTS milestones CASCADE;
 DROP TABLE IF EXISTS goals CASCADE;
 DROP TABLE IF EXISTS users CASCADE;
-
-DROP TYPE IF EXISTS task_state;
-DROP TYPE IF EXISTS task_priority;
-DROP TYPE IF EXISTS trigger_type;

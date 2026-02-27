@@ -1,251 +1,167 @@
-# Flux - Agentic AI Goal Achievement Platform
+# Flux Backend — DAO Service
 
-[![Python](https://img.shields.io/badge/python-3.9+-blue.svg)](https://www.python.org/downloads/)
-[![FastAPI](https://img.shields.io/badge/FastAPI-0.109.0-green.svg)](https://fastapi.tiangolo.com/)
+[![Python](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.115.6-green.svg)](https://fastapi.tiangolo.com/)
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-**Flux** is an Agentic AI system that transforms abstract goals into achievable daily actions. It acts as your AI partner, understanding your long-term aspirations, breaking them down into manageable routines, and guiding you with context-aware, empathetic support.
+The **Flux DAO Service** is a framework-agnostic data persistence microservice for all Flux AI agents (Goal Planner, Scheduler, Observer). It exposes a REST API for CRUD operations and contains **no business logic** — that belongs in the calling services.
 
-## 🌟 Features
+---
 
-- **AI-Powered Goal Breakdown**: Automatically breaks down long-term goals into weekly milestones and daily tasks
-- **Smart Scheduling**: Integrates with your calendar to find optimal time slots for tasks
-- **Intelligent Notifications**: Sends timely reminders when it's time to work on tasks
-- **Adaptive Rescheduling**: Automatically reschedules missed tasks based on your availability
-- **Context-Aware Support**: AI understands your goals and provides empathetic guidance
-- **RESTful API**: Easy-to-use FastAPI endpoints for all operations
-
-## 🏗️ Architecture
+## Architecture
 
 ```
-Flux/
-├── main.py                    # FastAPI application & endpoints
-├── config.py                  # Configuration and settings
-├── database.py                # Database setup and session management
-├── models.py                  # SQLAlchemy database models
-├── schemas.py                 # Pydantic schemas for API
-├── ai_agent.py                # AI agent for goal analysis
-├── calendar_service.py        # Calendar and scheduling logic
-├── notification_service.py    # Notification management
-├── test_main.py              # Unit tests
-├── requirements.txt          # Python dependencies
-├── .env.example              # Example environment variables
-└── README.md                 # This file
+backend/
+├── dao_service/                          # DAO microservice
+│   ├── main.py                          # FastAPI app + exception handlers
+│   ├── config.py                        # Pydantic Settings
+│   ├── core/                            # database.py, exceptions.py, logging.py
+│   ├── models/                          # SQLAlchemy ORM models
+│   │   ├── user_model.py
+│   │   ├── goal_model.py
+│   │   ├── task_model.py
+│   │   ├── conversation_model.py
+│   │   ├── pattern_model.py
+│   │   └── notification_log_model.py
+│   ├── schemas/                         # Pydantic DTO layer
+│   │   ├── user.py, goal.py, task.py
+│   │   ├── conversation.py, pattern.py, notification_log.py
+│   │   └── pagination.py
+│   ├── dao/                             # DAO protocols + SQLAlchemy implementations
+│   │   ├── dao_protocols.py
+│   │   ├── dao_registry.py
+│   │   └── impl/sqlalchemy/
+│   ├── services/                        # Data-validation services (no business logic)
+│   │   ├── dao_user_service.py
+│   │   ├── dao_goal_service.py
+│   │   ├── dao_task_service.py
+│   │   ├── dao_conversation_service.py
+│   │   ├── dao_pattern_service.py
+│   │   └── dao_notification_log_service.py
+│   ├── api/v1/                          # FastAPI routers
+│   │   ├── users_api.py, goals_api.py, tasks_api.py
+│   │   ├── conversations_api.py, patterns_api.py
+│   │   └── notification_log_api.py
+│   ├── tests/
+│   │   ├── unit/                        # 103 unit tests (no DB needed)
+│   │   └── integration/                 # 49 integration tests (needs Supabase)
+│   ├── scripts/
+│   │   ├── build_and_test.sh            # Full pipeline: build → unit → Docker → integration
+│   │   ├── run_tests.sh                 # Run tests only
+│   │   └── setup_dao.sh                 # Environment setup
+│   ├── requirements.txt
+│   └── requirements-dev.txt
+├── Dockerfile
+├── docker-compose.dao-service.yml
+└── Makefile
 ```
 
-## 🚀 Getting Started
+---
+
+## Entities
+
+| Entity | Table | Description |
+|--------|-------|-------------|
+| **User** | `users` | User profile — `email`, `onboarded`, `profile`, `notification_preferences` |
+| **Goal** | `goals` | User goal — `title`, `class_tags`, `status`, `target_weeks`, `plan_json` |
+| **Task** | `tasks` | Schedulable task — `title`, `status`, `trigger_type`, `scheduled_at` |
+| **Conversation** | `conversations` | LangGraph thread record — `langgraph_thread_id`, `context_type` |
+| **Pattern** | `patterns` | Behavioral signal — `pattern_type`, `data`, `confidence` |
+| **NotificationLog** | `notification_log` | Delivery record — `channel`, `sent_at`, `response` |
+
+---
+
+## API Endpoints
+
+All endpoints are prefixed with `/api/v1`. Full OpenAPI docs at `http://localhost:8000/docs`.
+
+| Group | Prefix | Methods |
+|-------|--------|---------|
+| Users | `/users` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}` |
+| Goals | `/goals` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}` |
+| Tasks | `/tasks` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}`, GET `/by-timerange`, GET `/statistics`, POST `/bulk-update-state` |
+| Conversations | `/conversations` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}` |
+| Patterns | `/patterns` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}` |
+| Notification Log | `/notification-log` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}` |
+| Operations | — | GET `/health`, GET `/ready` |
+
+**Task statuses**: `pending`, `done`, `missed`, `rescheduled`, `cancelled`
+**Task trigger types**: `time`, `location`
+**Goal statuses**: `active`, `completed`, `abandoned`, `pipeline`
+**Notification channels**: `push`, `whatsapp`, `call`
+
+---
+
+## Getting Started
 
 ### Prerequisites
 
-- Python 3.9 or higher
-- OpenAI API key
+- Python 3.11+
+- Docker Desktop
+- Supabase CLI: `brew install supabase/tap/supabase`
 
-### Installation
-
-1. **Clone the repository**
-
-   ```bash
-   git clone https://github.com/yourusername/flux.git
-   cd flux
-   ```
-
-2. **Create a virtual environment**
-
-   ```bash
-   python -m venv venv
-   
-   # On Windows
-   .\venv\Scripts\activate
-   
-   # On macOS/Linux
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies**
-
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Set up environment variables**
-
-   ```bash
-   # Copy the example file
-   cp .env.example .env
-   
-   # Edit .env and add your OpenAI API key
-   OPENAI_API_KEY=your_openai_api_key_here
-   ```
-
-5. **Run the application**
-
-   ```bash
-   python main.py
-   ```
-
-   The API will be available at `http://localhost:8000`
-
-6. **View API documentation**
-   - Swagger UI: `http://localhost:8000/docs`
-   - ReDoc: `http://localhost:8000/redoc`
-
-## 📖 API Usage
-
-### Create a Goal
+### Local Development
 
 ```bash
-POST http://localhost:8000/goals
-Content-Type: application/json
+# 1. Start Supabase
+supabase start
 
-{
-  "title": "Learn Machine Learning",
-  "description": "Master ML fundamentals and build real-world projects",
-  "due_date": "2026-03-15T00:00:00",
-  "user_id": "user123"
-}
+# 2. Create and activate virtual environment
+cd backend
+python3 -m venv venv && source venv/bin/activate
+
+# 3. Install dependencies
+pip install -r dao_service/requirements.txt
+pip install -r dao_service/requirements-dev.txt
+
+# 4. Create .env (if not present)
+# DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:54322/postgres
+
+# 5. Start the service
+make dev
 ```
 
-**Response:**
+API available at `http://localhost:8000` — Swagger UI at `http://localhost:8000/docs`.
 
-```json
-{
-  "id": 1,
-  "user_id": "user123",
-  "title": "Learn Machine Learning",
-  "description": "Master ML fundamentals and build real-world projects",
-  "due_date": "2026-03-15T00:00:00",
-  "status": "pending",
-  "created_at": "2026-02-12T10:00:00",
-  "updated_at": "2026-02-12T10:00:00",
-  "ai_analysis": null
-}
-```
-
-### Get Goal Breakdown
+### Running via Docker
 
 ```bash
-GET http://localhost:8000/goals/1/breakdown
+docker build -t flux-dao-service backend/
+docker compose -f backend/docker-compose.dao-service.yml up -d
+curl http://localhost:8000/health
 ```
-
-**Response:**
-
-```json
-{
-  "goal": { ... },
-  "milestones": [
-    {
-      "id": 1,
-      "goal_id": 1,
-      "title": "Week 1: Python Basics",
-      "description": "Learn Python fundamentals",
-      "week_number": 1,
-      "target_date": "2026-02-19T00:00:00",
-      "is_completed": false
-    }
-  ],
-  "tasks": [
-    {
-      "id": 1,
-      "goal_id": 1,
-      "milestone_id": 1,
-      "title": "Learn Python syntax",
-      "description": "Study variables, functions, and control flow",
-      "scheduled_date": "2026-02-13T09:00:00",
-      "duration_minutes": 30,
-      "status": "scheduled"
-    }
-  ],
-  "total_weeks": 4,
-  "total_tasks": 20
-}
-```
-
-### Acknowledge a Notification
-
-```bash
-POST http://localhost:8000/notifications/acknowledge
-Content-Type: application/json
-
-{
-  "notification_id": 1,
-  "acknowledged": true
-}
-```
-
-### Complete a Task
-
-```bash
-POST http://localhost:8000/tasks/1/complete
-```
-
-### Get Calendar Events
-
-```bash
-GET http://localhost:8000/calendar/events?start_date=2026-02-12T00:00:00&end_date=2026-02-19T00:00:00
-```
-
-## 🧪 Testing
-
-Run the test suite:
-
-```bash
-pytest test_main.py -v
-```
-
-Run with coverage:
-
-```bash
-pytest test_main.py --cov=. --cov-report=html
-```
-
-## 🔧 Configuration
-
-Edit `.env` file to customize:
-
-- `OPENAI_API_KEY`: Your OpenAI API key
-- `OPENAI_MODEL`: Model to use (default: gpt-4-turbo-preview)
-- `DATABASE_URL`: Database connection string
-- `DEFAULT_WORK_START_HOUR`: Working hours start (default: 9)
-- `DEFAULT_WORK_END_HOUR`: Working hours end (default: 18)
-- `DEFAULT_TASK_DURATION_MINUTES`: Default task duration (default: 30)
-- `NOTIFICATION_CHECK_INTERVAL_MINUTES`: How early to notify (default: 15)
-- `MISSED_TASK_RESCHEDULE_DAYS`: Days to reschedule missed tasks (default: 1)
-
-## 🎯 How It Works
-
-1. **Goal Creation**: User submits a goal with a due date
-2. **AI Analysis**: AI agent analyzes the goal and provides insights
-3. **Breakdown**: AI breaks the goal into weekly milestones and daily tasks
-4. **Scheduling**: Calendar service schedules tasks in available time slots
-5. **Notifications**: System sends reminders before each task
-6. **Acknowledgment**: User acknowledges or dismisses notifications
-7. **Rescheduling**: Missed tasks are automatically rescheduled
-8. **Completion**: User marks tasks as complete, tracking progress
-
-## 🔮 Future Enhancements
-
-- [ ] Multi-user authentication and authorization
-- [ ] Integration with Google Calendar, Outlook, etc.
-- [ ] Push notifications (mobile, email, SMS)
-- [ ] Progress visualization and analytics
-- [ ] Habit tracking and streak monitoring
-- [ ] Natural language input for goals
-- [ ] Voice assistant integration
-- [ ] Team collaboration features
-- [ ] Mobile app (iOS/Android)
-
-## 🤝 Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-## 🙏 Acknowledgments
-
-- Built with [FastAPI](https://fastapi.tiangolo.com/)
-- AI powered by [OpenAI](https://openai.com/)
-- LLM framework by [LangChain](https://langchain.com/)
-
-## 📧 Contact
-
-For questions or feedback, please open an issue on GitHub.
 
 ---
+
+## Testing
+
+```bash
+cd backend
+
+# Unit tests only (no database, ~0.5s)
+pytest dao_service/tests/unit/ -v
+
+# Integration tests (needs Supabase on port 54322)
+pytest dao_service/tests/integration/ -v
+
+# Full suite with coverage
+pytest dao_service/tests/ --cov=dao_service --cov-report=term-missing
+
+# Complete pipeline (build → unit → Docker deploy → integration → report)
+bash dao_service/scripts/build_and_test.sh
+```
+
+**Test counts**: 103 unit tests + 49 integration tests = 152 total.
+
+---
+
+## Design
+
+See [`docs/dao_design.md`](../docs/dao_design.md) for the full architecture document covering:
+- `DatabaseSession` protocol for ORM-agnostic layers
+- DAO protocol interfaces and SQLAlchemy implementations
+- Factory / Registry pattern for ORM switching
+- ACID transaction support via Unit of Work
+- Layer responsibilities (ORM → DTO → DAO → Service → API)
+
+See [`docs/user_guide_dao.md`](../docs/user_guide_dao.md) for integration examples (REST HTTP and direct Python API).

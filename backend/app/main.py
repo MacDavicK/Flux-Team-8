@@ -10,6 +10,16 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.config import settings
 from app.routers import goals, rag
 
+# Scrum sprint feature routers
+try:
+    from scrum_40_notification_priority_model.routes import priority_router as scrum40_router
+    from scrum_41_push_notification_integration.routes import router as scrum41_router
+    from scrum_43_phone_call_trigger.routes import router as scrum43_router
+    SCRUM_ROUTERS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Some scrum routers could not be loaded: {e}")
+    SCRUM_ROUTERS_AVAILABLE = False
+
 app = FastAPI(
     title="Flux Life Assistant API",
     description="AI-powered goal decomposition and compassionate scheduling",
@@ -28,6 +38,12 @@ app.add_middleware(
 # ── Routers ─────────────────────────────────────────────────
 app.include_router(goals.router)
 app.include_router(rag.router)
+
+# Include scrum sprint feature routers (if available)
+if SCRUM_ROUTERS_AVAILABLE:
+    app.include_router(scrum40_router)
+    app.include_router(scrum41_router)
+    app.include_router(scrum43_router)
 
 
 # ── Health Check ────────────────────────────────────────────

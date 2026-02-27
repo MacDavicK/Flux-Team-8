@@ -10,8 +10,9 @@ from dao_service.core.database import DatabaseSession, get_db  # noqa: F401 — 
 from dao_service.services.dao_user_service import DaoUserService
 from dao_service.services.dao_goal_service import DaoGoalService
 from dao_service.services.dao_task_service import DaoTaskService
-from dao_service.services.dao_milestone_service import DaoMilestoneService
 from dao_service.services.dao_conversation_service import DaoConversationService
+from dao_service.services.dao_notification_log_service import DaoNotificationLogService
+from dao_service.services.dao_pattern_service import DaoPatternService
 
 # --- Service key authentication ---
 
@@ -43,9 +44,13 @@ def get_task_service() -> DaoTaskService:
     return DaoTaskService()
 
 
-def get_milestone_service() -> DaoMilestoneService:
-    return DaoMilestoneService()
-
-
 def get_conversation_service() -> DaoConversationService:
     return DaoConversationService()
+
+
+def get_pattern_service() -> DaoPatternService:
+    return DaoPatternService()
+
+
+def get_notification_log_service() -> DaoNotificationLogService:
+    return DaoNotificationLogService()

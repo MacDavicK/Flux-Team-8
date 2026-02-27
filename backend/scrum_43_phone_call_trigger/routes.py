@@ -26,7 +26,7 @@ except ValueError as e:
     twilio_service = None
 
 
-@router.post("", response_model=CallResponse, status_code=201)
+@router.post("", response_model=CallResponse, status_code=201, summary="Trigger Phone Call", description="Initiate an outbound Twilio Voice call to the configured phone number. Plays a TTS message with the task title and waits for DTMF acknowledgement (press 1).", responses={400: {"description": "Invalid request payload"}, 500: {"description": "Twilio API error or configuration missing"}})
 async def initiate_call(call_request: CallRequest, request: Request) -> CallResponse:
     """Initiate a phone call with TTS message and gather user input.
     
@@ -76,7 +76,7 @@ async def initiate_call(call_request: CallRequest, request: Request) -> CallResp
         )
 
 
-@router.post("/twiml", response_class=Response)
+@router.post("/twiml", response_class=Response, summary="Generate TwiML", description="Twilio webhook: Returns TwiML XML that instructs Twilio to speak the task reminder message and gather DTMF input from the caller.", responses={200: {"description": "TwiML XML response"}})
 async def generate_twiml(
     request: Request,
     task_title: str,
@@ -130,7 +130,7 @@ async def generate_twiml(
     return Response(content=str(response), media_type="application/xml")
 
 
-@router.post("/gather", response_class=Response)
+@router.post("/gather", response_class=Response, summary="Handle DTMF Input", description="Twilio webhook: Processes DTMF digits collected during the call. Digit 1 marks the notification as acknowledged.", responses={200: {"description": "TwiML XML response"}})
 async def handle_gather(
     request: Request,
     Digits: Optional[str] = Form(None),
@@ -191,7 +191,7 @@ async def handle_gather(
     return Response(content=str(response), media_type="application/xml")
 
 
-@router.post("/status")
+@router.post("/status", summary="Call Status Callback", description="Twilio webhook: Receives call status updates (initiated, ringing, in-progress, completed, failed, no-answer, busy). Updates the call record accordingly.", responses={200: {"description": "Status received"}, 500: {"description": "Status processing error"}})
 async def handle_status(
     CallSid: str = Form(...),
     CallStatus: str = Form(...),

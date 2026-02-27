@@ -1,11 +1,10 @@
 """SQLAlchemy implementation of GoalDAOProtocol."""
 
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession as SQLAlchemyAsyncSession
-from sqlalchemy.orm import selectinload
 
 from dao_service.core.database import DatabaseSession
 from dao_service.models.goal_model import Goal
@@ -67,20 +66,3 @@ class DaoGoal:
         await session.flush()
         return True
 
-    async def get_with_relations(self, db: DatabaseSession, id: UUID) -> Optional[Dict[str, Any]]:
-        """Load goal with eager-loaded milestones and tasks."""
-        session: SQLAlchemyAsyncSession = db
-        stmt = (
-            select(Goal)
-            .where(Goal.id == id)
-            .options(selectinload(Goal.milestones), selectinload(Goal.tasks))
-        )
-        result = await session.execute(stmt)
-        db_obj = result.scalar_one_or_none()
-        if db_obj is None:
-            return None
-        return {
-            "goal": db_obj,
-            "milestones": db_obj.milestones,
-            "tasks": db_obj.tasks,
-        }
