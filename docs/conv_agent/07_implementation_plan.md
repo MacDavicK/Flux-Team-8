@@ -123,7 +123,7 @@ Full voice UI working in the browser.
 - Manual: test on mobile Safari and Chrome
 
 ### Deliverable
-Robust, complete voice agent feature.
+Robust, complete voice agent feature with inline documentation in code and tests. 
 
 ---
 
