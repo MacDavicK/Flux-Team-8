@@ -201,21 +201,16 @@ class IntentHandler:
 
 ---
 
-## What the Backend Does NOT Do
+## Scope Boundary
 
-Compared to the previous backend-relay design, the following are **removed**:
+The backend handles **control plane only** — it never touches audio or manages persistent connections. Specifically:
 
-| Removed | Why |
-|---------|-----|
-| WebSocket endpoint (`WS /voice/session/{id}/ws`) | Client connects directly to Deepgram |
-| `DeepgramClient` (Python WebSocket to Deepgram) | No backend-to-Deepgram connection |
-| `AudioRelay` (bridges two WebSockets) | No audio relay |
-| `EventHandler` (dispatches Deepgram events) | Client handles events directly |
-| `SessionRegistry` (in-memory session store) | No long-lived backend state per session |
-| `SSEManager` (server-sent events) | No SSE — client gets events from Deepgram directly |
-| KeepAlive management | Client sends KeepAlive to Deepgram directly |
+- No WebSocket endpoints
+- No audio streaming or binary frame handling
+- No Deepgram connection management
+- No in-memory session state
 
-The backend is stateless between requests. It just does CRUD + an HTTP call to Deepgram for tokens.
+The backend is stateless between requests. It does CRUD + an HTTP call to Deepgram for tokens.
 
 ---
 

@@ -16,17 +16,16 @@ A voice conversation mode for the Flux app. The user taps a mic button, speaks n
 
 ---
 
-## Why Deepgram Voice Agent (not OpenAI Realtime)
+## Deepgram Voice Agent API
 
-| Concern | Deepgram Voice Agent | OpenAI Realtime |
-|---------|---------------------|-----------------|
-| Architecture | Single WebSocket — STT + LLM + TTS managed by Deepgram | WebRTC (client) + companion WebSocket (backend) |
-| Complexity | One connection, clear event model | Three simultaneous connections to coordinate |
-| LLM choice | Pluggable — OpenAI, Anthropic, Groq, etc. | Locked to `gpt-4o-realtime-preview` |
-| TTS choice | Pluggable — Deepgram Aura, ElevenLabs, Cartesia, OpenAI | Locked to OpenAI voices |
-| Function calling | Built-in, client-side or server-side | Built-in |
-| Cost | ~$4.50/hr flat rate | ~$0.60-0.70 per 2-min session (~$18-21/hr) |
-| Direct browser connection | Yes — temp token auth, browser connects directly | Yes — via WebRTC with ephemeral key |
+The Deepgram Voice Agent API provides a single WebSocket that bundles STT, LLM, and TTS into one managed pipeline. Key capabilities we use:
+
+- **Single WebSocket** — browser connects directly, sends mic audio, receives TTS audio + JSON events
+- **Pluggable LLM** — we use GPT-4o-mini but can swap to any supported model
+- **Pluggable TTS** — we use Deepgram Aura but can swap voices
+- **Built-in function calling** — the LLM can invoke client-side functions, which we use for intent extraction
+- **Turn detection** — Deepgram handles silence detection and barge-in server-side
+- **Temp token auth** — backend mints a short-lived JWT so the browser connects without exposing the API key
 
 ---
 
@@ -67,11 +66,10 @@ The browser connects **directly** to Deepgram via WebSocket. The backend **never
 | Deepgram WebSocket | React PWA → Deepgram | Audio (binary) + JSON events (transcripts, function calls, status) |
 | REST calls | React PWA → FastAPI | Session creation, message persistence, intent processing |
 
-This is simpler than relaying audio through the backend:
-- No backend WebSocket handling
-- No binary audio frame management
-- No two-WebSocket coordination
-- Lower latency (one hop instead of two)
+Benefits:
+- Backend stays simple — just REST endpoints, no WebSocket or audio handling
+- Lower latency — audio goes directly to Deepgram, no extra hop
+- Less code — no binary frame management or connection bridging
 
 ### How Auth Works
 
