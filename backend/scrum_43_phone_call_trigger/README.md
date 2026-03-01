@@ -247,3 +247,38 @@ logging.basicConfig(
 ---
 
 **Built for SCRUM-43 | Flux Life Assistant**
+
+---
+
+## Swagger / API Documentation
+
+This module uses **FastAPI**, which provides automatic interactive API documentation via Swagger UI.
+
+### Running the standalone API server
+
+```bash
+# From the backend/ directory
+cd /workspaces/Flux-Team-8/backend
+uvicorn scrum_43_phone_call_trigger.main:app --host 0.0.0.0 --port 8043 --reload
+```
+
+### Accessing Swagger UI
+
+| Interface | URL |
+|---|---|
+| **Swagger UI** (interactive) | `http://localhost:8043/docs` |
+| **ReDoc** (read-only) | `http://localhost:8043/redoc` |
+| **OpenAPI JSON spec** | `http://localhost:8043/openapi.json` |
+
+Once running, open `http://localhost:8043/docs` in your browser to explore and test all endpoints interactively.
+
+### Running via the main app
+
+This module's router is also included in the main backend app. When running the full backend:
+
+```bash
+cd /workspaces/Flux-Team-8/backend
+uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+All `Phone Call Trigger API` endpoints will be available at `http://localhost:8000/docs` alongside the other modules.

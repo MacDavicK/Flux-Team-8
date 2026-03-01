@@ -5,3 +5,5 @@ twilio>=8.10.0
 flask>=3.0.0
 
 # Python standard library (no additional packages needed)
+
+flasgger>=0.9.7.1

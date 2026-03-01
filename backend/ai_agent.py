@@ -14,6 +14,8 @@ class AIAgent:
         self.llm = ChatOpenAI(
             model=settings.goal_planner_model,
             temperature=0.7,
+            openai_api_key=settings.open_router_api_key or "",
+            openai_api_base=settings.openrouter_base_url,
             openai_api_key=settings.open_router_api_key,
             base_url=settings.openrouter_base_url,
         )

@@ -16,7 +16,6 @@ class DaoUnitOfWork:
     Usage:
         async with DaoUnitOfWork(db) as uow:
             goal = await uow.goals.create(db, goal_data)
-            milestone = await uow.milestones.create(db, milestone_data)
             task = await uow.tasks.create(db, task_data)
             # If ANY fails, ALL are rolled back
     """
@@ -26,10 +25,10 @@ class DaoUnitOfWork:
         factory = get_dao_factory()
         self.users = factory.create_user_dao()
         self.goals = factory.create_goal_dao()
-        self.milestones = factory.create_milestone_dao()
         self.tasks = factory.create_task_dao()
         self.conversations = factory.create_conversation_dao()
-        self.demo_flags = factory.create_demo_flag_dao()
+        self.patterns = factory.create_pattern_dao()
+        self.notification_logs = factory.create_notification_log_dao()
 
     async def __aenter__(self):
         return self

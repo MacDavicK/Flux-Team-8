@@ -1,8 +1,8 @@
-import { AnimatePresence, motion } from "framer-motion";
-import { Bell, X, MessageSquare, Phone } from "lucide-react";
-import { useSimulation } from "~/agents/SimulationContext";
-import { cn } from "~/utils/cn";
 import { useNavigate } from "@tanstack/react-router";
+import { AnimatePresence, motion } from "framer-motion";
+import { Bell, MessageSquare, Phone, X } from "lucide-react";
+import { useSimulation } from "~/contexts/SimulationContext";
+import { cn } from "~/utils/cn";
 
 export function NotificationCenter() {
   const { notifications, removeNotification, handleNotificationAction } =

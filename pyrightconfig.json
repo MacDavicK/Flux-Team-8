@@ -1,0 +1,12 @@
+{
+  "pythonVersion": "3.13",
+  "venvPath": "backend",
+  "venv": ".venv",
+  "include": [
+    "backend/dao_service",
+    "backend/app",
+    "backend/tests"
+  ],
+  "extraPaths": ["backend"],
+  "typeCheckingMode": "basic"
+}

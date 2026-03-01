@@ -31,10 +31,7 @@ venv/
 # ---------- IDE ----------
 .idea/
 # Allow shared VS Code settings and extension recommendations
-.vscode/*
-!.vscode/settings.json
-!.vscode/extensions.json
-!.vscode/launch.json
+.vscode
 
 # ---------- OS ----------
 .DS_Store
@@ -70,3 +67,7 @@ dev-dist/
 # ---------- Files ----------
 *.pdf
 CURSOR-PROMPT-README.md
+.python-version
+
+# ---------- Cursor / Claude internal ----------
+.claude/

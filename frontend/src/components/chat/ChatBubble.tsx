@@ -1,9 +1,10 @@
 import { motion } from "framer-motion";
+import type { MessageVariant } from "~/types/message";
 import { cn } from "~/utils/cn";
 
 interface ChatBubbleProps {
   children: React.ReactNode;
-  variant: "user" | "ai";
+  variant: MessageVariant;
   className?: string;
   animate?: boolean;
 }
@@ -37,3 +38,5 @@ export function ChatBubble({
     </motion.div>
   );
 }
+
+export type { MessageVariant };

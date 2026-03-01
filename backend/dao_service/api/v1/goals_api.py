@@ -9,9 +9,7 @@ from dao_service.core.database import DatabaseSession
 from dao_service.schemas.goal import (
     GoalCreateDTO,
     GoalDTO,
-    GoalStructureCreateDTO,
     GoalUpdateDTO,
-    GoalWithRelationsDTO,
 )
 from dao_service.schemas.pagination import PaginatedResponse
 from dao_service.services.dao_goal_service import DaoGoalService
@@ -52,19 +50,6 @@ async def get_goal(
     return result
 
 
-@router.get("/{goal_id}/full", response_model=GoalWithRelationsDTO)
-async def get_goal_full(
-    goal_id: UUID,
-    db: DatabaseSession = Depends(get_db),
-    service: DaoGoalService = Depends(get_goal_service),
-    _: str = Depends(verify_service_key),
-):
-    result = await service.get_goal_full(db, goal_id)
-    if result is None:
-        raise HTTPException(status_code=404, detail=f"Goal {goal_id} not found")
-    return result
-
-
 @router.post("/", response_model=GoalDTO, status_code=status.HTTP_201_CREATED)
 async def create_goal(
     data: GoalCreateDTO,
@@ -73,16 +58,6 @@ async def create_goal(
     _: str = Depends(verify_service_key),
 ):
     return await service.create_goal(db, data)
-
-
-@router.post("/with-structure", response_model=GoalWithRelationsDTO, status_code=status.HTTP_201_CREATED)
-async def create_goal_with_structure(
-    data: GoalStructureCreateDTO,
-    db: DatabaseSession = Depends(get_db),
-    service: DaoGoalService = Depends(get_goal_service),
-    _: str = Depends(verify_service_key),
-):
-    return await service.create_goal_with_structure(db, data)
 
 
 @router.patch("/{goal_id}", response_model=GoalDTO)

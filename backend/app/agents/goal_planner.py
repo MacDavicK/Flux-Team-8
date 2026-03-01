@@ -17,6 +17,7 @@ import json
 import logging
 from typing import Any, Optional
 
+import httpx
 from openai import AsyncOpenAI
 
 from app.config import settings
@@ -61,8 +62,7 @@ Respond with ONLY the next conversational message — no JSON, no markdown heade
 """
 
 PLAN_GENERATION_PROMPT = """\
-You are Flux, an AI life assistant. Based on the conversation context below,
-generate a structured 6-week health & fitness plan.
+You are Flux, an AI life assistant and behavioral scientist. Based on the conversation context below, generate a structured 6-week health & fitness plan.
 
 Context:
 - Goal: {goal}
@@ -70,6 +70,9 @@ Context:
 - Current state: {current_state}
 - Target: {target}
 - Preferences: {preferences}
+
+{expert_context_section}
+
 {rag_section}
 Generate a JSON object with this exact structure:
 {{
@@ -80,6 +83,12 @@ Generate a JSON object with this exact structure:
       "tasks": ["task 1", "task 2", "task 3"]
     }}
   ],
+  "sources": [
+    {{
+      "title": "Article title",
+      "source": "URL"
+    }}
+  ]
   "sources_used": ["Article title 1", "Article title 2"]
 }}
 
@@ -90,12 +99,30 @@ Rules:
 - Progress from lighter to more intense across the weeks.
 - Include a mix of the user's preferences (gym, diet, etc.).
 - Make it realistic and achievable.
+{rag_rules}
 - Ground your recommendations in the expert content above when available.
 - In "sources_used", list the exact article titles you referenced. If no expert
   content was provided, return an empty array.
 
 Respond with ONLY the JSON object, nothing else.
 """
+
+RAG_RULES = """\
+- Ground recommendations in the expert content provided above. Do NOT fabricate advice.
+- If the expert content doesn't cover a specific topic, note that in the task description.
+- Include a "sources" array listing every article you referenced. Each entry must have "title" and "source" fields.
+- Cite sources naturally in task descriptions where applicable (e.g. "Based on CDC guidelines, aim for...").\
+"""
+
+NO_RAG_RULES = """\
+- If no expert content was provided, generate the best plan from your general knowledge.
+- Set "sources" to an empty array [].\
+"""
+
+FALLBACK_NO_EXPERT_CONTENT = (
+    "I don't have expert guidance for this specific goal yet. "
+    "I'll create a plan based on general best practices instead."
+)
 
 
 class GoalPlannerAgent:
@@ -119,7 +146,11 @@ class GoalPlannerAgent:
         self._client = AsyncOpenAI(
             api_key=settings.open_router_api_key,
             base_url=settings.openrouter_base_url,
+            http_client=httpx.AsyncClient(trust_env=False),
         )
+        self._model = settings.openai_model
+        self._sources: list[dict] = []
+        self._rag_available = False
         self._model = settings.goal_planner_model
 
     # ── Public API ──────────────────────────────────────────
@@ -298,16 +329,26 @@ class GoalPlannerAgent:
         self.context["preferences"] = message
         self.state = ConversationState.AWAITING_CONFIRMATION
 
-        # Generate the plan using a dedicated prompt (now RAG-enhanced)
+        # Generate the plan (with RAG if available)
         plan, sources = await self._generate_plan()
         self.plan = plan
         self._sources = sources
 
-        ai_response = (
-            "I've put together a personalized 6-week plan based on our conversation! 🎯\n\n"
-            "Here's what I've designed for you. Take a look and let me know if you'd like "
-            "to adjust anything, or say **'Looks good!'** to lock it in."
-        )
+        # Build response message based on whether RAG content was found
+        if self._rag_available:
+            ai_response = (
+                "I've put together a personalized 6-week plan based on our conversation "
+                "and expert health & fitness research! 🎯\n\n"
+                "Here's what I've designed for you. Take a look and let me know if you'd like "
+                "to adjust anything, or say **'Looks good!'** to lock it in."
+            )
+        else:
+            ai_response = (
+                f"{FALLBACK_NO_EXPERT_CONTENT}\n\n"
+                "I've put together a 6-week plan based on our conversation! 🎯\n\n"
+                "Take a look and let me know if you'd like to adjust anything, "
+                "or say **'Looks good!'** to lock it in."
+            )
 
         return {
             "message": ai_response,
@@ -380,6 +421,7 @@ class GoalPlannerAgent:
         """
         sources: list[dict] = []
         rag_section = "\n"
+        formatted = ""
 
         # --- RAG retrieval (blocking I/O → run in thread) ---------------
         try:
@@ -409,13 +451,30 @@ class GoalPlannerAgent:
             logger.warning("RAG retrieval failed (will generate without): %s", e)
 
         # --- Plan generation --------------------------------------------
+        self._rag_available = bool(sources)
+        self._sources = sources
+
         try:
+            if formatted:
+                expert_context_section = (
+                    "## Expert Content\n\n"
+                    "The following excerpts come from curated, expert-reviewed articles. "
+                    "Use them as the primary basis for your plan.\n\n"
+                    f"{formatted}"
+                )
+                rag_rules = RAG_RULES
+            else:
+                expert_context_section = ""
+                rag_rules = NO_RAG_RULES
+
             prompt = PLAN_GENERATION_PROMPT.format(
                 goal=self.context.get("goal", ""),
                 timeline=self.context.get("timeline", ""),
                 current_state=self.context.get("current_state", ""),
                 target=self.context.get("target", ""),
                 preferences=self.context.get("preferences", ""),
+                expert_context_section=expert_context_section,
+                rag_rules=rag_rules,
                 rag_section=rag_section,
             )
 
@@ -423,7 +482,7 @@ class GoalPlannerAgent:
                 model=self._model,
                 messages=[{"role": "user", "content": prompt}],
                 temperature=0.7,
-                max_tokens=1500,
+                max_tokens=2000,
                 response_format={"type": "json_object"},
             )
 
@@ -439,11 +498,19 @@ class GoalPlannerAgent:
                         tasks=item["tasks"],
                     )
                 )
-            return milestones, sources
+
+            # Capture LLM-reported sources (may differ from retrieval sources)
+            llm_sources = data.get("sources", [])
+            if llm_sources:
+                self._sources = llm_sources
+
+            return (milestones, self._sources)
 
         except Exception as e:
-            logger.error(f"Plan generation failed: {e}")
-            return self._fallback_plan(), []
+            logger.error("Plan generation failed: %s", e)
+            self._rag_available = False
+            self._sources = []
+            return (self._fallback_plan(), [])
 
     # ── Fallbacks ───────────────────────────────────────────
 
@@ -509,6 +576,7 @@ class GoalPlannerAgent:
             "context": self.context,
             "messages": self.messages,
             "plan": [m.model_dump() for m in self.plan] if self.plan else None,
+            "sources": getattr(self, "_sources", []),
             "sources": self._sources,
         }
 
@@ -522,6 +590,8 @@ class GoalPlannerAgent:
         agent.state = ConversationState(data["state"])
         agent.context = data.get("context", {})
         agent.messages = data.get("messages", [])
+        agent._sources = data.get("sources", [])
+        agent._rag_available = bool(agent._sources)
 
         raw_plan = data.get("plan")
         if raw_plan:

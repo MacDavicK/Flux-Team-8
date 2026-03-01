@@ -20,6 +20,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
+import httpx
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from openai import OpenAI
 from pinecone import Pinecone
@@ -40,9 +41,16 @@ def _get_openai_client() -> OpenAI:
     """Return an OpenAI client routed through OpenRouter."""
     global _openai_client
     if _openai_client is None:
+        key = (settings.open_router_api_key or "").strip()
+        if not key:
+            raise ValueError(
+                "OPEN_ROUTER_API_KEY is not set. Add it to backend/.env (or set the env var). "
+                "Get a key at https://openrouter.ai/keys"
+            )
         _openai_client = OpenAI(
-            api_key=settings.open_router_api_key,
+            api_key=key,
             base_url=settings.openrouter_base_url,
+            http_client=httpx.Client(trust_env=False),
         )
     return _openai_client
 

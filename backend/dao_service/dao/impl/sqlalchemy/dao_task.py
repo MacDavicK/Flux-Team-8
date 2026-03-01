@@ -8,9 +8,7 @@ from sqlalchemy import func, select, update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession as SQLAlchemyAsyncSession
 
 from dao_service.core.database import DatabaseSession
-from dao_service.models.enums import TaskStateEnum
 from dao_service.models.task_model import Task
-from dao_service.schemas.enums import TaskState
 from dao_service.schemas.task import TaskCreateDTO, TaskDTO, TaskUpdateDTO
 
 
@@ -72,43 +70,27 @@ class DaoTask:
     # --- Custom methods for Scheduler ---
 
     async def get_tasks_by_user_and_timerange(
-        self, db: DatabaseSession, user_id: UUID, start_time: datetime, end_time: datetime
+        self, db: DatabaseSession, user_id: UUID, start_at: datetime, end_at: datetime
     ) -> List[TaskDTO]:
         session: SQLAlchemyAsyncSession = db
         stmt = (
             select(Task)
             .where(Task.user_id == user_id)
-            .where(Task.start_time >= start_time)
-            .where(Task.start_time <= end_time)
-            .order_by(Task.start_time)
+            .where(Task.scheduled_at >= start_at)
+            .where(Task.scheduled_at <= end_at)
+            .order_by(Task.scheduled_at)
         )
         result = await session.execute(stmt)
         return [TaskDTO.model_validate(t) for t in result.scalars().all()]
 
-    async def update_calendar_event_id(
-        self, db: DatabaseSession, task_id: UUID, calendar_event_id: str
-    ) -> Optional[TaskDTO]:
-        session: SQLAlchemyAsyncSession = db
-        stmt = select(Task).where(Task.id == task_id)
-        result = await session.execute(stmt)
-        db_obj = result.scalar_one_or_none()
-        if db_obj is None:
-            return None
-        db_obj.calendar_event_id = calendar_event_id
-        await session.flush()
-        await session.refresh(db_obj)
-        return TaskDTO.model_validate(db_obj)
-
-    async def bulk_update_state(
-        self, db: DatabaseSession, task_ids: List[UUID], new_state: TaskState
+    async def bulk_update_status(
+        self, db: DatabaseSession, task_ids: List[UUID], new_status: str
     ) -> int:
         session: SQLAlchemyAsyncSession = db
-        # Map pydantic enum to ORM enum
-        orm_state = TaskStateEnum(new_state.value)
         stmt = (
             sql_update(Task)
             .where(Task.id.in_(task_ids))
-            .values(state=orm_state)
+            .values(status=new_status)
         )
         result = await session.execute(stmt)
         await session.flush()
@@ -121,12 +103,12 @@ class DaoTask:
     ) -> Dict[str, Any]:
         session: SQLAlchemyAsyncSession = db
         stmt = (
-            select(Task.state, func.count(Task.id).label("count"))
+            select(Task.status, func.count(Task.id).label("count"))
             .where(Task.user_id == user_id)
             .where(Task.created_at >= start_date)
             .where(Task.created_at <= end_date)
-            .group_by(Task.state)
+            .group_by(Task.status)
         )
         result = await session.execute(stmt)
-        stats = {row.state.value: row.count for row in result}
+        stats = {row.status: row.count for row in result}
         return stats

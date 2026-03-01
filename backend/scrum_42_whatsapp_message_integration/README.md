@@ -268,3 +268,34 @@ For issues or questions, please refer to:
 ## License
 
 Part of Flux Life Assistant - AI-powered life management platform.
+
+---
+
+## Swagger / API Documentation
+
+This module uses **Flask** with **flasgger**, which provides Swagger UI for interactive API documentation.
+
+### Running the standalone API server
+
+```bash
+# From the backend/ directory
+cd /workspaces/Flux-Team-8/backend
+python3 scrum_42_whatsapp_message_integration/main.py
+```
+
+### Accessing Swagger UI
+
+| Interface | URL |
+|---|---|
+| **Swagger UI** (interactive) | `http://localhost:8042/docs` |
+| **OpenAPI JSON spec** | `http://localhost:8042/apispec.json` |
+
+Once running, open `http://localhost:8042/docs` in your browser to explore and test all endpoints interactively.
+
+### Installing dependencies
+
+```bash
+pip install flask flasgger
+# or
+pip install -r scrum_42_whatsapp_message_integration/requirements.txt
+```

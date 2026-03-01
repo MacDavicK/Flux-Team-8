@@ -1,0 +1,20 @@
+# ============================================================
+# dao_service — Production Dependencies
+# ============================================================
+
+# Web framework
+fastapi==0.115.6
+uvicorn[standard]==0.34.0
+
+# Data validation & settings
+pydantic==2.10.4
+pydantic-settings==2.7.1
+
+# Database (PostgreSQL async via SQLAlchemy)
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.31.0
+
+# Utilities
+python-dotenv==1.0.1
+python-json-logger==2.0.7
+httpx==0.28.1
