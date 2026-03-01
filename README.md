@@ -201,7 +201,7 @@ Manual installation, Supabase URLs, and seed commands: **[Getting Started](docs/
 
 ## Project Structure
 
-The main backend app lives under `backend/app/` (agents, routers, services, models). Frontend is TanStack Start under `frontend/src/`. Full tree: **[Project Structure](docs/project-structure.md)**.
+The main backend app lives under `backend/app/` (agents, routers, services, models). Frontend is TanStack Start under `frontend/src/`. Full tree: **[Project Structure](docs/project-structure.md)**. See **[Agent Integration Guide](docs/agents/README.md)** for per-agent connection details and **[Git Workflow](docs/GIT-Workflow.md)** for branching and PR process.
 
 ---
 

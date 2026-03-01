@@ -1,6 +1,6 @@
 # Flux Backend — Comprehensive Implementation Plan
 
-> **Source of Truth:** [flux-tsd.md](file:///Users/hkale/Personal/Flux-Team-8/docs/flux-tsd.md) (Version 2.0 — Greenfield)
+> **Source of Truth:** [flux-tsd.md](flux-tsd.md) (Version 2.0 — Greenfield)
 > **Target Directory:** `/backend` (project root)
 > **Team:** 4 Backend Engineers
 > **Stack:** Python 3.12 · FastAPI · LangGraph · Supabase · Twilio · LiteLLM · LangSmith · Sentry
@@ -834,4 +834,4 @@ Phase 10: Setup Scripts
 
 ---
 
-*Generated from [flux-tsd.md](file:///Users/hkale/Personal/Flux-Team-8/docs/flux-tsd.md) v2.0 on 2026-02-21.*
+*Generated from [flux-tsd.md](flux-tsd.md) v2.0 on 2026-02-21.*
