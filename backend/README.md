@@ -20,7 +20,8 @@ backend/
 │   │   ├── user_model.py
 │   │   ├── goal_model.py
 │   │   ├── task_model.py
-│   │   ├── conversation_model.py
+│   │   ├── conversation_model.py        # + voice session columns
+│   │   ├── message_model.py             # Voice conversation transcripts
 │   │   ├── pattern_model.py
 │   │   └── notification_log_model.py
 │   ├── schemas/                         # Pydantic DTO layer
@@ -65,7 +66,8 @@ backend/
 | **User** | `users` | User profile — `email`, `onboarded`, `profile`, `notification_preferences` |
 | **Goal** | `goals` | User goal — `title`, `class_tags`, `status`, `target_weeks`, `plan_json` |
 | **Task** | `tasks` | Schedulable task — `title`, `status`, `trigger_type`, `scheduled_at` |
-| **Conversation** | `conversations` | LangGraph thread record — `langgraph_thread_id`, `context_type` |
+| **Conversation** | `conversations` | LangGraph thread record — `langgraph_thread_id`, `context_type` + voice columns |
+| **Message** | `messages` | Voice conversation transcript — `role`, `content`, `input_modality` |
 | **Pattern** | `patterns` | Behavioral signal — `pattern_type`, `data`, `confidence` |
 | **NotificationLog** | `notification_log` | Delivery record — `channel`, `sent_at`, `response` |
 
@@ -80,7 +82,8 @@ All endpoints are prefixed with `/api/v1`. Full OpenAPI docs at `http://localhos
 | Users | `/users` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}` |
 | Goals | `/goals` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}` |
 | Tasks | `/tasks` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}`, GET `/by-timerange`, GET `/statistics`, POST `/bulk-update-state` |
-| Conversations | `/conversations` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}` |
+| Conversations | `/conversations` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, PATCH `/{id}/voice` |
+| Messages | `/messages` | POST `/`, GET `/?conversation_id=`, GET `/{id}`, DELETE `/{id}` |
 | Patterns | `/patterns` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}` |
 | Notification Log | `/notification-log` | GET `/`, GET `/{id}`, POST `/`, PATCH `/{id}`, DELETE `/{id}` |
 | Operations | — | GET `/health`, GET `/ready` |

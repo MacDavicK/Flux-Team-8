@@ -6,7 +6,12 @@ from uuid import UUID
 from dao_service.core.database import DatabaseSession
 from dao_service.dao.dao_protocols import ConversationDAOProtocol
 from dao_service.dao.dao_registry import get_conversation_dao
-from dao_service.schemas.conversation import ConversationCreateDTO, ConversationDTO, ConversationUpdateDTO
+from dao_service.schemas.conversation import (
+    ConversationCreateDTO,
+    ConversationDTO,
+    ConversationUpdateDTO,
+    VoiceConversationUpdateDTO,
+)
 
 
 class DaoConversationService:
@@ -37,3 +42,9 @@ class DaoConversationService:
         self, db: DatabaseSession, conversation_id: UUID, data: ConversationUpdateDTO
     ) -> Optional[ConversationDTO]:
         return await self.conversation_dao.update(db, conversation_id, data)
+
+    async def update_conversation_voice(
+        self, db: DatabaseSession, conversation_id: UUID, data: VoiceConversationUpdateDTO
+    ) -> Optional[ConversationDTO]:
+        """Update voice-specific fields when closing a voice session."""
+        return await self.conversation_dao.update_voice_fields(db, conversation_id, data)

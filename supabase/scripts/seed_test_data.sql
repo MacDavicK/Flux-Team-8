@@ -189,7 +189,9 @@ INSERT INTO patterns (id, user_id, pattern_type, description, data, confidence, 
 
 -- Conversations
 INSERT INTO conversations (
-  id, user_id, langgraph_thread_id, context_type, created_at, last_message_at
+  id, user_id, langgraph_thread_id, context_type, created_at, last_message_at,
+  voice_session_id, extracted_intent, intent_payload, linked_goal_id, linked_task_id,
+  ended_at, duration_seconds
 ) VALUES
   (
     'e1000000-0000-0000-0000-000000000001',
@@ -197,7 +199,8 @@ INSERT INTO conversations (
     'thread-alice-goal-1',
     'goal',
     now() - interval '2 days',
-    now() - interval '1 day'
+    now() - interval '1 day',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL
   ),
   (
     'e1000000-0000-0000-0000-000000000002',
@@ -205,7 +208,8 @@ INSERT INTO conversations (
     'thread-bob-task-1',
     'task',
     now() - interval '1 day',
-    now() - interval '3 hours'
+    now() - interval '3 hours',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL
   ),
   (
     'e1000000-0000-0000-0000-000000000003',
@@ -213,7 +217,92 @@ INSERT INTO conversations (
     'thread-carol-onboarding-1',
     'onboarding',
     now() - interval '3 hours',
-    now() - interval '1 hour'
+    now() - interval '1 hour',
+    NULL, NULL, NULL, NULL, NULL, NULL, NULL
+  ),
+  (
+    'e1000000-0000-0000-0000-000000000004',
+    'a1000000-0000-0000-0000-000000000001',
+    'thread-alice-voice-1',
+    'voice',
+    now() - interval '30 minutes',
+    now() - interval '5 minutes',
+    'vs_alice_20260301_001',
+    'reschedule_task',
+    '{"task_id": "d1000000-0000-0000-0000-000000000001", "new_time": "08:00"}'::jsonb,
+    'b1000000-0000-0000-0000-000000000001',
+    'd1000000-0000-0000-0000-000000000001',
+    now() - interval '5 minutes',
+    1520
+  );
+
+-- Messages
+INSERT INTO messages (id, conversation_id, role, content, input_modality, metadata, created_at) VALUES
+  -- Text messages in Alice's goal conversation
+  (
+    'g1000000-0000-0000-0000-000000000001',
+    'e1000000-0000-0000-0000-000000000001',
+    'user',
+    'How is my half marathon goal progressing?',
+    'text',
+    '{}'::jsonb,
+    now() - interval '2 days'
+  ),
+  (
+    'g1000000-0000-0000-0000-000000000002',
+    'e1000000-0000-0000-0000-000000000001',
+    'assistant',
+    'You''re on track! You''ve completed 3 of 6 planned runs this week.',
+    'text',
+    '{}'::jsonb,
+    now() - interval '1 day 23 hours'
+  ),
+  -- Text messages in Bob's task conversation
+  (
+    'g1000000-0000-0000-0000-000000000003',
+    'e1000000-0000-0000-0000-000000000002',
+    'user',
+    'Can you reschedule my API coding task to tomorrow morning?',
+    'text',
+    '{}'::jsonb,
+    now() - interval '1 day'
+  ),
+  (
+    'g1000000-0000-0000-0000-000000000004',
+    'e1000000-0000-0000-0000-000000000002',
+    'assistant',
+    'Done! I''ve moved "Code API endpoints" to tomorrow at 09:00.',
+    'text',
+    '{}'::jsonb,
+    now() - interval '23 hours'
+  ),
+  -- Voice messages in Alice's voice session
+  (
+    'g1000000-0000-0000-0000-000000000005',
+    'e1000000-0000-0000-0000-000000000004',
+    'user',
+    'Hey, can you move my morning run to 8am instead?',
+    'voice',
+    '{"confidence": 0.97, "duration_ms": 2800}'::jsonb,
+    now() - interval '28 minutes'
+  ),
+  (
+    'g1000000-0000-0000-0000-000000000006',
+    'e1000000-0000-0000-0000-000000000004',
+    'assistant',
+    'Sure! I''ve rescheduled your morning run to 8:00 AM. Anything else?',
+    'voice',
+    '{"tts_latency_ms": 340}'::jsonb,
+    now() - interval '27 minutes 30 seconds'
+  ),
+  (
+    'g1000000-0000-0000-0000-000000000007',
+    'e1000000-0000-0000-0000-000000000004',
+    'user',
+    'No, that''s all. Thanks!',
+    'voice',
+    '{"confidence": 0.99, "duration_ms": 1100}'::jsonb,
+    now() - interval '6 minutes'
   );
 
 -- Notification log

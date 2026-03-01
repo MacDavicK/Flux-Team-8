@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.pool import NullPool
 
 from dao_service.models.base import Base
-from dao_service.models import Conversation, Goal, NotificationLog, Pattern, Task, User  # noqa: F401
+from dao_service.models import Conversation, Goal, Message, NotificationLog, Pattern, Task, User  # noqa: F401
 from dao_service.core.database import get_db
 from dao_service.api.deps import verify_service_key
 from dao_service.main import app
@@ -127,6 +127,29 @@ def make_goal_data(user_id: str, **overrides) -> dict:
         "class_tags": ["Health"],
         "status": "active",
         "target_weeks": 6,
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def make_conversation_data(user_id: str, **overrides) -> dict:
+    """Generate conversation creation data."""
+    defaults = {
+        "user_id": user_id,
+        "langgraph_thread_id": f"thread-{uuid4().hex[:12]}",
+        "context_type": "goal",
+    }
+    defaults.update(overrides)
+    return defaults
+
+
+def make_message_data(conversation_id: str, **overrides) -> dict:
+    """Generate message creation data."""
+    defaults = {
+        "conversation_id": conversation_id,
+        "role": "user",
+        "content": f"Test message {uuid4().hex[:6]}",
+        "input_modality": "text",
     }
     defaults.update(overrides)
     return defaults

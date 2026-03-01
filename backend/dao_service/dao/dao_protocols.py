@@ -10,7 +10,13 @@ from typing import Any, Dict, List, Optional, Protocol
 from uuid import UUID
 
 from dao_service.core.database import DatabaseSession
-from dao_service.schemas.conversation import ConversationCreateDTO, ConversationDTO, ConversationUpdateDTO
+from dao_service.schemas.conversation import (
+    ConversationCreateDTO,
+    ConversationDTO,
+    ConversationUpdateDTO,
+    VoiceConversationUpdateDTO,
+)
+from dao_service.schemas.message import MessageCreateDTO, MessageDTO
 from dao_service.schemas.goal import GoalCreateDTO, GoalDTO, GoalUpdateDTO
 from dao_service.schemas.notification_log import (
     NotificationLogCreateDTO,
@@ -91,6 +97,23 @@ class ConversationDAOProtocol(Protocol):
     async def update(
         self, db: DatabaseSession, id: UUID, obj_in: ConversationUpdateDTO
     ) -> Optional[ConversationDTO]: ...
+    async def update_voice_fields(
+        self, db: DatabaseSession, id: UUID, obj_in: VoiceConversationUpdateDTO
+    ) -> Optional[ConversationDTO]: ...
+
+
+class MessageDAOProtocol(Protocol):
+    """Framework-agnostic message DAO interface."""
+
+    async def create(self, db: DatabaseSession, obj_in: MessageCreateDTO) -> MessageDTO: ...
+    async def get_by_id(self, db: DatabaseSession, id: UUID) -> Optional[MessageDTO]: ...
+    async def get_by_conversation(
+        self, db: DatabaseSession, conversation_id: UUID, skip: int, limit: int
+    ) -> List[MessageDTO]: ...
+    async def get_multi(self, db: DatabaseSession, skip: int, limit: int) -> List[MessageDTO]: ...
+    async def count(self, db: DatabaseSession) -> int: ...
+    async def count_by_conversation(self, db: DatabaseSession, conversation_id: UUID) -> int: ...
+    async def delete(self, db: DatabaseSession, id: UUID) -> bool: ...
 
 
 class PatternDAOProtocol(Protocol):

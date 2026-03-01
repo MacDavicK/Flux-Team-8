@@ -209,10 +209,34 @@ The following will be **separate microservices** calling this Data Access API:
 |--------|------|---------|---------|----------|
 | GET | `/` | List conversations with pagination | All | `PaginatedResponse[ConversationDTO]` |
 | GET | `/{conversation_id}` | Get single conversation | All | `ConversationDTO` |
-| POST | `/` | Create conversation | Goal Planner | `ConversationDTO` |
+| POST | `/` | Create conversation | Goal Planner, Conv Agent | `ConversationDTO` |
 | PATCH | `/{conversation_id}` | Update conversation | Goal Planner | `ConversationDTO` |
+| PATCH | `/{conversation_id}/voice` | Update voice-specific fields | Conv Agent | `ConversationDTO` |
 
-**Context types**: `goal`, `task`, `onboarding`, `reschedule`
+**Context types**: `goal`, `task`, `onboarding`, `reschedule`, `voice`
+
+**Voice columns** (added for conv_agent support):
+- `voice_session_id` (String, nullable) -- unique voice session identifier
+- `extracted_intent` (String, nullable) -- detected intent (GOAL, NEW_TASK, RESCHEDULE_TASK)
+- `intent_payload` (JSONB, nullable) -- raw intent parameters
+- `linked_goal_id` (UUID FK, nullable) -- goal created during session
+- `linked_task_id` (UUID FK, nullable) -- task created/rescheduled during session
+- `ended_at` (Timestamp, nullable) -- session end time
+- `duration_seconds` (Integer, nullable) -- session duration
+
+#### Message Endpoints (`/api/v1/messages`)
+
+| Method | Path | Purpose | Used By | Response |
+|--------|------|---------|---------|----------|
+| POST | `/` | Create message | Conv Agent | `MessageDTO` |
+| GET | `/` | List messages by conversation_id | Conv Agent | `List[MessageDTO]` |
+| GET | `/{message_id}` | Get single message | Conv Agent | `MessageDTO` |
+| DELETE | `/{message_id}` | Delete message | Conv Agent | `204 No Content` |
+
+**Roles**: `user`, `assistant`, `system`, `function`
+**Input modalities**: `voice`, `text`
+
+> **Note**: The conv_agent routes all DB access through this service via HTTP (see `ConvAgentDaoClient`).
 
 #### Pattern Endpoints (`/api/v1/patterns`)
 
@@ -527,6 +551,7 @@ backend/
 │   │   ├── goal_model.py
 │   │   ├── task_model.py
 │   │   ├── conversation_model.py
+│   │   ├── message_model.py
 │   │   ├── pattern_model.py
 │   │   └── notification_log_model.py
 │   │
@@ -539,6 +564,7 @@ backend/
 │   │   ├── goal.py
 │   │   ├── task.py                      # TaskDTO, BulkUpdateStateRequest, TaskStatisticsDTO
 │   │   ├── conversation.py
+│   │   ├── message.py
 │   │   ├── pattern.py
 │   │   └── notification_log.py
 │   │
@@ -559,6 +585,7 @@ backend/
 │   │           ├── dao_goal.py
 │   │           ├── dao_task.py          # Extended queries (time range, bulk update, statistics)
 │   │           ├── dao_conversation.py
+│   │           ├── dao_message.py
 │   │           ├── dao_pattern.py
 │   │           └── dao_notification_log.py
 │   │
@@ -572,6 +599,7 @@ backend/
 │   │   ├── dao_goal_service.py
 │   │   ├── dao_task_service.py
 │   │   ├── dao_conversation_service.py
+│   │   ├── dao_message_service.py
 │   │   ├── dao_pattern_service.py
 │   │   └── dao_notification_log_service.py
 │   │
@@ -584,6 +612,7 @@ backend/
 │   │       ├── goals_api.py
 │   │       ├── tasks_api.py
 │   │       ├── conversations_api.py
+│   │       ├── messages_api.py
 │   │       ├── patterns_api.py
 │   │       └── notification_log_api.py
 │   │

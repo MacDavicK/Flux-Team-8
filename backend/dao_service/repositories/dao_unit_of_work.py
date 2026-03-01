@@ -29,6 +29,7 @@ class DaoUnitOfWork:
         self.conversations = factory.create_conversation_dao()
         self.patterns = factory.create_pattern_dao()
         self.notification_logs = factory.create_notification_log_dao()
+        self.messages = factory.create_message_dao()
 
     async def __aenter__(self):
         return self

@@ -6,10 +6,12 @@ import { ChatBubble } from "~/components/chat/ChatBubble";
 import { ChatInput } from "~/components/chat/ChatInput";
 import { PlanView } from "~/components/chat/PlanView";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
+import { VoiceOverlay } from "~/conv_agent/components/VoiceOverlay";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { useAuth } from "~/contexts/AuthContext";
 import { useSimulation } from "~/contexts/SimulationContext";
+import { useVoiceAgent } from "~/conv_agent/useVoiceAgent";
 import { chatService } from "~/services/ChatService";
 import type { ConversationSummary, HistoryMessage } from "~/services/ChatService";
 import type { ChatMessage, PlanMilestone } from "~/types";
@@ -18,6 +20,9 @@ import { MessageVariant } from "~/types/message";
 export const Route = createFileRoute("/chat")({
   component: ChatPage,
 });
+
+/** Mock user ID for MVP — matches Alice in seed_test_data.sql. Will come from auth in production. */
+const MOCK_USER_ID = "a1000000-0000-0000-0000-000000000001";
 
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -50,6 +55,10 @@ function ChatPage() {
   const initDoneRef = useRef(false);
 
   const isOnboarding = user && !user.onboarded;
+
+  // Voice agent hook
+  const voice = useVoiceAgent(MOCK_USER_ID);
+  const isVoiceActive = voice.status !== "idle";
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -308,7 +317,27 @@ function ChatPage() {
         onSend={handleSendMessage}
         disabled={isThinking || isLoadingHistory}
         placeholder={messages.length === 0 ? "What would you like to achieve?" : "What's on your mind?"}
+        voiceStatus={voice.status}
+        onVoiceToggle={() => {
+          if (isVoiceActive) {
+            voice.endSession();
+          } else {
+            voice.startSession();
+          }
+        }}
       />
+
+      {/* Voice overlay — shown when a voice session is active */}
+      <AnimatePresence>
+        {isVoiceActive && (
+          <VoiceOverlay
+            status={voice.status}
+            messages={voice.messages}
+            isAgentSpeaking={voice.isAgentSpeaking}
+            onEndSession={voice.endSession}
+          />
+        )}
+      </AnimatePresence>
 
       <BottomNav />
 
