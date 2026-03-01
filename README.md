@@ -145,6 +145,8 @@ Flux uses a **multi-agent architecture** where five specialized AI agents work i
 | 📍 **Sensor** | Infers real-time context from device signals | GPS, phone state, calendar status; adjusts nudge timing; 100% on-device processing |
 | 💚 **Empath** | Gauges emotional state from voice input | Stressed → reduce nudges; low energy → suggest lighter tasks; upbeat → tackle challenges |
 
+For **orchestrator integration** and per-agent connection details (how to run each agent, endpoints, request/response), see [docs/agents/](docs/agents/).
+
 ---
 
 ## Getting Started
