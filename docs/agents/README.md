@@ -17,6 +17,7 @@ This folder documents each Flux agent (and related services) so that anyone work
 | **DAO Service** | Data persistence (users, goals, tasks, etc.) | Separate FastAPI app | HTTP: `/api/v1/users`, `/api/v1/goals`, `/api/v1/tasks`, … | [dao-service.md](dao-service.md) |
 | **Classifier** | (Planned) Tags goal/task from taxonomy | LangGraph node | In-process node; fan-out from goal_planner | [classifier.md](classifier.md) |
 | **Pattern Observer** | (Planned) Behavioral analysis; avoid slots | LangGraph node or pattern_observer HTTP | In-process or HTTP `/api/pattern-observer` | [pattern-observer.md](pattern-observer.md) |
+| **Conv Agent** | Conversational voice/text interface | Part of main app | HTTP (in-process) | [conv_agent_README.md](conv_agent_README.md) |
 
 ---
 

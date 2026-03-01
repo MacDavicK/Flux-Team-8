@@ -10,15 +10,15 @@
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { AudioEngine } from "./AudioEngine";
 import {
   closeVoiceSession,
   createVoiceSession,
   saveVoiceMessage,
   submitVoiceIntent,
 } from "./api";
-import type { DeepgramEvent, VoiceMessage, VoiceStatus } from "./types";
-import { AudioEngine } from "./AudioEngine";
 import { DeepgramClient } from "./DeepgramClient";
+import type { DeepgramEvent, VoiceMessage, VoiceStatus } from "./types";
 
 interface UseVoiceAgentReturn {
   status: VoiceStatus;
@@ -40,6 +40,41 @@ export function useVoiceAgent(userId: string): UseVoiceAgentReturn {
   const messageCountRef = useRef(0);
 
   // -- Event Handlers -------------------------------------------------------
+
+  /** Forward a Deepgram function call to the backend and return the result. */
+  const handleFunctionCall = useCallback(
+    async (
+      callId: string,
+      functionName: string,
+      input: Record<string, unknown>,
+    ) => {
+      if (!sessionIdRef.current) return;
+
+      try {
+        const result = await submitVoiceIntent(
+          sessionIdRef.current,
+          callId,
+          functionName,
+          input,
+        );
+
+        // V1 FunctionCallResponse requires id, name, and content.
+        dgClientRef.current?.sendFunctionResult(
+          callId,
+          functionName,
+          result.result,
+        );
+      } catch (err) {
+        console.error("Intent processing failed:", err);
+        dgClientRef.current?.sendFunctionResult(
+          callId,
+          functionName,
+          "Sorry, something went wrong processing that request.",
+        );
+      }
+    },
+    [],
+  );
 
   /** Handle all text-based events from the Deepgram WebSocket. */
   const handleDeepgramEvent = useCallback(
@@ -90,7 +125,10 @@ export function useVoiceAgent(userId: string): UseVoiceAgentReturn {
             try {
               args = JSON.parse(fn.arguments);
             } catch {
-              console.warn("[VoiceAgent] Could not parse function arguments:", fn.arguments);
+              console.warn(
+                "[VoiceAgent] Could not parse function arguments:",
+                fn.arguments,
+              );
             }
             handleFunctionCall(fn.id, fn.name, args);
           }
@@ -108,34 +146,7 @@ export function useVoiceAgent(userId: string): UseVoiceAgentReturn {
           break;
       }
     },
-    [], // stable -- uses refs for mutable state
-  );
-
-  /** Forward a Deepgram function call to the backend and return the result. */
-  const handleFunctionCall = useCallback(
-    async (callId: string, functionName: string, input: Record<string, unknown>) => {
-      if (!sessionIdRef.current) return;
-
-      try {
-        const result = await submitVoiceIntent(
-          sessionIdRef.current,
-          callId,
-          functionName,
-          input,
-        );
-
-        // V1 FunctionCallResponse requires id, name, and content.
-        dgClientRef.current?.sendFunctionResult(callId, functionName, result.result);
-      } catch (err) {
-        console.error("Intent processing failed:", err);
-        dgClientRef.current?.sendFunctionResult(
-          callId,
-          functionName,
-          "Sorry, something went wrong processing that request.",
-        );
-      }
-    },
-    [],
+    [handleFunctionCall], // stable -- uses refs for mutable state
   );
 
   // -- Session Lifecycle ----------------------------------------------------

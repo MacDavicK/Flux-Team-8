@@ -20,7 +20,11 @@ type StatsResponse = {
   stats: { icon: "check" | "clock" | "flame"; value: string; label: string }[];
 };
 type EnergyAuraResponse = { data: { date: string; intensity: number }[] };
-type FocusDistributionResponse = { work: number; personal: number; health: number };
+type FocusDistributionResponse = {
+  work: number;
+  personal: number;
+  health: number;
+};
 type WeeklyInsightResponse = { title: string; insight: string };
 
 const iconMap = {
@@ -33,7 +37,9 @@ export const Route = createFileRoute("/reflection")({
   component: ReflectionPage,
   loader: async () => {
     const me = await accountService.getMe();
-    return { profile: { id: me.id, name: me.email ?? "User", email: me.email ?? "" } };
+    return {
+      profile: { id: me.id, name: me.email ?? "User", email: me.email ?? "" },
+    };
   },
 });
 
@@ -42,7 +48,9 @@ function ReflectionPage() {
 
   const [stats, setStats] = useState<StatsResponse | null>(null);
   const [energyData, setEnergyData] = useState<EnergyAuraResponse | null>(null);
-  const [focusData, setFocusData] = useState<FocusDistributionResponse | null>(null);
+  const [focusData, setFocusData] = useState<FocusDistributionResponse | null>(
+    null,
+  );
   const [insight, setInsight] = useState<WeeklyInsightResponse | null>(null);
 
   useEffect(() => {
@@ -57,14 +65,19 @@ function ReflectionPage() {
       setStats({
         title: o.week_label ?? "This Week",
         stats: [
-          { icon: "check", value: String(o.tasks_completed ?? 0), label: "Done" },
+          {
+            icon: "check",
+            value: String(o.tasks_completed ?? 0),
+            label: "Done",
+          },
           { icon: "clock", value: `${o.focus_hours ?? 0}h`, label: "Focus" },
           { icon: "flame", value: String(o.streak_days ?? 0), label: "Streak" },
         ],
       });
       setInsight({
         title: "This Week's Insight",
-        insight: o.insight ?? "Keep up the great work! You're building strong habits.",
+        insight:
+          o.insight ?? "Keep up the great work! You're building strong habits.",
       });
     });
 

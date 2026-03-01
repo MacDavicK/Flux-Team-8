@@ -1,4 +1,4 @@
-import { TimelineEvent, type EventType } from "./TimelineEvent";
+import { type EventType, TimelineEvent } from "./TimelineEvent";
 
 export interface TimelineEventData {
   id: string;
@@ -19,9 +19,7 @@ interface FlowTimelineProps {
 }
 
 export function FlowTimeline({ events, onShuffleClick }: FlowTimelineProps) {
-  const nowIndex = events.findIndex(
-    (e) => e.time && e.period && !e.isPast
-  );
+  const nowIndex = events.findIndex((e) => e.time && e.period && !e.isPast);
   const insertNowAfter = nowIndex >= 0 ? nowIndex - 1 : -2;
 
   const nowDivider = (

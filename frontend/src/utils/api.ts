@@ -2,7 +2,9 @@
  * Backend API base URL. Set VITE_API_URL in .env for production.
  */
 const API_BASE =
-  (typeof import.meta !== "undefined" && (import.meta as ImportMeta & { env?: Record<string, string> }).env?.VITE_API_URL) ||
+  (typeof import.meta !== "undefined" &&
+    (import.meta as ImportMeta & { env?: Record<string, string> }).env
+      ?.VITE_API_URL) ||
   "http://localhost:8000";
 
 export interface Task {
@@ -41,7 +43,9 @@ export async function fetchTimelineTasks(): Promise<Task[]> {
   return data.tasks ?? [];
 }
 
-export async function fetchSuggestions(eventId: string): Promise<SuggestResponse> {
+export async function fetchSuggestions(
+  eventId: string,
+): Promise<SuggestResponse> {
   const res = await fetch(`${API_BASE}/scheduler/suggest`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -58,7 +62,7 @@ export async function applyReschedule(
   eventId: string,
   action: "reschedule" | "skip",
   newStart?: string,
-  newEnd?: string
+  newEnd?: string,
 ): Promise<void> {
   const body: Record<string, string> = { event_id: eventId, action };
   if (action === "reschedule" && newStart && newEnd) {

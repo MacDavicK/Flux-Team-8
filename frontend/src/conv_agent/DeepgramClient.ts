@@ -103,7 +103,11 @@ export class DeepgramClient {
    *
    * V1 format requires id, name, and content (not output).
    */
-  sendFunctionResult(functionCallId: string, functionName: string, result: string): void {
+  sendFunctionResult(
+    functionCallId: string,
+    functionName: string,
+    result: string,
+  ): void {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(
         JSON.stringify({

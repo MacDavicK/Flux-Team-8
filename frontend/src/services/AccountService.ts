@@ -36,9 +36,10 @@ class AccountService {
   }
 
   async getWeeklyStats(weeks?: number): Promise<unknown[]> {
-    const url = weeks != null
-      ? `/api/v1/analytics/weekly?weeks=${weeks}`
-      : "/api/v1/analytics/weekly";
+    const url =
+      weeks != null
+        ? `/api/v1/analytics/weekly?weeks=${weeks}`
+        : "/api/v1/analytics/weekly";
     const response = await apiFetch(url);
 
     if (!response.ok) {

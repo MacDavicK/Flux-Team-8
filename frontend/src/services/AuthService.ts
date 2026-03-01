@@ -4,7 +4,12 @@ import {
   serverLogout,
   serverSignup,
 } from "~/lib/authServerFns";
-import type { LoginRequest, LoginResponse, SignupRequest, SignupResponse } from "~/types";
+import type {
+  LoginRequest,
+  LoginResponse,
+  SignupRequest,
+  SignupResponse,
+} from "~/types";
 
 // AuthService is now a thin wrapper around server functions.
 // No Supabase SDK is imported here. No localStorage is touched.

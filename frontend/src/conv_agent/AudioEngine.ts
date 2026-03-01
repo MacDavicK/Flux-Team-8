@@ -61,14 +61,15 @@ export class AudioEngine {
       const inputData = event.inputBuffer.getChannelData(0);
 
       // Resample if the AudioContext rate differs from target
+      const sampleRate = this.audioCtx?.sampleRate ?? TARGET_SAMPLE_RATE;
       const resampled =
-        this.audioCtx!.sampleRate !== TARGET_SAMPLE_RATE
-          ? this._resample(inputData, this.audioCtx!.sampleRate)
+        sampleRate !== TARGET_SAMPLE_RATE
+          ? this._resample(inputData, sampleRate)
           : inputData;
 
       // Convert Float32 [-1, 1] to Int16 for Deepgram
       const int16 = float32ToInt16(resampled);
-      this.onCapture?.(int16.buffer);
+      this.onCapture?.(int16.buffer as ArrayBuffer);
     };
 
     // Connect the pipeline: mic -> processor -> destination (required for node to work)
@@ -80,6 +81,7 @@ export class AudioEngine {
   stopCapture(): void {
     this.processorNode?.disconnect();
     this.sourceNode?.disconnect();
+    // biome-ignore lint/suspicious/useIterableCallbackReturn: forEach pattern intentional
     this.micStream?.getTracks().forEach((t) => t.stop());
 
     this.processorNode = null;
@@ -132,6 +134,7 @@ export class AudioEngine {
     }
 
     this.isPlaying = true;
+    // biome-ignore lint/style/noNonNullAssertion: audio context guaranteed initialized
     const samples = this.playbackQueue.shift()!;
 
     // Create a buffer and fill it with the Float32 samples

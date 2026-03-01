@@ -11,8 +11,9 @@ import { AnimatePresence, motion } from "framer-motion";
 import { PhoneOff } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { ChatBubble } from "~/components/chat/ChatBubble";
-import type { VoiceMessage, VoiceStatus } from "../types";
+import { MessageVariant } from "~/types/message";
 import { cn } from "~/utils/cn";
+import type { VoiceMessage, VoiceStatus } from "../types";
 
 interface VoiceOverlayProps {
   status: VoiceStatus;
@@ -60,7 +61,7 @@ export function VoiceOverlay({
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
     scrollRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+  }, []);
 
   const statusLabel = getStatusLabel(status, isAgentSpeaking);
   const orbColor = getOrbColor(status, isAgentSpeaking);
@@ -90,7 +91,9 @@ export function VoiceOverlay({
               )}
             >
               <ChatBubble
-                variant={msg.role === "user" ? "user" : "ai"}
+                variant={
+                  msg.role === "user" ? MessageVariant.USER : MessageVariant.AI
+                }
                 animate={false}
               >
                 {msg.content}

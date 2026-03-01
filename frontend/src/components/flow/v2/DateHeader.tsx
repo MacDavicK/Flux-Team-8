@@ -1,6 +1,12 @@
 import { format } from "~/utils/date";
 
-export function DateHeader({ date, greeting }: { date?: string; greeting?: string }) {
+export function DateHeader({
+  date,
+  greeting,
+}: {
+  date?: string;
+  greeting?: string;
+}) {
   const displayDate = date || format(new Date(), "MMMM do");
 
   return (

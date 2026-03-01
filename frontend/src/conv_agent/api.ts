@@ -14,8 +14,11 @@ import type {
 
 /** Base URL for the backend API. Reads from env or defaults to localhost. */
 const API_BASE =
-  typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_API_BASE
-    ? (import.meta as any).env.VITE_API_BASE
+  typeof import.meta !== "undefined" &&
+  // biome-ignore lint/suspicious/noExplicitAny: import.meta env typing
+  (import.meta as any).env?.VITE_API_BASE
+    ? // biome-ignore lint/suspicious/noExplicitAny: import.meta env typing
+      (import.meta as any).env.VITE_API_BASE
     : "http://localhost:8000";
 
 // -- Helpers ----------------------------------------------------------------
@@ -32,7 +35,7 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return resp.json() as Promise<T>;
 }
 
-async function get<T>(path: string): Promise<T> {
+async function _get<T>(path: string): Promise<T> {
   const resp = await fetch(`${API_BASE}${path}`);
   if (!resp.ok) {
     throw new Error(`GET ${path} failed: ${resp.status} ${resp.statusText}`);
@@ -43,9 +46,7 @@ async function get<T>(path: string): Promise<T> {
 async function del<T>(path: string): Promise<T> {
   const resp = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
   if (!resp.ok) {
-    throw new Error(
-      `DELETE ${path} failed: ${resp.status} ${resp.statusText}`,
-    );
+    throw new Error(`DELETE ${path} failed: ${resp.status} ${resp.statusText}`);
   }
   return resp.json() as Promise<T>;
 }

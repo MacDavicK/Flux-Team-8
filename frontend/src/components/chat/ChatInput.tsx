@@ -9,8 +9,8 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import type { VoiceStatus } from "~/conv_agent/types";
 import { VoiceFAB } from "~/conv_agent/components/VoiceFAB";
+import type { VoiceStatus } from "~/conv_agent/types";
 import { cn } from "~/utils/cn";
 
 interface ChatInputProps {

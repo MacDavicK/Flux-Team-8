@@ -1,5 +1,7 @@
 # Flux Conv Agent
 
+> Last verified: 2026-03-02
+
 Voice-first conversational agent for the Flux life assistant. Users speak goals, tasks, and reschedule requests through a real-time Deepgram voice connection. The backend processes three intents (goal creation, task creation, task rescheduling) and persists all data via the Flux DAO Service REST API.
 
 ## Architecture

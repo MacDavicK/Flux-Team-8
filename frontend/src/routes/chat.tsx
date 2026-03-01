@@ -6,14 +6,17 @@ import { ChatBubble } from "~/components/chat/ChatBubble";
 import { ChatInput } from "~/components/chat/ChatInput";
 import { PlanView } from "~/components/chat/PlanView";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
-import { VoiceOverlay } from "~/conv_agent/components/VoiceOverlay";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { useAuth } from "~/contexts/AuthContext";
 import { useSimulation } from "~/contexts/SimulationContext";
+import { VoiceOverlay } from "~/conv_agent/components/VoiceOverlay";
 import { useVoiceAgent } from "~/conv_agent/useVoiceAgent";
+import type {
+  ConversationSummary,
+  HistoryMessage,
+} from "~/services/ChatService";
 import { chatService } from "~/services/ChatService";
-import type { ConversationSummary, HistoryMessage } from "~/services/ChatService";
 import type { ChatMessage, PlanMilestone } from "~/types";
 import { MessageVariant } from "~/types/message";
 
@@ -27,7 +30,9 @@ const MOCK_USER_ID = "a1000000-0000-0000-0000-000000000001";
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor(
+    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+  );
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays} days ago`;
@@ -36,16 +41,24 @@ function formatRelativeTime(dateStr: string): string {
 
 function getGreeting(name?: string): string {
   const hour = new Date().getHours();
-  const salutation = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const salutation =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return name ? `${salutation}, ${name.split(" ")[0]}` : salutation;
 }
 
 function ChatPage() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading: authLoading, user, refreshAuthStatus } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading: authLoading,
+    user,
+    refreshAuthStatus,
+  } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
-  const [conversationId, setConversationId] = useState<string | undefined>(undefined);
+  const [conversationId, setConversationId] = useState<string | undefined>(
+    undefined,
+  );
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
@@ -84,7 +97,12 @@ function ChatPage() {
     if (isOnboarding) wasOnboardingRef.current = true;
   }, [isOnboarding]);
   useEffect(() => {
-    if (!authLoading && isAuthenticated && user?.onboarded && wasOnboardingRef.current) {
+    if (
+      !authLoading &&
+      isAuthenticated &&
+      user?.onboarded &&
+      wasOnboardingRef.current
+    ) {
       navigate({ to: "/" });
     }
   }, [authLoading, isAuthenticated, user?.onboarded, navigate]);
@@ -104,7 +122,10 @@ function ChatPage() {
           if (conversation_id) setConversationId(conversation_id);
 
           const uiMessages: ChatMessage[] = history
-            .filter((m: HistoryMessage) => m.role === "user" || m.role === "assistant")
+            .filter(
+              (m: HistoryMessage) =>
+                m.role === "user" || m.role === "assistant",
+            )
             .map((m: HistoryMessage, i: number) => ({
               id: `history-${i}`,
               type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
@@ -134,11 +155,14 @@ function ChatPage() {
     setIsHistoryOpen(false);
     setIsLoadingHistory(true);
     try {
-      const { messages: history, conversation_id } = await chatService.getHistory(id);
+      const { messages: history, conversation_id } =
+        await chatService.getHistory(id);
       if (conversation_id) setConversationId(conversation_id);
 
       const uiMessages: ChatMessage[] = history
-        .filter((m: HistoryMessage) => m.role === "user" || m.role === "assistant")
+        .filter(
+          (m: HistoryMessage) => m.role === "user" || m.role === "assistant",
+        )
         .map((m: HistoryMessage, i: number) => ({
           id: `history-${i}`,
           type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
@@ -183,7 +207,6 @@ function ChatPage() {
         setConversationId(result.conversation_id);
       }
 
-
       setTimeout(() => {
         setIsThinking(false);
 
@@ -224,7 +247,8 @@ function ChatPage() {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: MessageVariant.AI,
-        content: "Sorry, I had trouble understanding that. Could you try again?",
+        content:
+          "Sorry, I had trouble understanding that. Could you try again?",
       };
       setMessages((prev) => [...prev, errorMessage]);
     }
@@ -277,7 +301,9 @@ function ChatPage() {
       <div className="flex-1 overflow-y-auto px-4 pt-2 space-y-4 pb-4">
         {isLoadingHistory ? (
           <div className="flex items-center justify-center h-full">
-            <div className="animate-pulse text-sage text-sm">Loading conversation…</div>
+            <div className="animate-pulse text-sage text-sm">
+              Loading conversation…
+            </div>
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
@@ -288,7 +314,9 @@ function ChatPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ delay: index * 0.05 }}
-                className={message.type === MessageVariant.USER ? "flex justify-end" : ""}
+                className={
+                  message.type === MessageVariant.USER ? "flex justify-end" : ""
+                }
               >
                 <ChatBubble variant={message.type} animate={false}>
                   {message.content}
@@ -316,7 +344,11 @@ function ChatPage() {
       <ChatInput
         onSend={handleSendMessage}
         disabled={isThinking || isLoadingHistory}
-        placeholder={messages.length === 0 ? "What would you like to achieve?" : "What's on your mind?"}
+        placeholder={
+          messages.length === 0
+            ? "What would you like to achieve?"
+            : "What's on your mind?"
+        }
         voiceStatus={voice.status}
         onVoiceToggle={() => {
           if (isVoiceActive) {
@@ -361,7 +393,9 @@ function ChatPage() {
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
             >
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                <h2 className="font-display italic text-lg text-charcoal">Past Chats</h2>
+                <h2 className="font-display italic text-lg text-charcoal">
+                  Past Chats
+                </h2>
                 <button
                   type="button"
                   onClick={() => setIsHistoryOpen(false)}
@@ -373,7 +407,9 @@ function ChatPage() {
 
               <div className="overflow-y-auto max-h-[55vh] pb-8">
                 {conversations.length === 0 ? (
-                  <p className="text-center text-river/60 text-sm py-8">No past conversations yet.</p>
+                  <p className="text-center text-river/60 text-sm py-8">
+                    No past conversations yet.
+                  </p>
                 ) : (
                   <ul className="divide-y divide-glass-border">
                     {conversations.map((conv) => (
@@ -387,7 +423,9 @@ function ChatPage() {
                             {conv.preview ?? "New conversation"}
                           </p>
                           <p className="text-river/60 text-xs mt-0.5">
-                            {formatRelativeTime(conv.last_message_at ?? conv.created_at)}
+                            {formatRelativeTime(
+                              conv.last_message_at ?? conv.created_at,
+                            )}
                           </p>
                         </button>
                       </li>

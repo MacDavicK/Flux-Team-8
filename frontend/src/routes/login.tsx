@@ -14,7 +14,7 @@ export const Route = createFileRoute("/login")({
 
 function LoginPage() {
   const navigate = useNavigate();
-  const { login, signup, loginWithGoogle, isAuthenticated, user } = useAuth();
+  const { login, signup, loginWithGoogle, isAuthenticated } = useAuth();
   const [mode, setMode] = useState<AuthMode>("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

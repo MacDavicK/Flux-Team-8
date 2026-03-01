@@ -10,8 +10,10 @@ function babelPluginDataComponent(): object {
   return {
     name: "data-component",
     visitor: {
-      // biome-ignore lint/suspicious/noExplicitAny: Babel node types
-      "FunctionDeclaration|ArrowFunctionExpression|FunctionExpression"(path: any) {
+      "FunctionDeclaration|ArrowFunctionExpression|FunctionExpression"(
+        // biome-ignore lint/suspicious/noExplicitAny: vite plugin typing
+        path: any,
+      ) {
         const componentName: string | null =
           path.node.id?.name ??
           path.parentPath?.node?.id?.name ??

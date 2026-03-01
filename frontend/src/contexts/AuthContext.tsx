@@ -6,8 +6,8 @@ import {
   useEffect,
   useState,
 } from "react";
-import { serverGetAccessToken } from "~/lib/authServerFns";
 import { setInMemoryToken } from "~/lib/apiClient";
+import { serverGetAccessToken } from "~/lib/authServerFns";
 import { authService } from "~/services/AuthService";
 import type { User } from "~/types";
 
@@ -17,7 +17,11 @@ interface AuthContextType {
   user: User | undefined;
   hasTasks: boolean;
   login: (email: string, password: string) => Promise<User | undefined>;
-  signup: (name: string, email: string, password: string) => Promise<User | undefined>;
+  signup: (
+    name: string,
+    email: string,
+    password: string,
+  ) => Promise<User | undefined>;
   logout: () => Promise<void>;
   refreshAuthStatus: () => Promise<User | undefined>;
   loginWithGoogle: () => Promise<void>;
@@ -69,7 +73,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           return undefined;
         }
         if (res.ok) {
-          const meData = (await res.json()) as { onboarded: boolean; name?: string | null };
+          const meData = (await res.json()) as {
+            onboarded: boolean;
+            name?: string | null;
+          };
           onboarded = meData.onboarded ?? false;
           profileName = meData.name ?? null;
         }
@@ -120,7 +127,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const signup = useCallback(
-    async (name: string, email: string, password: string): Promise<User | undefined> => {
+    async (
+      name: string,
+      email: string,
+      password: string,
+    ): Promise<User | undefined> => {
       await authService.signup({ name, email, password });
       return refreshAuthStatus();
     },

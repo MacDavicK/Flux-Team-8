@@ -14,6 +14,7 @@ export const currentUser: User = {
     timezone: "America/New_York",
     language: "en",
   },
+  onboarded: false,
 };
 
 export type { User };

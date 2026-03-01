@@ -111,14 +111,20 @@ function RootDocument({ children }: { children: React.ReactNode }) {
 
   const handleSimulateLeavingHome = async () => {
     const raw = await demoService.triggerLocation();
-    const response = { message: String(raw.message ?? "You're out!"), type: "notification" as const };
+    const response = {
+      message: String(raw.message ?? "You're out!"),
+      type: "notification" as const,
+    };
     addNotification(response);
     startEscalation();
   };
 
   const handleSimulateNearStore = async () => {
     const raw = await demoService.triggerLocation();
-    const response = { message: String(raw.message ?? "You're near a store!"), type: "notification" as const };
+    const response = {
+      message: String(raw.message ?? "You're near a store!"),
+      type: "notification" as const,
+    };
     addNotification(response);
     startEscalation();
   };

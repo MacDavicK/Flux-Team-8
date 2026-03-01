@@ -17,7 +17,10 @@ export interface ConversationSummary {
 }
 
 class ChatService {
-  async getHistory(conversationId?: string, limit = 50): Promise<{ messages: HistoryMessage[]; conversation_id: string | null }> {
+  async getHistory(
+    conversationId?: string,
+    limit = 50,
+  ): Promise<{ messages: HistoryMessage[]; conversation_id: string | null }> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (conversationId) params.set("conversation_id", conversationId);
     const response = await apiFetch(`/api/v1/chat/history?${params}`);
@@ -30,11 +33,15 @@ class ChatService {
   }
 
   async getConversations(limit = 20): Promise<ConversationSummary[]> {
-    const response = await apiFetch(`/api/v1/chat/conversations?limit=${limit}`);
+    const response = await apiFetch(
+      `/api/v1/chat/conversations?limit=${limit}`,
+    );
     if (!response.ok) {
       throw new Error("Failed to fetch conversations");
     }
-    const data = await response.json() as { conversations: ConversationSummary[] };
+    const data = (await response.json()) as {
+      conversations: ConversationSummary[];
+    };
     return data.conversations;
   }
 

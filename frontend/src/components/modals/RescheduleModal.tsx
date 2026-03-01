@@ -1,12 +1,13 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
-import { cn } from "~/utils/cn";
+import { Mic, Volume2, X } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   applyReschedule,
   fetchSuggestions,
   type SuggestResponse,
 } from "~/utils/api";
+import { cn } from "~/utils/cn";
+import { useVoiceNegotiation } from "~/utils/useVoiceNegotiation";
 
 interface RescheduleModalProps {
   isOpen: boolean;
@@ -28,6 +29,13 @@ export function RescheduleModal({
   const [error, setError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
 
+  const voice = useVoiceNegotiation();
+  const voiceEnabled =
+    (import.meta as ImportMeta & { env?: Record<string, string> }).env
+      ?.VITE_ENABLE_VOICE === "true";
+  const hasSpokenForSessionRef = useRef(false);
+  const lastHandledVoiceActionRef = useRef<string | null>(null);
+
   const loadSuggestions = useCallback(async () => {
     if (!eventId) return;
     setLoading(true);
@@ -46,6 +54,72 @@ export function RescheduleModal({
   useEffect(() => {
     if (isOpen && eventId) loadSuggestions();
   }, [isOpen, eventId, loadSuggestions]);
+
+  // Reset voice session when modal closes or event changes
+  // biome-ignore lint/correctness/useExhaustiveDependencies: eventId intentionally resets refs when opening a different event
+  useEffect(() => {
+    if (!isOpen) {
+      hasSpokenForSessionRef.current = false;
+      lastHandledVoiceActionRef.current = null;
+    }
+  }, [isOpen, eventId]);
+
+  // Speak AI message when data loads, then start listening (voice enabled only)
+  useEffect(() => {
+    if (
+      !isOpen ||
+      !data?.ai_message ||
+      !voiceEnabled ||
+      !voice.isSupported ||
+      hasSpokenForSessionRef.current ||
+      applying
+    )
+      return;
+    hasSpokenForSessionRef.current = true;
+    voice.speak(data.ai_message).then(() => {
+      if (voiceEnabled && voice.isSupported) voice.startListening();
+    });
+  }, [
+    isOpen,
+    data?.ai_message,
+    voiceEnabled,
+    voice.isSupported,
+    voice.speak,
+    voice.startListening,
+    applying,
+  ]);
+
+  // Map voice command to button actions (once per detected action).
+  // handleReschedule/handleSkip intentionally omitted from deps to avoid effect re-running every render and double-firing.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: ref guards one-shot; handlers stable enough for voice action
+  useEffect(() => {
+    if (
+      !voiceEnabled ||
+      !voice.isSupported ||
+      !data ||
+      applying ||
+      voice.detectedAction === null
+    )
+      return;
+    if (lastHandledVoiceActionRef.current === voice.detectedAction) return;
+    lastHandledVoiceActionRef.current = voice.detectedAction;
+    if (voice.detectedAction === "accept_first" && data.suggestions[0]) {
+      handleReschedule(
+        data.suggestions[0].new_start,
+        data.suggestions[0].new_end,
+      );
+    } else if (
+      voice.detectedAction === "accept_second" &&
+      data.suggestions[1]
+    ) {
+      handleReschedule(
+        data.suggestions[1].new_start,
+        data.suggestions[1].new_end,
+      );
+    } else if (voice.detectedAction === "skip" && data.skip_option) {
+      handleSkip();
+    }
+  }, [voiceEnabled, voice.isSupported, voice.detectedAction, data, applying]);
 
   const handleReschedule = async (newStart: string, newEnd: string) => {
     setApplying(true);
@@ -101,7 +175,19 @@ export function RescheduleModal({
               </button>
 
               <div className="mb-6 pr-8">
-                <p className="text-river text-sm mb-2">Reschedule</p>
+                <div className="flex items-center gap-2 mb-2">
+                  <p className="text-river text-sm">Reschedule</p>
+                  {voiceEnabled && voice.isSupported && (
+                    <span className="flex items-center gap-1.5 text-charcoal/70">
+                      {voice.isSpeaking && (
+                        <Volume2 className="w-4 h-4" aria-hidden />
+                      )}
+                      {voice.isListening && (
+                        <Mic className="w-4 h-4" aria-hidden />
+                      )}
+                    </span>
+                  )}
+                </div>
                 <div
                   className={cn(
                     "glass-bubble p-4 transform -rotate-1",
@@ -120,25 +206,23 @@ export function RescheduleModal({
                 </div>
               )}
 
-              {error && (
-                <p className="text-terracotta text-sm mb-4">{error}</p>
-              )}
+              {error && <p className="text-terracotta text-sm mb-4">{error}</p>}
 
               {!loading && data && (
                 <>
-                  <p className="text-charcoal text-sm mb-4">{data.ai_message}</p>
+                  <p className="text-charcoal text-sm mb-4">
+                    {data.ai_message}
+                  </p>
                   <div className="space-y-3">
                     {data.suggestions.map((s, i) => (
                       <motion.button
-                        key={i}
+                        key={`${s.new_start}-${s.new_end}`}
                         type="button"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: i * 0.05 }}
                         disabled={applying}
-                        onClick={() =>
-                          handleReschedule(s.new_start, s.new_end)
-                        }
+                        onClick={() => handleReschedule(s.new_start, s.new_end)}
                         className={cn(
                           "w-full glass-bubble p-4 text-left flex flex-col gap-1",
                           "hover:bg-charcoal/5 transition-colors",

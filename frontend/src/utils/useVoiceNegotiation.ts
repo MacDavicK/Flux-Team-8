@@ -55,44 +55,41 @@ export function useVoiceNegotiation() {
   }, []);
 
   // Speak text via SpeechSynthesis
-  const speak = useCallback(
-    (text: string): Promise<void> => {
-      return new Promise((resolve, reject) => {
-        if (!("speechSynthesis" in window)) {
-          reject(new Error("SpeechSynthesis not supported"));
-          return;
-        }
+  const speak = useCallback((text: string): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      if (!("speechSynthesis" in window)) {
+        reject(new Error("SpeechSynthesis not supported"));
+        return;
+      }
 
-        // Cancel any ongoing speech
-        window.speechSynthesis.cancel();
+      // Cancel any ongoing speech
+      window.speechSynthesis.cancel();
 
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.rate = 1.0;
-        utterance.pitch = 1.0;
-        utterance.lang = "en-US";
+      const utterance = new SpeechSynthesisUtterance(text);
+      utterance.rate = 1.0;
+      utterance.pitch = 1.0;
+      utterance.lang = "en-US";
 
-        // Prefer a natural-sounding voice
-        const voices = window.speechSynthesis.getVoices();
-        const preferred = voices.find(
-          (v) => v.name.includes("Samantha") || v.name.includes("Google"),
-        );
-        if (preferred) utterance.voice = preferred;
+      // Prefer a natural-sounding voice
+      const voices = window.speechSynthesis.getVoices();
+      const preferred = voices.find(
+        (v) => v.name.includes("Samantha") || v.name.includes("Google"),
+      );
+      if (preferred) utterance.voice = preferred;
 
-        utterance.onstart = () => setIsSpeaking(true);
-        utterance.onend = () => {
-          setIsSpeaking(false);
-          resolve();
-        };
-        utterance.onerror = (e) => {
-          setIsSpeaking(false);
-          reject(e);
-        };
+      utterance.onstart = () => setIsSpeaking(true);
+      utterance.onend = () => {
+        setIsSpeaking(false);
+        resolve();
+      };
+      utterance.onerror = (e) => {
+        setIsSpeaking(false);
+        reject(e);
+      };
 
-        window.speechSynthesis.speak(utterance);
-      });
-    },
-    [],
-  );
+      window.speechSynthesis.speak(utterance);
+    });
+  }, []);
 
   // Start listening for voice commands
   const startListening = useCallback(() => {

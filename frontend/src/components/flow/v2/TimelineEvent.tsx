@@ -23,7 +23,7 @@ export function TimelineEvent({
   time,
   period,
   type,
-  avatars,
+  avatars: _avatars,
   isDrifted,
   eventId,
   onShuffleClick,
@@ -50,7 +50,8 @@ export function TimelineEvent({
         className={cn(
           "flex-1 p-5 rounded-[1.5rem] transition-transform relative",
           typeClasses[type],
-          isDrifted && "ring-2 ring-terracotta/50 shadow-lg shadow-terracotta/10",
+          isDrifted &&
+            "ring-2 ring-terracotta/50 shadow-lg shadow-terracotta/10",
         )}
       >
         {isDrifted && (

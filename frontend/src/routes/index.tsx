@@ -1,13 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { BottomNav } from "~/components/navigation/BottomNav";
 import { DateHeader } from "~/components/flow/v2/DateHeader";
-import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { FlowTimeline } from "~/components/flow/v2/FlowTimeline";
 import { TaskRail } from "~/components/flow/v2/TaskRail";
-import { RescheduleModal } from "~/components/modals/RescheduleModal";
-import { fetchTimelineTasks, type Task } from "~/utils/api";
 import type { EventType } from "~/components/flow/v2/TimelineEvent";
+import { RescheduleModal } from "~/components/modals/RescheduleModal";
+import { BottomNav } from "~/components/navigation/BottomNav";
+import { AmbientBackground } from "~/components/ui/AmbientBackground";
+import { fetchTimelineTasks, type Task } from "~/utils/api";
 
 // Fallback tasks when API is unavailable (e.g. backend not running)
 const sampleTasks = [
@@ -105,10 +105,7 @@ function FlowPage() {
           Loading schedule…
         </div>
       ) : (
-        <FlowTimeline
-          events={events}
-          onShuffleClick={openShuffle}
-        />
+        <FlowTimeline events={events} onShuffleClick={openShuffle} />
       )}
 
       <BottomNav />

@@ -12,8 +12,8 @@
 
 import { motion } from "framer-motion";
 import { Mic, MicOff } from "lucide-react";
-import type { VoiceStatus } from "../types";
 import { cn } from "~/utils/cn";
+import type { VoiceStatus } from "../types";
 
 interface VoiceFABProps {
   status: VoiceStatus;
@@ -85,7 +85,11 @@ export function VoiceFAB({ status, onClick, disabled = false }: VoiceFABProps) {
       }
       transition={
         isPulsing
-          ? { duration: 1.2, repeat: Number.POSITIVE_INFINITY, ease: "easeInOut" }
+          ? {
+              duration: 1.2,
+              repeat: Number.POSITIVE_INFINITY,
+              ease: "easeInOut",
+            }
           : { duration: 0.2 }
       }
       aria-label={isActive ? "End voice session" : "Start voice session"}

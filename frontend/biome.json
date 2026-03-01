@@ -6,7 +6,8 @@
     "useIgnoreFile": true
   },
   "files": {
-    "ignoreUnknown": false
+    "ignoreUnknown": false,
+    "includes": ["**", "!dev-dist"]
   },
   "formatter": {
     "enabled": true,
@@ -44,6 +45,9 @@
         "enabled": false
       },
       "formatter": {
+        "enabled": false
+      },
+      "assist": {
         "enabled": false
       }
     }
