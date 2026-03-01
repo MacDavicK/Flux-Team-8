@@ -155,8 +155,12 @@ cmd_deploy() {
     ok "Backend started (PID: $BACKEND_PID)"
 
     # Start frontend dev server (VITE_API_BASE tells conv_agent API client where backend lives)
-    info "Starting frontend dev server..."
+    info "Installing frontend dependencies..."
     cd "$PROJECT_ROOT/frontend"
+    npm install
+    ok "Frontend dependencies installed"
+
+    info "Starting frontend dev server..."
     VITE_API_BASE=http://localhost:8080 npm run dev &
     FRONTEND_PID=$!
     ok "Frontend started (PID: $FRONTEND_PID)"
