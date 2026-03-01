@@ -21,27 +21,27 @@ def _db():
 
 
 def get_task_by_id(task_id: str) -> Optional[dict]:
-    """Fetch a single task by ID."""
+    """Fetch a single task by ID. Returns None if not found (use .maybe_single() to avoid exception)."""
     result = (
         _db().table("tasks")
         .select("*")
         .eq("id", task_id)
-        .single()
+        .maybe_single()
         .execute()
     )
-    return result.data
+    return result.data if result.data is not None else None
 
 
 def get_user_profile(user_id: str) -> Optional[dict]:
-    """Fetch user preferences (sleep window, work hours, etc.)."""
+    """Fetch user preferences (sleep window, work hours, etc.). Returns None if not found."""
     result = (
         _db().table("users")
         .select("id, name, preferences")
         .eq("id", user_id)
-        .single()
+        .maybe_single()
         .execute()
     )
-    return result.data
+    return result.data if result.data is not None else None
 
 
 def get_tasks_in_range(

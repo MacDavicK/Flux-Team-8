@@ -49,7 +49,10 @@ async def suggest_reschedule(body: SchedulerSuggestRequest):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         logger.error(f"Scheduler suggest failed: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="Failed to generate suggestions")
+        detail = "Failed to generate suggestions"
+        if settings.debug:
+            detail = f"{detail}: {e!s}"
+        raise HTTPException(status_code=500, detail=detail)
 
 
 @router.post("/apply", response_model=SchedulerApplyResponse)
