@@ -67,10 +67,10 @@ What sets Flux apart is its **Compassionate Drift & Shuffle** engine. Instead of
 
 | Layer | Technology |
 |-------|-----------|
-| Frontend | React 18, TypeScript, Vite, Framer Motion, React Router |
+| Frontend | React 19, TanStack Start, Vite 7, TypeScript, Framer Motion, Tailwind CSS |
 | Backend | FastAPI, Python 3.11+ |
 | Database | PostgreSQL via Supabase |
-| AI/ML | GPT-4o-mini, RAG (Pinecone/Chroma) |
+| AI/ML | GPT-4o-mini (OpenRouter), RAG (Pinecone) |
 | Deployment | Vercel (Frontend), Railway/Render (Backend) |
 
 ---
@@ -131,7 +131,7 @@ flowchart TD
     N --> Call
 ```
 
-Flux uses a **multi-agent architecture** where five specialized AI agents work in concert. The **Goal Planner** decomposes user goals into weekly milestones and daily tasks through empathetic dialogue. The **Scheduler** is the core orchestrator — it manages time-blocking, conflict resolution, drift recovery, and coordinates inputs from all other agents. The **Observer** tracks behavioral patterns over time (e.g., "you always skip gym on Mondays") and feeds scheduling preferences back to the Scheduler. The **Sensor** infers real-time user context from device signals — location, phone state, calendar status — to adjust nudge timing. The **Empath** gauges emotional state from voice input to modulate tone and urgency. All agents share GPT-4o-mini as their language backbone, with a RAG-powered vector database providing personalized, history-aware context.
+Flux uses a **multi-agent architecture**. The **Goal Planner** (implemented) decomposes user goals into weekly milestones and daily tasks through empathetic dialogue. The **Scheduler** (implemented) is the core orchestrator — time-blocking, conflict resolution, drift recovery, and reschedule suggestions (GET /scheduler/tasks, POST /scheduler/suggest, POST /scheduler/apply). Observer, Sensor, and Empath are planned; the diagram shows the target architecture. Implemented agents use GPT-4o-mini (OpenRouter) and an optional RAG pipeline (Pinecone) for context.
 
 ---
 
@@ -139,13 +139,11 @@ Flux uses a **multi-agent architecture** where five specialized AI agents work i
 
 | Agent | Purpose | Key Behavior |
 |-------|---------|-------------|
-| 🎯 **Goal Planner** | Transforms vague goals into structured plans | Multi-turn empathetic dialogue; weekly milestones; recurring task creation |
-| 🗓️ **Scheduler** | Core orchestrator for all calendar operations | Conflict resolution; drift recovery; negotiation when no perfect slot exists |
-| 🔍 **Observer** | Learns user behavior patterns over time | Detects aversions (e.g., Monday gym skips); suggests preference updates weekly |
-| 📍 **Sensor** | Infers real-time context from device signals | GPS, phone state, calendar status; adjusts nudge timing; 100% on-device processing |
-| 💚 **Empath** | Gauges emotional state from voice input | Stressed → reduce nudges; low energy → suggest lighter tasks; upbeat → tackle challenges |
-
-For **orchestrator integration** and per-agent connection details (how to run each agent, endpoints, request/response), see [docs/agents/](docs/agents/).
+| 🎯 **Goal Planner** | Transforms vague goals into structured plans | Multi-turn empathetic dialogue; weekly milestones; recurring task creation (POST /goals/start, POST /goals/{id}/respond) |
+| 🗓️ **Scheduler** | Core orchestrator for calendar and drift recovery | Timeline tasks (GET /scheduler/tasks); reschedule suggestions (POST /scheduler/suggest); apply or skip (POST /scheduler/apply) |
+| 🔍 **Observer** | *(Planned)* Learns user behavior patterns over time | Detects aversions; suggests preference updates weekly |
+| 📍 **Sensor** | *(Planned)* Infers real-time context from device signals | GPS, phone state; adjusts nudge timing; on-device |
+| 💚 **Empath** | *(Planned)* Gauges emotional state from voice input | Tone and urgency modulation |
 
 ---
 
@@ -163,6 +161,8 @@ For **orchestrator integration** and per-agent connection details (how to run ea
 
 ### Quick Start (Recommended)
 
+See **[Getting Started](docs/getting-started.md)** for full steps. Summary:
+
 ```bash
 git clone https://github.com/MacDavicK/Flux-Team-8.git
 cd Flux-Team-8
@@ -174,132 +174,34 @@ bash scripts/setup.sh
 bash scripts/supabase_setup.sh
 ```
 
-> **Note:** The first Supabase run downloads ~2-3 GB of Docker images. Subsequent runs are fast.
-
-After setup completes:
+After setup:
 
 ```bash
 # Terminal 1 — Frontend
 cd frontend && npm run dev
 
-# Terminal 2 — Backend (DAO Service)
-cd backend && source venv/bin/activate && uvicorn dao_service.main:app --reload
-
-# Terminal 3 — Backend (AI Agents: Goal Planner, Scheduler, RAG)
+# Terminal 2 — Backend
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 ```
 
-> **Note:** The DAO service and the AI agents app are separate FastAPI processes. Both must be running for full functionality.
+Frontend: [http://localhost:5173](http://localhost:5173). Backend: [http://localhost:8000](http://localhost:8000). API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
 
-### Supabase Local Development
+### Connecting Frontend to Backend
 
-Supabase runs entirely in Docker on your machine. No cloud account needed for local dev.
+- **Mock mode (`VITE_USE_MOCK=true`):** Frontend uses mock data; no backend required.
+- **Live backend (`VITE_USE_MOCK=false`):** Frontend calls `VITE_API_URL` for timeline and reschedule. Set in `frontend/.env` and restart `npm run dev`.
 
-| Service | URL |
-|---------|-----|
-| Studio (Dashboard) | http://127.0.0.1:54323 |
-| API (Project URL) | http://127.0.0.1:54321 |
-| Database | `postgresql://postgres:postgres@127.0.0.1:54322/postgres` |
-| Email Testing (Mailpit) | http://127.0.0.1:54324 |
+### Feature Flags
 
-**Useful commands:**
+`VITE_USE_MOCK`, `VITE_ENABLE_VOICE`, `VITE_ENABLE_DEMO_MODE` — see [Feature Flags](docs/feature-flags.md).
 
-```bash
-supabase status    # Show local URLs and keys
-supabase stop      # Stop all Supabase containers
-supabase start     # Restart (fast after first run)
-supabase db reset  # Reset database and re-apply all migrations
-```
-
-**Setting up the database with test data:**
-
-After `supabase start` (or as part of initial setup), run:
-
-```bash
-# Apply migrations (creates all tables)
-supabase db reset
-
-# Preferred (safe): includes warning + confirmation, truncates first, then seeds
-bash scripts/supabase_setup.sh
-
-# Non-interactive CI/dev automation:
-bash scripts/supabase_setup.sh --yes
-```
-
-This seeds canonical Flux-Claude objects: users, goals, tasks, patterns, conversations, and notification logs — enough to exercise local API and analytics flows.
-
-**Other database utility scripts:**
-
-| Script | Purpose | Command |
-|--------|---------|---------|
-| `truncate_tables.sql` | Delete all rows, keep schema | `read -p "This deletes all local DB data. Type yes to continue: " ans && [ "$ans" = "yes" ] && docker cp supabase/scripts/truncate_tables.sql supabase_db_Flux-Team-8:/tmp/truncate_tables.sql && docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/truncate_tables.sql` |
-| `drop_tables.sql` | Drop canonical tables + analytics views | `read -p "This drops tables/views from local DB. Type yes to continue: " ans && [ "$ans" = "yes" ] && docker cp supabase/scripts/drop_tables.sql supabase_db_Flux-Team-8:/tmp/drop_tables.sql && docker exec supabase_db_Flux-Team-8 psql -U postgres -f /tmp/drop_tables.sql` |
-
-Validation checklist: `supabase/scripts/VALIDATION_CHECKLIST.md`
-
-### Manual Installation
-
-If you prefer to set things up step by step:
-
-```bash
-# Clone the repository
-git clone https://github.com/MacDavicK/Flux-Team-8.git
-cd Flux-Team-8
-
-# Frontend
-cd frontend
-npm install
-cp .env.example .env
-cd ..
-
-# Backend
-cd backend
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-cd ..
-
-# Supabase (Docker Desktop must be running)
-supabase start
-supabase db reset
-
-# Seed test data (optional but recommended; prompts before destructive truncate)
-bash scripts/supabase_setup.sh
-```
+Manual installation, Supabase URLs, and seed commands: **[Getting Started](docs/getting-started.md)**.
 
 ---
 
 ## Project Structure
 
-```
-flux/
-├── frontend/          # React + Vite + TypeScript
-│   ├── src/
-│   │   ├── api/       # API integration layer
-│   │   ├── components/# Reusable UI components
-│   │   ├── hooks/     # Custom React hooks
-│   │   ├── pages/     # Route pages
-│   │   ├── styles/    # Global styles & theme
-│   │   ├── types/     # TypeScript definitions
-│   │   └── utils/     # Helper functions
-│   ├── public/
-│   └── package.json
-├── backend/           # FastAPI + Python
-│   ├── dao_service/   # DAO microservice (data access layer)
-│   │   ├── api/       # API route handlers (v1/)
-│   │   ├── core/      # Database engine, config, exceptions
-│   │   ├── dao/       # Data Access Objects (protocols + implementations)
-│   │   ├── models/    # SQLAlchemy ORM models
-│   │   ├── schemas/   # Pydantic DTOs
-│   │   ├── services/  # Data validation services
-│   │   └── repositories/ # Unit of Work pattern
-│   ├── tests/         # Unit (44) + Integration (40) tests
-│   ├── Dockerfile     # Service-specific Docker image
-│   └── requirements.txt
-├── docs/              # Documentation
-└── README.md
-```
+The main backend app lives under `backend/app/` (agents, routers, services, models). Frontend is TanStack Start under `frontend/src/`. Full tree: **[Project Structure](docs/project-structure.md)**.
 
 ---
 
@@ -360,176 +262,17 @@ flux/
 
 ## Demo Mode
 
-Flux includes an integrated sandbox that lets anyone experience its failure-handling flows without waiting for real time to pass.
+Time-warp, force-miss, and escalation controls for showcasing drift and recovery. Pre-seeded data and sample flow: **[Demo Mode](docs/demo-mode.md)**.
 
-**Activation:** Toggle "Demo Mode" in Settings → a floating control panel appears over the normal UI.
+## Notification Escalation
 
-| Control | What It Does |
-|---------|-------------|
-| **Time Warp** | Slider to fast-forward 1–24 hours, triggering drift detection on passed tasks |
-| **Force Miss** | Select any upcoming task → immediately mark as drifted → triggers ghost animation |
-| **Simulate Leaving Home** | Fires context-aware reminder cascade (grocery nudge with hardcoded distance) |
-| **Escalation Speed** | 1x / 5x / 10x multiplier for the push → WhatsApp → call notification ladder |
-| **Reset State** | Returns to fresh demo with pre-seeded sample tasks and goals |
-
-**Pre-seeded demo data:** One user with a "Lose weight for a wedding" goal, weekly milestones, recurring gym tasks, a grocery reminder, and one must-not-miss task for escalation demonstration.
-
-### Sample Demo Flow
-
-```mermaid
-sequenceDiagram
-    participant D as Demonstrator
-    participant F as Flux App
-    participant A as Audience
-
-    Note over D,A: 1. Show Clean Dashboard
-    D->>F: Calendar with 3–5 tasks visible
-    F-->>A: Fluid UI with time-blocked tasks
-
-    Note over D,A: 2. Force Miss a Task
-    D->>F: Click "Force Miss" on Gym at 10 AM
-    F-->>A: Task ghosts with fade animation
-
-    Note over D,A: 3. AI Negotiation
-    F->>D: "Gym drifted. I can do 5 PM or tomorrow 7 AM"
-    D->>F: Selects "Tomorrow 7 AM"
-    F-->>A: Task smoothly animates to tomorrow's slot
-
-    Note over D,A: 4. Escalation Demo
-    D->>F: Trigger escalation on must-not-miss task
-    F-->>A: Push notification → WhatsApp message → Call UI
-```
+Push → WhatsApp → call by priority (standard, important, must-not-miss). Speed multiplier for demos. Details: **[Notification Escalation](docs/notification-escalation.md)** and SCRUM 40–44 READMEs in `backend/`.
 
 ---
 
 ## Database Schema
 
-### Tables
-
-**`users`** — User identity and onboarding/preferences payloads.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | PK, auto-generated |
-| `email` | text | required, unique |
-| `onboarded` | boolean | default `false` |
-| `profile` | jsonb | onboarding answers and schedule profile |
-| `notification_preferences` | jsonb | phone/WhatsApp/reminder/escalation settings |
-| `created_at` | timestamptz | default `now()` |
-
-**`goals`** — Goal records with micro-goal pipeline support.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | PK, auto-generated |
-| `user_id` | uuid | FK → users, CASCADE |
-| `title` | text | required |
-| `description` | text | nullable |
-| `class_tags` | text[] | classifier tags |
-| `status` | text | CHECK: `active`, `completed`, `abandoned`, `pipeline` |
-| `parent_goal_id` | uuid | self-FK for pipeline chains, nullable |
-| `pipeline_order` | int | sequence in a chain, nullable |
-| `activated_at` | timestamptz | nullable |
-| `completed_at` | timestamptz | nullable |
-| `target_weeks` | int | default `6` |
-| `plan_json` | jsonb | full negotiated plan payload |
-| `created_at` | timestamptz | default `now()` |
-
-**`tasks`** — Time/location-triggered tasks for reminders and completion tracking.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | PK, auto-generated |
-| `user_id` | uuid | FK → users, CASCADE |
-| `goal_id` | uuid | FK → goals, nullable (`ON DELETE SET NULL`) |
-| `title` | text | required |
-| `description` | text | nullable |
-| `status` | text | CHECK: `pending`, `done`, `missed`, `rescheduled`, `cancelled` |
-| `scheduled_at` | timestamptz | primary schedule timestamp |
-| `duration_minutes` | int | nullable |
-| `trigger_type` | text | CHECK: `time`, `location` |
-| `location_trigger` | text | nullable (e.g. `away_from_home`) |
-| `reminder_sent_at` | timestamptz | nullable |
-| `whatsapp_sent_at` | timestamptz | nullable |
-| `call_sent_at` | timestamptz | nullable |
-| `completed_at` | timestamptz | nullable |
-| `recurrence_rule` | text | nullable RRULE string |
-| `shared_with_goal_ids` | uuid[] | nullable multi-goal linkage |
-| `created_at` | timestamptz | default `now()` |
-
-**`patterns`** — Learned behavior summaries for scheduling optimization.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | PK, auto-generated |
-| `user_id` | uuid | FK → users, CASCADE |
-| `pattern_type` | text | e.g. `time_avoidance`, `completion_streak` |
-| `description` | text | human-readable summary |
-| `data` | jsonb | structured pattern payload |
-| `confidence` | float | 0.0-1.0 confidence |
-| `created_at` | timestamptz | default `now()` |
-| `updated_at` | timestamptz | default `now()`, auto-updated by trigger |
-
-**`conversations`** — LangGraph conversation thread metadata.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | PK, auto-generated |
-| `user_id` | uuid | FK → users |
-| `langgraph_thread_id` | text | unique, required |
-| `context_type` | text | CHECK: `onboarding`, `goal`, `task`, `reschedule` |
-| `created_at` | timestamptz | default `now()` |
-| `last_message_at` | timestamptz | nullable |
-
-**`notification_log`** — Audit log for push/WhatsApp/call dispatch + responses.
-
-| Column | Type | Notes |
-|--------|------|-------|
-| `id` | uuid | PK, auto-generated |
-| `task_id` | uuid | FK → tasks |
-| `channel` | text | CHECK: `push`, `whatsapp`, `call` |
-| `sent_at` | timestamptz | nullable |
-| `response` | text | nullable (`done`, `reschedule`, `missed`, `no_response`) |
-| `responded_at` | timestamptz | nullable |
-
-### Entity Relationships
-
-```
-users
- ├── goals (1:N, ON DELETE CASCADE)
- ├── tasks (1:N, ON DELETE CASCADE)
- ├── patterns (1:N, ON DELETE CASCADE)
- └── conversations (1:N)
-
-goals
- └── tasks (1:N, ON DELETE SET NULL via tasks.goal_id)
-
-tasks
- └── notification_log (1:N)
-```
-
-### Materialized Views
-
-- `user_weekly_stats`
-- `missed_by_category`
-
-### Indexes (key examples)
-
-- `idx_goals_user_id`
-- `idx_goals_parent_goal_id`
-- `idx_tasks_user_id`, `idx_tasks_goal_id`, `idx_tasks_status`, `idx_tasks_scheduled_at`
-- `idx_tasks_user_scheduled_status` (composite for `/tasks/today` and notifier polling)
-- `idx_patterns_user_id`, `idx_patterns_pattern_type`, `idx_patterns_updated_at`
-- `idx_conversations_user_id`, `idx_conversations_last_message_at`
-- `idx_notification_log_task_id`, `idx_notification_log_sent_at`, `idx_notification_log_response`
-
-### Design Decisions
-
-- **UUIDs everywhere** — Supabase standard; avoids sequential ID leakage.
-- **CHECK constraints over custom enums** — easier migration evolution while preserving valid state sets.
-- **jsonb for profile/preferences/pattern payloads** — flexible evolution for agent-driven metadata.
-- **RLS enabled on all user-data tables** with owner-scoped policies.
-- **Legacy objects removed** (`milestones`, `demo_flags`, old enum types) to match canonical Flux-Claude schema.
+Tables: `users`, `goals`, `milestones`, `tasks`, `conversations`, `demo_flags`. Enums: `task_state`, `task_priority`, `trigger_type`. Full schema and relationships: **[Database Schema](docs/database-schema.md)**. API reference: **[API Reference](docs/api-reference.md)**.
 
 ---
 

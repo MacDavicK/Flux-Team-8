@@ -1,5 +1,7 @@
 # Phone Call Trigger API
 
+> **Note:** This feature is documented in the main [Notification Escalation](../../docs/notification-escalation.md) guide. This file contains implementation-specific details for SCRUM-43.
+
 **SCRUM-43: Phone Call Trigger**  
 **Owner:** BE-B | **Points:** 3 | **Component:** `notifications`
 

@@ -1,5 +1,7 @@
 # WhatsApp Message Integration (SCRUM-42)
 
+> **Note:** This feature is documented in the main [Notification Escalation](../../docs/notification-escalation.md) guide. This file contains implementation-specific details for SCRUM-42.
+
 ## Overview
 
 This module provides WhatsApp messaging integration for the Flux Life Assistant using the Twilio API. It enables sending task reminder notifications via WhatsApp with templated messages.

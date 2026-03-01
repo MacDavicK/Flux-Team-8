@@ -1,6 +1,5 @@
 # ============================================================
-# Flux DAO Service — Makefile
-# Common development commands for the Data Access microservice.
+# Flux Backend — Makefile
 # Usage:  make <target>
 # ============================================================
 
@@ -14,9 +13,9 @@ install:
 install-dev:
 	pip install -r requirements-dev.txt
 
-# Start the FastAPI dev server with auto-reload
+# Start the FastAPI app (app.main) with auto-reload
 dev:
-	uvicorn dao_service.main:app --reload --host 0.0.0.0 --port 8000
+	uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 # Run the full test suite with verbose output
 test:
