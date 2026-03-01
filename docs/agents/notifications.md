@@ -1,5 +1,7 @@
 # Notifications (Priority, Push, Call)
 
+> Last verified: 2026-03-01
+
 ## What it does
 
 Multi-channel escalation: **push** → **WhatsApp** → **call** by priority (standard, important, must-not-miss). Implemented by SCRUM modules (40: priority model, 41: push, 42: WhatsApp, 43: phone call, 44: escalation demo). This is not a single agent; it is a set of services that a **notifier** process or cron job typically calls when a task is due or missed. The orchestrator usually does not call these directly.
@@ -22,11 +24,11 @@ HTTP. Base paths below assume the main app base URL (e.g. `http://localhost:8000
 
 | Module | Base path | Key endpoints | Routes file |
 |--------|-----------|---------------|-------------|
-| **Priority / config** | `/api/v1/notifications/priority` | POST `/send`, GET `/config`, GET `/timing`, GET `/health` | [scrum_40_notification_priority_model/routes.py](../../backend/scrum_40_notification_priority_model/routes.py) |
-| **Push** | `/notifications/push` | POST `` (send), POST `/subscribe`, DELETE `/unsubscribe`, GET `/vapid-public-key` | [scrum_41_push_notification_integration/routes.py](../../backend/scrum_41_push_notification_integration/routes.py) |
-| **Call** | `/notifications/call` | POST `` (trigger), POST `/twiml`, POST `/gather`, POST `/status` | [scrum_43_phone_call_trigger/routes.py](../../backend/scrum_43_phone_call_trigger/routes.py) |
+| **Priority / config** | `/api/v1/notifications/priority` | POST `/send`, GET `/config`, GET `/timing`, GET `/health` | [notification_priority_model/routes.py](../../backend/notification_priority_model/routes.py) |
+| **Push** | `/notifications/push` | POST `` (send), POST `/subscribe`, DELETE `/unsubscribe`, GET `/vapid-public-key` | [push_notification_integration/routes.py](../../backend/push_notification_integration/routes.py) |
+| **Call** | `/notifications/call` | POST `` (trigger), POST `/twiml`, POST `/gather`, POST `/status` | [phone_call_trigger/routes.py](../../backend/phone_call_trigger/routes.py) |
 
-WhatsApp (SCRUM 42) and Escalation Demo (SCRUM 44) may use different stacks (e.g. Flask Blueprint); see their READMEs in `backend/scrum_42_*` and `backend/scrum_44_*`.
+WhatsApp (SCRUM 42) and Escalation Demo (SCRUM 44) may use different stacks (e.g. Flask Blueprint); see their READMEs in `backend/whatsapp_message_integration/` and `backend/escalation_demo_ui/`.
 
 ## When the orchestrator uses it
 
@@ -40,10 +42,10 @@ If you are building an orchestrator that must trigger a notification (e.g. “se
 
 ## Links
 
-- **SCRUM 40** — [backend/scrum_40_notification_priority_model/README.md](../../backend/scrum_40_notification_priority_model/README.md)
-- **SCRUM 41** — [backend/scrum_41_push_notification_integration/README.md](../../backend/scrum_41_push_notification_integration/README.md)
-- **SCRUM 42** — [backend/scrum_42_whatsapp_message_integration/README.md](../../backend/scrum_42_whatsapp_message_integration/README.md)
-- **SCRUM 43** — [backend/scrum_43_phone_call_trigger/README.md](../../backend/scrum_43_phone_call_trigger/README.md)
-- **SCRUM 44** — [backend/scrum_44_escalation_demo_ui/README.md](../../backend/scrum_44_escalation_demo_ui/README.md)
-- **SCRUM 57 (Notifier Agent)** — [backend/scrum_57_notifier_agent/](../../backend/scrum_57_notifier_agent/) (if present)
+- **SCRUM 40** — [backend/notification_priority_model/README.md](../../backend/notification_priority_model/README.md)
+- **SCRUM 41** — [backend/push_notification_integration/README.md](../../backend/push_notification_integration/README.md)
+- **SCRUM 42** — [backend/whatsapp_message_integration/README.md](../../backend/whatsapp_message_integration/README.md)
+- **SCRUM 43** — [backend/phone_call_trigger/README.md](../../backend/phone_call_trigger/README.md)
+- **SCRUM 44** — [backend/escalation_demo_ui/README.md](../../backend/escalation_demo_ui/README.md)
+- **SCRUM 57 (Notifier Agent)** — [backend/notifier_agent/](../../backend/notifier_agent/) (if present)
 - If the repo has a high-level **notification escalation** doc (e.g. `docs/notification-escalation.md`), link it here for a one-page summary of push → WhatsApp → call flow.

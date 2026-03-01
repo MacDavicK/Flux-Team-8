@@ -1,4 +1,8 @@
+> ⚠️ **NOT YET IMPLEMENTED** — This agent is planned. Do not integrate against it.
+
 # Classifier Agent (Planned)
+
+> Last verified: 2026-03-01
 
 ## What it does
 

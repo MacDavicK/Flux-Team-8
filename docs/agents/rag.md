@@ -1,5 +1,7 @@
 # RAG (Retrieval-Augmented Generation)
 
+> Last verified: 2026-03-01
+
 ## What it does
 
 Article ingestion pipeline (load → chunk → embed → upsert to Pinecone) and semantic search. Used by the **Goal Planner** to ground plans in expert content. It is a **service**, not a conversational agent. The orchestrator does not call RAG directly.

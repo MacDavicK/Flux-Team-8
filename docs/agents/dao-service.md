@@ -1,5 +1,7 @@
 # DAO Service (Data Access)
 
+> Last verified: 2026-03-01
+
 ## What it does
 
 Data persistence microservice for Flux: **users**, **goals**, **tasks**, **conversations**, **patterns**, **notification_log**. It exposes CRUD and a few specialized endpoints (e.g. tasks by time range, statistics, bulk update). It contains **no business logic** — that lives in the agents and the main app. Agents (or the main app) use it to read and write canonical data.

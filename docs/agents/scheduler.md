@@ -1,5 +1,7 @@
 # Scheduler Agent
 
+> Last verified: 2026-03-01
+
 ## What it does
 
 Finds free time slots for **drifted** tasks (today and tomorrow). Returns 1–2 suggested slots with a short rationale for each, and applies the user’s choice (reschedule to a new time or skip). Uses user profile (sleep window, work hours) and existing tasks to avoid conflicts. Stateless singleton in-process.

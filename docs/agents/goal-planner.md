@@ -1,5 +1,7 @@
 # Goal Planner Agent
 
+> Last verified: 2026-03-01
+
 ## What it does
 
 Multi-turn goal decomposition for Health & Fitness goals. The agent conducts an empathetic dialogue to extract timeline, current state, target, and preferences, then produces a plan with weekly milestones and recurring tasks. When Pinecone is configured, it uses **RAG** to ground plans in expert content (see [rag.md](rag.md)).

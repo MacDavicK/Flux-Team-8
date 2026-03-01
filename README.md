@@ -184,7 +184,12 @@ cd frontend && npm run dev
 
 # Terminal 2 — Backend (DAO Service)
 cd backend && source venv/bin/activate && uvicorn dao_service.main:app --reload
+
+# Terminal 3 — Backend (AI Agents: Goal Planner, Scheduler, RAG)
+cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 ```
+
+> **Note:** The DAO service and the AI agents app are separate FastAPI processes. Both must be running for full functionality.
 
 ### Supabase Local Development
 

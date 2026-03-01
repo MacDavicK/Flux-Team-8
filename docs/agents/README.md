@@ -1,5 +1,7 @@
 # Agents — Orchestrator Connection Guide
 
+> Last verified: 2026-03-01
+
 This folder documents each Flux agent (and related services) so that anyone working on the **orchestrator** knows how to run and connect to them: endpoints, request/response shapes, and when the orchestrator routes to each.
 
 ---
@@ -14,7 +16,7 @@ This folder documents each Flux agent (and related services) so that anyone work
 | **Notifications** | Push, priority, call (escalation) | Mounted on main app when SCRUM routers load | HTTP: `/api/v1/notifications/priority`, `/notifications/push`, `/notifications/call` | [notifications.md](notifications.md) |
 | **DAO Service** | Data persistence (users, goals, tasks, etc.) | Separate FastAPI app | HTTP: `/api/v1/users`, `/api/v1/goals`, `/api/v1/tasks`, … | [dao-service.md](dao-service.md) |
 | **Classifier** | (Planned) Tags goal/task from taxonomy | LangGraph node | In-process node; fan-out from goal_planner | [classifier.md](classifier.md) |
-| **Pattern Observer** | (Planned) Behavioral analysis; avoid slots | LangGraph node or scrum_50 HTTP | In-process or HTTP `/api/pattern-observer` | [pattern-observer.md](pattern-observer.md) |
+| **Pattern Observer** | (Planned) Behavioral analysis; avoid slots | LangGraph node or pattern_observer HTTP | In-process or HTTP `/api/pattern-observer` | [pattern-observer.md](pattern-observer.md) |
 
 ---
 
