@@ -21,14 +21,37 @@ fail()  { echo -e "${RED}[FAIL]${NC}  $*"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-# -- Load backend .env (if present) -----------------------------------------
+# -- Load .env files (if present) --------------------------------------------
+# backend/.env is loaded first; frontend/.env may override individual values.
 
-ENV_FILE="$PROJECT_ROOT/backend/.env"
-if [ -f "$ENV_FILE" ]; then
+BACKEND_ENV="$PROJECT_ROOT/backend/.env"
+if [ -f "$BACKEND_ENV" ]; then
     set -a
     # shellcheck source=/dev/null
-    source "$ENV_FILE"
+    source "$BACKEND_ENV"
     set +a
+fi
+
+FRONTEND_ENV="$PROJECT_ROOT/frontend/.env"
+if [ -f "$FRONTEND_ENV" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$FRONTEND_ENV"
+    set +a
+fi
+
+# Bridge naming conventions: the backend uses SUPABASE_KEY; the frontend server
+# functions expect SUPABASE_ANON_KEY. Map one to the other if needed.
+if [ -z "${SUPABASE_ANON_KEY:-}" ] && [ -n "${SUPABASE_KEY:-}" ]; then
+    export SUPABASE_ANON_KEY="$SUPABASE_KEY"
+fi
+
+# Validate required Supabase env vars and warn early rather than failing at runtime.
+if [ -z "${SUPABASE_URL:-}" ] || [ -z "${SUPABASE_ANON_KEY:-}" ]; then
+    warn "SUPABASE_URL or SUPABASE_ANON_KEY is not set."
+    warn "Create backend/.env (or frontend/.env) with:"
+    warn "  SUPABASE_URL=https://<project>.supabase.co"
+    warn "  SUPABASE_KEY=<anon-key>   # or SUPABASE_ANON_KEY=<anon-key>"
 fi
 
 # -- Subcommands -------------------------------------------------------------
