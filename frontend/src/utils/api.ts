@@ -36,6 +36,11 @@ export interface SuggestResponse {
   ai_message: string;
 }
 
+/** Alias for modal compatibility (SCRUM-33). */
+export type RescheduleSuggestion = Suggestion;
+/** Alias for modal compatibility (SCRUM-33). */
+export type SchedulerSuggestResponse = SuggestResponse;
+
 export async function fetchTimelineTasks(): Promise<Task[]> {
   const res = await fetch(`${API_BASE}/scheduler/tasks`);
   if (!res.ok) throw new Error("Failed to fetch tasks");
