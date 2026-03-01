@@ -37,7 +37,8 @@ The DAO Service is a **data-only microservice** — it handles CRUD operations a
 | **Users** | User profiles: `email`, `onboarded`, `profile`, `notification_preferences` |
 | **Goals** | User goals: `title`, `class_tags`, `status`, `target_weeks`, `plan_json` |
 | **Tasks** | Individual tasks: `title`, `status`, `trigger_type`, `scheduled_at` |
-| **Conversations** | LangGraph thread records: `langgraph_thread_id`, `context_type` |
+| **Conversations** | LangGraph thread records: `langgraph_thread_id`, `context_type` + voice columns |
+| **Messages** | Voice conversation transcript messages: `role`, `content`, `input_modality` |
 | **Patterns** | Behavioral signals: `pattern_type`, `data`, `confidence` |
 | **NotificationLog** | Delivery records: `channel`, `sent_at`, `response` |
 
@@ -456,8 +457,9 @@ async def atomic_multi_entity_creation():
 | GET | `/api/v1/conversations/{id}` | Get conversation |
 | POST | `/api/v1/conversations/` | Create conversation |
 | PATCH | `/api/v1/conversations/{id}` | Update conversation |
+| PATCH | `/api/v1/conversations/{id}/voice` | Update voice-specific fields (session close) |
 
-**Context types**: `goal`, `task`, `onboarding`, `reschedule`
+**Context types**: `goal`, `task`, `onboarding`, `reschedule`, `voice`
 
 **Create Conversation Request:**
 ```json
@@ -467,6 +469,43 @@ async def atomic_multi_entity_creation():
   "context_type": "goal"
 }
 ```
+
+**Voice Update Request** (`PATCH /conversations/{id}/voice`):
+```json
+{
+  "ended_at": "2026-03-01T15:30:00Z",
+  "duration_seconds": 120,
+  "extracted_intent": "GOAL",
+  "intent_payload": {"goal_statement": "Learn Spanish"},
+  "linked_goal_id": "uuid"
+}
+```
+
+### Message Endpoints
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/messages/` | Create message (used by conv_agent) |
+| GET | `/api/v1/messages/?conversation_id=uuid` | List messages by conversation |
+| GET | `/api/v1/messages/{id}` | Get single message |
+| DELETE | `/api/v1/messages/{id}` | Delete message |
+
+**Roles**: `user`, `assistant`, `system`, `function`
+**Input modalities**: `voice`, `text`
+
+**Create Message Request:**
+```json
+{
+  "conversation_id": "uuid",
+  "role": "user",
+  "content": "I want to learn Spanish",
+  "input_modality": "voice"
+}
+```
+
+### Conv Agent Integration
+
+The voice conversational agent (`conv_agent`) routes all database access through this service via HTTP. The `ConvAgentDaoClient` (in `backend/app/conv_agent/dao_client.py`) wraps calls to conversations, messages, users, tasks, and goals endpoints. The dao_service runs on port 8001 by default.
 
 ### Pattern Endpoints
 

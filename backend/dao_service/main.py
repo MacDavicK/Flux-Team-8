@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from dao_service.api.v1 import (
     conversations_api,
     goals_api,
+    messages_api,
     notification_log_api,
     patterns_api,
     tasks_api,
@@ -24,6 +25,7 @@ app = FastAPI(
         {"name": "goals", "description": "Goal management"},
         {"name": "tasks", "description": "Task operations (includes Scheduler & Observer endpoints)"},
         {"name": "conversations", "description": "Conversation history"},
+        {"name": "messages", "description": "Voice conversation transcript messages"},
         {"name": "patterns", "description": "Behavioral pattern signals"},
         {"name": "notification-log", "description": "Notification delivery logs"},
     ],
@@ -46,6 +48,7 @@ app.include_router(users_api.router, prefix="/api/v1")
 app.include_router(goals_api.router, prefix="/api/v1")
 app.include_router(tasks_api.router, prefix="/api/v1")
 app.include_router(conversations_api.router, prefix="/api/v1")
+app.include_router(messages_api.router, prefix="/api/v1")
 app.include_router(patterns_api.router, prefix="/api/v1")
 app.include_router(notification_log_api.router, prefix="/api/v1")
 

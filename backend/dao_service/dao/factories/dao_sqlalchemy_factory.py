@@ -2,6 +2,7 @@
 
 from dao_service.dao.impl.sqlalchemy.dao_conversation import DaoConversation
 from dao_service.dao.impl.sqlalchemy.dao_goal import DaoGoal
+from dao_service.dao.impl.sqlalchemy.dao_message import DaoMessage
 from dao_service.dao.impl.sqlalchemy.dao_notification_log import DaoNotificationLog
 from dao_service.dao.impl.sqlalchemy.dao_pattern import DaoPattern
 from dao_service.dao.impl.sqlalchemy.dao_task import DaoTask
@@ -28,3 +29,6 @@ class DaoSqlalchemyFactory:
 
     def create_notification_log_dao(self) -> DaoNotificationLog:
         return DaoNotificationLog()
+
+    def create_message_dao(self) -> DaoMessage:
+        return DaoMessage()

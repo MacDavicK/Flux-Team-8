@@ -49,3 +49,7 @@ def get_pattern_dao():
 
 def get_notification_log_dao():
     return get_dao_factory().create_notification_log_dao()
+
+
+def get_message_dao():
+    return get_dao_factory().create_message_dao()

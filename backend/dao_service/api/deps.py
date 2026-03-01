@@ -11,6 +11,7 @@ from dao_service.services.dao_user_service import DaoUserService
 from dao_service.services.dao_goal_service import DaoGoalService
 from dao_service.services.dao_task_service import DaoTaskService
 from dao_service.services.dao_conversation_service import DaoConversationService
+from dao_service.services.dao_message_service import DaoMessageService
 from dao_service.services.dao_notification_log_service import DaoNotificationLogService
 from dao_service.services.dao_pattern_service import DaoPatternService
 
@@ -50,6 +51,10 @@ def get_conversation_service() -> DaoConversationService:
 
 def get_pattern_service() -> DaoPatternService:
     return DaoPatternService()
+
+
+def get_message_service() -> DaoMessageService:
+    return DaoMessageService()
 
 
 def get_notification_log_service() -> DaoNotificationLogService:

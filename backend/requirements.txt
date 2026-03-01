@@ -23,6 +23,9 @@ langchain-text-splitters==0.2.4
 # Vector store (Pinecone)
 pinecone==5.4.2
 
+# YAML parsing (voice agent config)
+pyyaml==6.0.2
+
 # Utilities
 python-dotenv==1.0.1
 httpx==0.28.1
@@ -32,6 +35,9 @@ python-json-logger==2.0.7
 
 # Background tasks and scheduling
 apscheduler==3.10.4
+
+# Push notifications (required by scrum_41_push_notification_integration)
+pywebpush>=1.14.0
 
 # Script / RAG pipeline (download_articles.py, demo_rag*.py, etc.)
 requests>=2.31.0

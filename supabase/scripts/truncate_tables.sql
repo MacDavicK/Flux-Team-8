@@ -3,6 +3,7 @@
 
 TRUNCATE TABLE
   notification_log,
+  messages,
   conversations,
   patterns,
   tasks,
