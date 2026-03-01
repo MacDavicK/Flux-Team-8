@@ -278,8 +278,8 @@ Tables: `users`, `goals`, `milestones`, `tasks`, `conversations`, `demo_flags`. 
 
 ## Team
 
-| Name              | Role                      | GitHub                                         |
-| ----------------- | --------------------------| ---------------------------------------------- |
+| Name              | Role                           | GitHub                                         |
+| ----------------- | ------------------------------ | ---------------------------------------------- |
 | Harshal Kale      | Frontend Developer Team Leader | [@harshalkale](https://github.com/harshalkale) |
 | Session Mwamufiya | Frontend Developer             | [@Session-SOS](https://github.com/Session-SOS) |
 | Krishnan Iyer     | Backend Developer              | [@kiyer1974](https://github.com/kiyer1974)     |
