@@ -278,14 +278,14 @@ Tables: `users`, `goals`, `milestones`, `tasks`, `conversations`, `demo_flags`. 
 
 ## Team
 
-| Name              | Role        | GitHub                                         |
-| ----------------- | ----------- | ---------------------------------------------- |
-| Harshal Kale      | Team Leader | [@harshalkale](https://github.com/harshalkale) |
-| Session Mwamufiya |             | [@Session-SOS](https://github.com/Session-SOS) |
-| Krishnan Iyer     |             | [@kiyer1974](https://github.com/kiyer1974)     |
-| Sathish Kulal     |             | [@kulalking](https://github.com/kulalking)     |
-| Hima              |             | [@aug13post](https://github.com/aug13post)     |
-| Kavish Jaiswal    |             | [@MacDavicK](https://github.com/MacDavicK)     |
+| Name              | Role                      | GitHub                                         |
+| ----------------- | --------------------------| ---------------------------------------------- |
+| Harshal Kale      | Frontend Developer Team Leader | [@harshalkale](https://github.com/harshalkale) |
+| Session Mwamufiya | Frontend Developer             | [@Session-SOS](https://github.com/Session-SOS) |
+| Krishnan Iyer     | Backend Developer              | [@kiyer1974](https://github.com/kiyer1974)     |
+| Sathish Kulal     | Backend Developer              | [@kulalking](https://github.com/kulalking)     |
+| Hima              | Backend Developer              | [@aug13post](https://github.com/aug13post)     |
+| Kavish Jaiswal    | Full-Stack Developer           | [@MacDavicK](https://github.com/MacDavicK)     |
 
 ---
 
