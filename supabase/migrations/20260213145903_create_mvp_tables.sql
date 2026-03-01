@@ -142,7 +142,7 @@ BEGIN
   ) THEN
     ALTER TABLE conversations
       ADD CONSTRAINT conversations_context_type_check
-      CHECK (context_type IN ('onboarding', 'goal', 'task', 'reschedule'));
+      CHECK (context_type IN ('onboarding', 'goal', 'task', 'reschedule', 'voice'));
   END IF;
 END $$;
 
