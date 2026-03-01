@@ -1,6 +1,6 @@
 # 🎯 Flux Life Assistant
 
-*"Transforming Goals into Daily Actions with Empathetic AI"*
+_"Transforming Goals into Daily Actions with Empathetic AI"_
 
 ![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
@@ -51,13 +51,13 @@ What sets Flux apart is its **Compassionate Drift & Shuffle** engine. Instead of
 
 ## Why Flux?
 
-| Competitor | Their Approach | Where They Fall Short |
-|------------|----------------|----------------------|
-| **Todoist** | Task lists with due dates and manual rescheduling | No understanding of *why* you missed; pure list management |
-| **Reclaim.ai** | Auto-schedules around calendar meetings | Rigid time slots; no emotional intelligence; no pattern learning |
-| **Motion** | AI auto-scheduler for teams | Enterprise-focused; no compassion layer; expensive |
-| **Notion Calendar** | Unified workspace with drag-and-drop | Manual effort; no AI intervention when plans fail |
-| **Google Calendar** | Universal calendar standard | Binary missed/done states; red "overdue" labels trigger shame |
+| Competitor          | Their Approach                                    | Where They Fall Short                                            |
+| ------------------- | ------------------------------------------------- | ---------------------------------------------------------------- |
+| **Todoist**         | Task lists with due dates and manual rescheduling | No understanding of _why_ you missed; pure list management       |
+| **Reclaim.ai**      | Auto-schedules around calendar meetings           | Rigid time slots; no emotional intelligence; no pattern learning |
+| **Motion**          | AI auto-scheduler for teams                       | Enterprise-focused; no compassion layer; expensive               |
+| **Notion Calendar** | Unified workspace with drag-and-drop              | Manual effort; no AI intervention when plans fail                |
+| **Google Calendar** | Universal calendar standard                       | Binary missed/done states; red "overdue" labels trigger shame    |
 
 **Flux fills the gap** with goal decomposition, context-aware nudging, compassionate rescheduling, and multi-channel escalation — capabilities none of the above offer together.
 
@@ -65,13 +65,13 @@ What sets Flux apart is its **Compassionate Drift & Shuffle** engine. Instead of
 
 ## Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| Frontend | React 19, TanStack Start, Vite 7, TypeScript, Framer Motion, Tailwind CSS |
-| Backend | FastAPI, Python 3.11+ |
-| Database | PostgreSQL via Supabase |
-| AI/ML | GPT-4o-mini (OpenRouter), RAG (Pinecone) |
-| Deployment | Vercel (Frontend), Railway/Render (Backend) |
+| Layer      | Technology                                                                |
+| ---------- | ------------------------------------------------------------------------- |
+| Frontend   | React 19, TanStack Start, Vite 7, TypeScript, Framer Motion, Tailwind CSS |
+| Backend    | FastAPI, Python 3.11+                                                     |
+| Database   | PostgreSQL via Supabase                                                   |
+| AI/ML      | GPT-4o-mini (OpenRouter), RAG (Pinecone)                                  |
+| Deployment | Vercel (Frontend), Railway/Render (Backend)                               |
 
 ---
 
@@ -137,13 +137,13 @@ Flux uses a **multi-agent architecture**. The **Goal Planner** (implemented) dec
 
 ## AI Agents
 
-| Agent | Purpose | Key Behavior |
-|-------|---------|-------------|
-| 🎯 **Goal Planner** | Transforms vague goals into structured plans | Multi-turn empathetic dialogue; weekly milestones; recurring task creation (POST /goals/start, POST /goals/{id}/respond) |
-| 🗓️ **Scheduler** | Core orchestrator for calendar and drift recovery | Timeline tasks (GET /scheduler/tasks); reschedule suggestions (POST /scheduler/suggest); apply or skip (POST /scheduler/apply) |
-| 🔍 **Observer** | *(Planned)* Learns user behavior patterns over time | Detects aversions; suggests preference updates weekly |
-| 📍 **Sensor** | *(Planned)* Infers real-time context from device signals | GPS, phone state; adjusts nudge timing; on-device |
-| 💚 **Empath** | *(Planned)* Gauges emotional state from voice input | Tone and urgency modulation |
+| Agent               | Purpose                                                  | Key Behavior                                                                                                                   |
+| ------------------- | -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| 🎯 **Goal Planner** | Transforms vague goals into structured plans             | Multi-turn empathetic dialogue; weekly milestones; recurring task creation (POST /goals/start, POST /goals/{id}/respond)       |
+| 🗓️ **Scheduler**    | Core orchestrator for calendar and drift recovery        | Timeline tasks (GET /scheduler/tasks); reschedule suggestions (POST /scheduler/suggest); apply or skip (POST /scheduler/apply) |
+| 🔍 **Observer**     | _(Planned)_ Learns user behavior patterns over time      | Detects aversions; suggests preference updates weekly                                                                          |
+| 📍 **Sensor**       | _(Planned)_ Infers real-time context from device signals | GPS, phone state; adjusts nudge timing; on-device                                                                              |
+| 💚 **Empath**       | _(Planned)_ Gauges emotional state from voice input      | Tone and urgency modulation                                                                                                    |
 
 ---
 
@@ -225,28 +225,28 @@ The main backend app lives under `backend/app/` (agents, routers, services, mode
 
 ## Scope
 
-| Capability | v1 (MVP Demo) | v2 (Post-Launch) |
-|-----------|---------------|-----------------|
-| **Goal Categories** | Health & Fitness only | Career, Personal, Finance, Learning, Relationships |
-| **Goal Timeline** | Up to 6 months | Multi-year with quarterly reviews |
-| **Plan Depth** | High-level weekly milestones | Deep plans (calories, specific workouts, curricula) |
-| **Calendar Sync** | Internal Flux calendar only | Google Calendar two-way sync |
-| **Pattern Learning** | Hard-coded demo scenarios | Lightweight RL model tracking accept/reject/miss rates |
-| **Context Awareness** | Simulated via demo controls | On-device ML (TensorFlow Lite) for location and phone state |
-| **Sentiment Detection** | Keyword-based tone adjustment | On-device speech emotion recognition |
-| **Cold Storage** | Static parking lot view | Full chronic-avoidance detection with weekly review prompts |
-| **Notification Channels** | Push + 1 WhatsApp + 1 call path | Email, rich WhatsApp quick replies, full VoIP |
-| **External Integrations** | None | Apple Health, Fitbit, Strava, MyFitnessPal |
+| Capability                | v1 (MVP Demo)                   | v2 (Post-Launch)                                            |
+| ------------------------- | ------------------------------- | ----------------------------------------------------------- |
+| **Goal Categories**       | Health & Fitness only           | Career, Personal, Finance, Learning, Relationships          |
+| **Goal Timeline**         | Up to 6 months                  | Multi-year with quarterly reviews                           |
+| **Plan Depth**            | High-level weekly milestones    | Deep plans (calories, specific workouts, curricula)         |
+| **Calendar Sync**         | Internal Flux calendar only     | Google Calendar two-way sync                                |
+| **Pattern Learning**      | Hard-coded demo scenarios       | Lightweight RL model tracking accept/reject/miss rates      |
+| **Context Awareness**     | Simulated via demo controls     | On-device ML (TensorFlow Lite) for location and phone state |
+| **Sentiment Detection**   | Keyword-based tone adjustment   | On-device speech emotion recognition                        |
+| **Cold Storage**          | Static parking lot view         | Full chronic-avoidance detection with weekly review prompts |
+| **Notification Channels** | Push + 1 WhatsApp + 1 call path | Email, rich WhatsApp quick replies, full VoIP               |
+| **External Integrations** | None                            | Apple Health, Fitbit, Strava, MyFitnessPal                  |
 
 ---
 
 ## Guardrails
 
-**Tone Safety** — Flux never uses shaming language. If a task is missed, responses use neutral or supportive phrasing: *"Let's find a better time"* rather than *"You failed again."*
+**Tone Safety** — Flux never uses shaming language. If a task is missed, responses use neutral or supportive phrasing: _"Let's find a better time"_ rather than _"You failed again."_
 
 **Privacy by Design** — Context awareness (location, phone state) uses on-device processing only. No location data leaves the device. Voice interactions produce transcripts and emotion labels — raw audio is never stored.
 
-**Explainability** — When suggesting a new time slot, Flux displays a brief rationale: *"Suggested 6 PM because you prefer evening workouts and 5 PM was blocked."*
+**Explainability** — When suggesting a new time slot, Flux displays a brief rationale: _"Suggested 6 PM because you prefer evening workouts and 5 PM was blocked."_
 
 **Consent & Control** — All sensor-based features require explicit opt-in with granular permissions. Users can disable any data signal at any time; the AI falls back to time-based heuristics.
 
@@ -278,14 +278,14 @@ Tables: `users`, `goals`, `milestones`, `tasks`, `conversations`, `demo_flags`. 
 
 ## Team
 
-| Name | Role | GitHub |
-|------|------|--------|
-| Harshal Kale | Team Leader | [@harshalkale](https://github.com/harshalkale) |
-| Session Mwamufiya | | [@Session-SOS](https://github.com/Session-SOS) |
-| Krishnan Iyer | | [@kiyer1974](https://github.com/kiyer1974) |
-| Sathish Kulal | | [@placeholder](#) |
-| Hima | | [@placeholder](#) |
-| Kavish Jaiswal | | [@MacDavicK](https://github.com/MacDavicK) |
+| Name              | Role        | GitHub                                         |
+| ----------------- | ----------- | ---------------------------------------------- |
+| Harshal Kale      | Team Leader | [@harshalkale](https://github.com/harshalkale) |
+| Session Mwamufiya |             | [@Session-SOS](https://github.com/Session-SOS) |
+| Krishnan Iyer     |             | [@kiyer1974](https://github.com/kiyer1974)     |
+| Sathish Kulal     |             | [@kulalking](https://github.com/kulalking)     |
+| Hima              |             | [@aug13post](https://github.com/aug13post)     |
+| Kavish Jaiswal    |             | [@MacDavicK](https://github.com/MacDavicK)     |
 
 ---
 
