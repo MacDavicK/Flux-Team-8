@@ -109,8 +109,8 @@ cmd_setup() {
 cmd_test() {
     info "Running conv_agent unit tests..."
 
-    cd "$PROJECT_ROOT"
-    python3 -m pytest backend/conv_agent/tests/ -v --tb=short -k "not integration"
+    cd "$PROJECT_ROOT/backend"
+    python3 -m pytest conv_agent/tests/ -v --tb=short -k "not integration"
 
     if [ $? -eq 0 ]; then
         ok "Unit tests passed"
@@ -121,7 +121,7 @@ cmd_test() {
     # Run integration tests if DEEPGRAM_API_KEY is set
     if [ -n "${DEEPGRAM_API_KEY:-}" ]; then
         info "DEEPGRAM_API_KEY detected -- running integration tests..."
-        python3 -m pytest backend/conv_agent/tests/ -v --tb=short -m integration
+        python3 -m pytest conv_agent/tests/ -v --tb=short -m integration
         if [ $? -eq 0 ]; then
             ok "Integration tests passed"
         else

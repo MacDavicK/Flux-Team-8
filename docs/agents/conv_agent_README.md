@@ -34,13 +34,12 @@ Browser                         Backend (FastAPI)            Deepgram
 | Requirement       | Version   | Notes                                                      |
 |-------------------|-----------|------------------------------------------------------------|
 | Python            | 3.11+     | Backend runtime                                            |
-| Node.js           | 18+       | Frontend build                                             |
+| Node.js           | 20+       | Frontend build (matches `frontend/Dockerfile`)             |
 | Supabase CLI      | latest    | Required to run Supabase locally (`brew install supabase/tap/supabase`) |
-| Docker Desktop    | latest    | Required to run dao_service via Docker Compose             |
-| DAO Service       | --        | Must be running on port 8001 before starting the backend   |
+| Docker Desktop    | latest    | Required for `docker compose up` deployment                |
 | DEEPGRAM_API_KEY  | --        | Required for live voice (not needed for unit tests)        |
 
-**Important:** The conv_agent does not connect to the database directly. All persistence goes through the DAO Service (`http://localhost:8001`). Start the DAO Service before running the backend.
+**Important:** The conv_agent does not connect to the database directly. All persistence goes through the DAO Service (`http://localhost:8001`). When running without Docker, start the DAO Service before starting the backend. Docker Compose does not include the DAO Service container — see Step 2 for options.
 
 ## Quick Setup
 
@@ -96,11 +95,22 @@ npx supabase
 supabase start
 ```
 
-This automatically applies all migrations from `supabase/migrations/`, including `20260301120000_voice_session.sql` which creates the `messages` table and adds voice columns to `conversations`. No manual migration step is needed.
+`supabase start` boots the local stack but does **not** apply schema automatically — the `supabase/migrations/` directory was consolidated and its contents merged into a single canonical file. Apply the full schema once after starting:
 
-If Supabase is already running but you need to reset the schema:
 ```bash
-supabase db reset      # drops + recreates from migrations (DESTROYS local data)
+# Apply the consolidated schema (tables, indexes, RLS, triggers)
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -f flux-backend/migrations/001_schema.sql
+```
+
+This idempotent script creates all tables including the voice session columns (`voice_session_id`, `extracted_intent`, `intent_payload`, `linked_goal_id`, `linked_task_id`, `ended_at`, `duration_seconds`) on `conversations`, and `input_modality` + `metadata` on `messages`. Safe to run again on an existing database.
+
+To reset the database to a clean state:
+```bash
+supabase db reset      # drops and recreates the local Postgres instance (DESTROYS local data)
+# then re-apply the schema:
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -f flux-backend/migrations/001_schema.sql
 ```
 
 Useful ports after `supabase start`:
@@ -148,50 +158,64 @@ DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:54322/postgres
 
 ### Step 4 — Start the full stack
 
+**Option A — Docker Compose (recommended):**
+```bash
+# From the project root
+docker compose up --build
+```
+
+This starts:
+- **backend** on `http://localhost:8000` (conv_agent + other APIs)
+- **frontend** on `http://localhost:5173` (Vite dev server)
+
+> **Note:** The DAO Service is not included in `docker-compose.yml`. Voice session intents that write goals and tasks require the DAO Service to be running separately (see Step 2). Unit tests and the router tests use in-memory mocks and do not require it.
+
+**Option B — Local dev (`conv_agent.sh`):**
 ```bash
 ./scripts/conv_agent.sh deploy
 ```
 
 This starts:
-- **dao_service** on `http://localhost:8001` (data persistence layer)
-- **backend** on `http://localhost:8080` (conv_agent + other APIs)
-- **frontend** on `http://localhost:3000` (React dev server)
+- **dao_service** on `http://localhost:8001`
+- **backend** on `http://localhost:8080`
+- **frontend** on `http://localhost:3000`
 
 Or start services separately:
 ```bash
-# Terminal 1: dao_service (direct)
+# Terminal 1: dao_service
 cd backend && uvicorn dao_service.main:app --host 0.0.0.0 --port 8001
 
 # Terminal 2: backend
-cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-# Terminal 3: frontend (set VITE_API_BASE so voice API points to backend)
-cd frontend && VITE_API_BASE=http://localhost:8080 npm run dev
+# Terminal 3: frontend
+cd frontend && npm run dev
 ```
 
-Open `http://localhost:3000/chat` and tap the mic button.
+Open the chat/voice UI and tap the mic button.
 
 ### Service URLs reference
 
-| What you want | URL |
-|--------------|-----|
-| **App UI (chat + voice)** | http://localhost:3000/chat |
-| Home / flow view | http://localhost:3000/ |
-| Backend API docs (Swagger) | http://localhost:8080/docs |
-| Backend health check | http://localhost:8080/health |
-| dao_service health | http://localhost:8001/health |
-| dao_service readiness | http://localhost:8001/ready |
+| What you want | Docker Compose | Local dev (`conv_agent.sh`) |
+|--------------|----------------|------------------------------|
+| **App UI (chat + voice)** | http://localhost:5173/chat | http://localhost:3000/chat |
+| Backend API docs (Swagger) | http://localhost:8000/docs | http://localhost:8080/docs |
+| Backend health check | http://localhost:8000/health | http://localhost:8080/health |
+| dao_service health | _(not in compose)_ | http://localhost:8001/health |
+| Supabase API | http://localhost:54321 | http://localhost:54321 |
+| Supabase Studio | http://localhost:54323 | http://localhost:54323 |
 
-> **Note:** The frontend (`localhost:3000`) is the React app — this is where the voice UI lives.
-> The backend (`localhost:8080`) and dao_service (`localhost:8001`) are REST APIs; opening `/` in a browser returns 404 because they serve no root page. Use `/docs` to browse the backend API interactively.
+> **Note:** The backend and dao_service are REST APIs — opening `/` in a browser returns 404. Use `/docs` to browse the API interactively.
 
 ## API Reference
+
+All examples use port `8000` (Docker Compose). If running locally via `conv_agent.sh`, replace `8000` with `8080`.
 
 ### POST /api/v1/voice/session
 Create a new voice session. Returns a Deepgram token and agent configuration.
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/voice/session \
+curl -X POST http://localhost:8000/api/v1/voice/session \
   -H "Content-Type: application/json" \
   -d '{"user_id": "a1000000-0000-0000-0000-000000000001"}'
 ```
@@ -202,7 +226,7 @@ Response: `{ "session_id": "...", "deepgram_token": "...", "config": { ... } }`
 Save a transcript message (fire-and-forget).
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/voice/messages \
+curl -X POST http://localhost:8000/api/v1/voice/messages \
   -H "Content-Type: application/json" \
   -d '{"session_id": "...", "role": "user", "content": "I want to learn Spanish"}'
 ```
@@ -213,7 +237,7 @@ Response: `{ "message_id": "...", "status": "saved" }`
 Retrieve the full transcript for a session.
 
 ```bash
-curl http://localhost:8080/api/v1/voice/sessions/{session_id}/messages
+curl http://localhost:8000/api/v1/voice/sessions/{session_id}/messages
 ```
 
 Response: `{ "session_id": "...", "messages": [ ... ] }`
@@ -222,7 +246,7 @@ Response: `{ "session_id": "...", "messages": [ ... ] }`
 Process a Deepgram function call (goal, task, or reschedule).
 
 ```bash
-curl -X POST http://localhost:8080/api/v1/voice/intents \
+curl -X POST http://localhost:8000/api/v1/voice/intents \
   -H "Content-Type: application/json" \
   -d '{
     "session_id": "...",
@@ -238,7 +262,7 @@ Response: `{ "function_call_id": "fc_123", "result": "Goal created: Learn guitar
 Close a voice session.
 
 ```bash
-curl -X DELETE http://localhost:8080/api/v1/voice/session/{session_id}
+curl -X DELETE http://localhost:8000/api/v1/voice/session/{session_id}
 ```
 
 Response: `{ "session_id": "...", "status": "closed", "message_count": 5 }`
@@ -345,17 +369,24 @@ Integration tests are automatically skipped when `DEEPGRAM_API_KEY` is not set.
 ## Common Issues
 
 ### Mic permission denied
-The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:3000`, not an IP address.
+The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:5173` (Docker) or `http://localhost:3000` (local `conv_agent.sh`), not an IP address.
 
 ### Deepgram token error
 If you see "Failed to create voice session", check that `DEEPGRAM_API_KEY` is set in `backend/.env`. For local development without a key, run tests with mocks instead.
 
 ### DB migration errors
-If Supabase tables are missing columns (e.g., `voice_session_id`, `ended_at`, `duration_seconds`), the voice migration has not been applied. Fix with:
+If Supabase tables are missing columns (e.g., `voice_session_id`, `ended_at`, `duration_seconds`), the consolidated schema has not been applied. The `supabase/migrations/` directory is empty so `supabase db reset` alone will not create any tables. Apply the schema manually:
+
 ```bash
-supabase db reset          # applies all migrations from scratch (DESTROYS local data)
-# or, to apply only new migrations without resetting:
-supabase migration up
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -f flux-backend/migrations/001_schema.sql
+```
+
+To start completely fresh:
+```bash
+supabase db reset
+psql postgresql://postgres:postgres@localhost:54322/postgres \
+  -f flux-backend/migrations/001_schema.sql
 ```
 
 ### Import errors

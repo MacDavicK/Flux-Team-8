@@ -6,50 +6,109 @@
 
 ## System Requirements
 
-| Tool | Minimum Version | Download |
-|------|----------------|----------|
-| Node.js | 18+ | [nodejs.org](https://nodejs.org) |
+| Tool | Minimum Version | Notes |
+|------|----------------|-------|
+| Node.js | 20+ | [nodejs.org](https://nodejs.org) |
 | Python | 3.11+ | [python.org](https://python.org) |
 | Git | 2.30+ | [git-scm.com](https://git-scm.com) |
-| PostgreSQL | 15+ (or Supabase) | [postgresql.org](https://postgresql.org) |
-| Docker | Optional | [docker.com](https://docker.com) |
+| Docker Desktop | Latest | Required for Supabase and Docker Compose path |
+| Supabase CLI | Latest | `brew install supabase/tap/supabase` (macOS) |
 
 ---
 
-## Quick Start (Automated)
+## Option A: Docker Compose
 
-The fastest way to get everything installed:
+Docker Compose builds and starts all three services — PostgreSQL (`5432`), backend (`8000`), and frontend (`5173`) — from a single command. This is the recommended path for integration testing and demo runs.
 
-**macOS / Linux:**
+### 1. Clone and create env files
 
 ```bash
 git clone https://github.com/MacDavicK/Flux-Team-8.git
 cd Flux-Team-8
-bash scripts/setup.sh
+
+cp backend/.env.example backend/.env
+cp frontend/.env.example frontend/.env
 ```
 
-**Windows (PowerShell):**
+### 2. Start Supabase locally
 
-```powershell
-git clone https://github.com/MacDavicK/Flux-Team-8.git
-cd Flux-Team-8
-powershell -ExecutionPolicy Bypass -File scripts\setup.ps1
+Docker Desktop must be running before this step.
+
+```bash
+supabase start
+supabase db reset     # applies all migrations and seeds test data
 ```
 
-The setup scripts will check your tool versions, install dependencies, and create `.env` files from the provided examples.
+Run `supabase status` to print your local API URL and keys.
+
+### 3. Configure backend/.env for Docker networking
+
+When the backend runs inside a Docker container, it cannot reach Supabase at `127.0.0.1`. Update `backend/.env` with the following values (substituting your actual keys from `supabase status`):
+
+```env
+# Use host.docker.internal so the backend container can reach the
+# Supabase container running on your host machine.
+SUPABASE_URL=http://host.docker.internal:54321
+SUPABASE_KEY=<anon key from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<service_role key from supabase status>
+```
+
+All other settings (`DATABASE_URL`, `OPEN_ROUTER_API_KEY`, etc.) can remain at their `.env.example` defaults or be filled in as needed.
+
+### 4. Build and start all services
+
+```bash
+docker compose up --build
+```
+
+The `--build` flag is required on first run and after any Dockerfile change. For subsequent runs without code changes to the Docker images:
+
+```bash
+docker compose up
+```
+
+### Service URLs
+
+| Service | URL |
+|---------|-----|
+| Frontend (Vite dev server) | http://localhost:5173 |
+| Backend API | http://localhost:8000 |
+| Backend API docs (Swagger) | http://localhost:8000/docs |
+| Health check | http://localhost:8000/health |
+
+### Stop services
+
+```bash
+# Stop and remove containers (keeps volume data)
+docker compose down
+
+# Stop and remove containers AND all volume data
+docker compose down -v
+```
 
 ---
 
-## Manual Installation
+## Option B: Local Development (without Docker Compose)
 
-### 1. Clone the Repository
+Run the backend and frontend directly on your host machine. Supabase still runs in Docker.
+
+### 1. Clone the repository
 
 ```bash
 git clone https://github.com/MacDavicK/Flux-Team-8.git
 cd Flux-Team-8
 ```
 
-### 2. Frontend Setup
+### 2. Start Supabase
+
+Docker Desktop must be running.
+
+```bash
+supabase start
+supabase db reset     # applies all migrations and seeds test data
+```
+
+### 3. Frontend setup
 
 ```bash
 cd frontend
@@ -57,9 +116,9 @@ npm install
 cp .env.example .env
 ```
 
-Edit `frontend/.env` if you need to change the API URL or toggle mock mode.
+Edit `frontend/.env` if you need to override the API URL or toggle mock mode. The default `VITE_API_URL=http://localhost:8000` is correct for local development.
 
-### 3. Backend Setup
+### 4. Backend setup
 
 **macOS / Linux:**
 
@@ -81,70 +140,65 @@ pip install -r requirements.txt
 copy .env.example .env
 ```
 
-**Windows (Command Prompt):**
+Edit `backend/.env`. The key variables to fill in are:
 
-```cmd
-cd backend
-python -m venv venv
-venv\Scripts\activate.bat
-pip install -r requirements.txt
-copy .env.example .env
+```env
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_KEY=<anon key from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<service_role key from supabase status>
+OPEN_ROUTER_API_KEY=<your OpenRouter key>
 ```
 
-Edit `backend/.env` with your database URL, API keys, and secret key.
+### 5. Run the dev servers
 
----
+Open two terminal windows:
 
-## Running the Dev Servers
-
-### Frontend
+**Terminal 1 — Frontend:**
 
 ```bash
 cd frontend
 npm run dev
+# Opens at http://localhost:5173
 ```
 
-Opens at [http://localhost:5173](http://localhost:5173). Hot-reloads on file changes.
-
-### Backend
+**Terminal 2 — Backend:**
 
 ```bash
 cd backend
-source venv/bin/activate   # or .\venv\Scripts\Activate.ps1 on Windows
-uvicorn app.main:app --reload
+source venv/bin/activate    # or .\venv\Scripts\Activate.ps1 on Windows
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# API available at http://localhost:8000
+# Swagger UI at http://localhost:8000/docs
 ```
-
-Runs at [http://localhost:8000](http://localhost:8000). Auto-reloads on file changes. If you have `make dev` configured to run the same command, you can use that instead.
-
-The API docs are available at [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI).
 
 ---
 
-## Running with Docker
+## Running Tests
 
-If you prefer containerised development or want to spin up PostgreSQL without installing it locally:
+### Backend tests
 
-### Start all services
+The backend test suite uses pytest. Supabase must be running for integration tests.
 
 ```bash
-docker compose up
+cd backend
+source venv/bin/activate
+
+# Run the full test suite (unit + integration)
+pytest tests/ -v
+
+# Run unit tests only (no database required)
+pytest tests/ -v -m "not integration"
+
+# Run conv_agent tests
+pytest conv_agent/tests/ -v
 ```
 
-### Start only the database
+### Frontend tests
 
 ```bash
-docker compose up db
-```
-
-This gives you a PostgreSQL 15 instance on port 5432 with credentials:
-- User: `flux`
-- Password: `flux_dev_password`
-- Database: `flux`
-
-### Stop and remove volumes
-
-```bash
-docker compose down -v
+cd frontend
+npm run type-check    # TypeScript type checking
+npm run lint          # ESLint
 ```
 
 ---
@@ -155,67 +209,79 @@ docker compose down -v
 
 | Variable | Default | Description |
 |----------|---------|-------------|
+| `SUPABASE_URL` | — | Supabase project URL |
+| `SUPABASE_ANON_KEY` | — | Supabase anonymous key |
 | `VITE_API_URL` | `http://localhost:8000` | Backend API base URL |
-| `VITE_USE_MOCK` | `true` | Use mock API layer (no backend needed) |
-| `VITE_API_TIMEOUT` | `10000` | Request timeout in milliseconds |
-| `VITE_ENABLE_DEMO_MODE` | `true` | Show demo controls panel |
-| `VITE_ENABLE_VOICE` | `false` | Enable voice input (experimental) |
-| `VITE_SUPABASE_URL` | — | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | — | Supabase anonymous key |
+| `VITE_ENABLE_MOCKS` | `false` | Enable MSW mock handlers (bypasses real backend) |
 
 ### Backend (`backend/.env`)
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | — | PostgreSQL connection string |
-| `OPENAI_API_KEY` | — | OpenAI API key for GPT-4o-mini |
-| `SECRET_KEY` | — | JWT signing secret (change in production) |
-| `DEBUG` | `true` | Enable debug logging |
+| Variable | Example / Default | Description |
+|----------|------------------|-------------|
+| `DATABASE_URL` | `postgresql://user:password@localhost:5432/flux` | PostgreSQL connection string |
+| `SUPABASE_URL` | `http://127.0.0.1:54321` | Supabase local API URL. Use `http://host.docker.internal:54321` when running inside Docker |
+| `SUPABASE_KEY` | — | Supabase anon key (from `supabase status`) |
+| `SUPABASE_SERVICE_ROLE_KEY` | — | Supabase service role key (bypasses RLS) |
+| `OPEN_ROUTER_API_KEY` | — | OpenRouter API key (for GPT-4o-mini and embeddings) |
+| `PINECONE_API_KEY` | — | Pinecone API key (for RAG vector store) |
+| `SECRET_KEY` | — | JWT signing secret (change before production use) |
+| `DEBUG` | `True` | Enable debug logging |
+| `DEEPGRAM_API_KEY` | — | Required for voice/conversational agent sessions |
 
-See `backend/.env.example` for the full list.
+See `backend/.env.example` for the complete list with descriptions.
 
 ---
 
-## Common Issues & Troubleshooting
+## Common Issues and Troubleshooting
+
+### Backend cannot connect to Supabase when running in Docker
+
+**Symptom:** The backend container starts but logs show connection errors to `127.0.0.1:54321`.
+
+**Cause:** Inside a Docker container, `127.0.0.1` refers to the container itself, not your host machine.
+
+**Fix:** Set `SUPABASE_URL=http://host.docker.internal:54321` in `backend/.env`.
+
+---
 
 ### Port 5173 is already in use
 
-Another process (possibly a previous Vite instance) is using the port.
-
 ```bash
-# Find the process
-lsof -i :5173          # macOS / Linux
-netstat -ano | findstr 5173   # Windows
+# macOS / Linux
+lsof -i :5173
+kill -9 <PID>
 
-# Kill it
-kill -9 <PID>          # macOS / Linux
-taskkill /PID <PID> /F        # Windows
+# Windows
+netstat -ano | findstr 5173
+taskkill /PID <PID> /F
 ```
 
 Or change the port in `vite.config.ts` under `server.port`.
 
+---
+
 ### Port 8000 is already in use
 
-Same approach as above, but for port 8000. You can also change the backend port via the `PORT` variable in `backend/.env`.
+Same approach as above for port `8000`.
+
+---
 
 ### Node version mismatch
 
-If you see errors about unsupported syntax or missing APIs:
-
 ```bash
-node -v   # Should be 18+
+node -v   # Should be 20+
 ```
 
-Use [nvm](https://github.com/nvm-sh/nvm) (macOS/Linux) or [nvm-windows](https://github.com/coreybutler/nvm-windows) to manage Node versions:
+Use [nvm](https://github.com/nvm-sh/nvm) (macOS/Linux) to switch versions:
 
 ```bash
-nvm install 18
-nvm use 18
+nvm install 20
+nvm use 20
 ```
+
+---
 
 ### Python venv activation fails
-
-The activation command differs by platform:
 
 | Platform | Command |
 |----------|---------|
@@ -223,21 +289,15 @@ The activation command differs by platform:
 | Windows PowerShell | `.\venv\Scripts\Activate.ps1` |
 | Windows CMD | `venv\Scripts\activate.bat` |
 
-If PowerShell blocks the script, run:
+If PowerShell blocks the script:
 
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy RemoteSigned -Scope CurrentUser
 ```
 
-### Supabase connection issues
-
-1. Verify your `SUPABASE_URL` and `SUPABASE_KEY` are correct in `backend/.env`.
-2. Check that your IP is allowlisted in the Supabase dashboard under Settings > Database.
-3. For local development, set `VITE_USE_MOCK=true` in `frontend/.env` to bypass the backend entirely.
+---
 
 ### TypeScript errors after pulling
-
-If you see type errors after pulling new changes:
 
 ```bash
 cd frontend
@@ -250,7 +310,7 @@ npx tsc --noEmit
 
 ## Recommended VS Code Extensions
 
-This project includes a `.vscode/extensions.json` file. When you open the project in VS Code, you'll be prompted to install the recommended extensions. You can also install them manually:
+This project includes a `.vscode/extensions.json` file. When you open the project in VS Code, you will be prompted to install the recommended extensions. You can also install them manually:
 
 - **Prettier** — Code formatting
 - **ESLint** — JavaScript/TypeScript linting

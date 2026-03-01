@@ -17,6 +17,8 @@ interface ChatInputProps {
   onSend: (message: string) => void;
   placeholder?: string;
   disabled?: boolean;
+  /** When true, the voice FAB is disabled (e.g. no user ID yet). */
+  voiceDisabled?: boolean;
   /** Current voice session status — controls VoiceFAB appearance. */
   voiceStatus?: VoiceStatus;
   /** Called when the mic button is tapped. */
@@ -27,6 +29,7 @@ export function ChatInput({
   onSend,
   placeholder = "What is on your mind?",
   disabled = false,
+  voiceDisabled = false,
   voiceStatus = "idle",
   onVoiceToggle,
 }: ChatInputProps) {
@@ -114,7 +117,7 @@ export function ChatInput({
               <VoiceFAB
                 status={voiceStatus}
                 onClick={onVoiceToggle}
-                disabled={disabled}
+                disabled={disabled || voiceDisabled}
               />
             </motion.div>
           ) : null}

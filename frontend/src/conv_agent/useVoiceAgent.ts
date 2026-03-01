@@ -154,6 +154,10 @@ export function useVoiceAgent(userId: string): UseVoiceAgentReturn {
   /** Start a new voice session -- backend + Deepgram + mic. */
   const startSession = useCallback(async () => {
     if (status !== "idle" && status !== "error") return;
+    if (!userId?.trim()) {
+      console.warn("[VoiceAgent] Cannot start session: no user ID");
+      return;
+    }
 
     setStatus("connecting");
     setMessages([]);

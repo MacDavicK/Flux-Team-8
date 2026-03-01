@@ -24,9 +24,6 @@ export const Route = createFileRoute("/chat")({
   component: ChatPage,
 });
 
-/** Mock user ID for MVP — matches Alice in seed_test_data.sql. Will come from auth in production. */
-const MOCK_USER_ID = "a1000000-0000-0000-0000-000000000001";
-
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
@@ -69,9 +66,11 @@ function ChatPage() {
 
   const isOnboarding = user && !user.onboarded;
 
-  // Voice agent hook
-  const voice = useVoiceAgent(MOCK_USER_ID);
+  // Voice agent uses the authenticated user's ID (must exist in public.users via Supabase Auth trigger).
+  const voiceUserId = user?.id ?? "";
+  const voice = useVoiceAgent(voiceUserId);
   const isVoiceActive = voice.status !== "idle";
+  const canUseVoice = Boolean(voiceUserId);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -344,6 +343,7 @@ function ChatPage() {
       <ChatInput
         onSend={handleSendMessage}
         disabled={isThinking || isLoadingHistory}
+        voiceDisabled={!canUseVoice}
         placeholder={
           messages.length === 0
             ? "What would you like to achieve?"

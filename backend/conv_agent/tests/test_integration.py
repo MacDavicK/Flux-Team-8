@@ -84,6 +84,9 @@ async def test_process_intent_calls_mocked_goal_handler(conv_agent_client, test_
     session_resp = await conv_agent_client.post(
         "/api/v1/voice/session", json={"user_id": test_user["id"]}
     )
+    assert session_resp.status_code == 200, (
+        f"create session failed: {session_resp.status_code} {session_resp.text}"
+    )
     session_id = session_resp.json()["session_id"]
 
     mock_handler = AsyncMock(return_value="Goal noted (test mock)")

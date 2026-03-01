@@ -1,370 +1,271 @@
-# Getting Started with Flux
+# Getting Started — Flux Backend
 
-Welcome to **Flux** - your Agentic AI partner for achieving goals! This guide will walk you through setting up and using Flux for the first time.
+Welcome to the Flux backend. This guide walks you through local setup, running the dev server, and executing the test suite.
 
-## 📋 Prerequisites
+The backend is a **FastAPI + Python 3.11** application. It serves the core REST API, the conversational (voice) agent control plane, the goal planner, the RAG pipeline, and the scheduler agent — all from a single service started with `uvicorn app.main:app`.
 
-Before you begin, ensure you have:
+---
 
-1. **Python 3.9 or higher** installed
-   - Check: `python --version`
-   - Download: <https://www.python.org/downloads/>
+## Prerequisites
 
-2. **OpenAI API Key**
-   - Sign up at: <https://platform.openai.com/>
-   - Get API key from: <https://platform.openai.com/api-keys>
-   - You'll need this to use the AI features
+Before you begin, ensure the following are available on your machine:
 
-3. **Git** (if you cloned the repository)
-   - Check: `git --version`
+| Tool | Minimum Version | Check |
+|------|----------------|-------|
+| Python | 3.11 | `python3 --version` |
+| Docker Desktop | Latest | Required for Supabase |
+| Supabase CLI | Latest | `supabase --version` |
+| Git | 2.30+ | `git --version` |
 
-## 🚀 Setup Steps
+Install the Supabase CLI on macOS:
 
-### Step 1: Open PowerShell in the Project Directory
-
-```powershell
-cd c:\project path..
+```bash
+brew install supabase/tap/supabase
 ```
 
-### Step 2: Verify Setup
+---
 
-Run the verification script to check if everything is ready:
+## Step 1: Clone the Repository
 
-```powershell
-python verify_setup.py
+```bash
+git clone https://github.com/MacDavicK/Flux-Team-8.git
+cd Flux-Team-8/backend
 ```
 
-This will check:
+---
 
-- Python version
-- Virtual environment
-- Dependencies
-- Configuration files
-- Required project files
+## Step 2: Create a Python Virtual Environment
 
-### Step 3: Quick Setup (Recommended)
+**macOS / Linux:**
 
-Run the automated setup script:
-
-```powershell
-.\run.ps1
+```bash
+python3 -m venv venv
+source venv/bin/activate
 ```
 
-This script will:
-
-1. Create a virtual environment (if needed)
-2. Install all dependencies
-3. Check for `.env` file and create from example
-4. Prompt you to add your OpenAI API key
-5. Start the server
-
-**Important:** When prompted, you MUST add your OpenAI API key to the `.env` file!
-
-### Step 4: Manual Setup (Alternative)
-
-If you prefer to set up manually:
-
-#### 4.1 Create Virtual Environment
+**Windows (PowerShell):**
 
 ```powershell
 python -m venv venv
-```
-
-#### 4.2 Activate Virtual Environment
-
-```powershell
 .\venv\Scripts\Activate.ps1
 ```
 
-You should see `(venv)` at the start of your command prompt.
+You should see `(venv)` at the start of your prompt once the environment is active.
 
-#### 4.3 Install Dependencies
+---
 
-```powershell
+## Step 3: Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-This will install:
+This installs FastAPI, uvicorn, SQLAlchemy, Supabase client, LangChain, Pinecone, pytest, and all other dependencies declared in `requirements.txt`.
 
-- FastAPI (web framework)
-- SQLAlchemy (database)
-- OpenAI & LangChain (AI)
-- And other dependencies
+---
 
-#### 4.4 Configure Environment Variables
+## Step 4: Configure Environment Variables
 
-```powershell
-# Copy the example file
-Copy-Item .env.example .env
-
-# Open .env in notepad
-notepad .env
+```bash
+cp .env.example .env
 ```
 
-**Edit the `.env` file and add your OpenAI API key:**
+Open `.env` and fill in the required values. The minimum set for local development:
 
 ```env
-OPENAI_API_KEY=sk-your-actual-api-key-here
-OPENAI_MODEL=gpt-4-turbo-preview
+# Supabase (local instance — run `supabase status` to get these values)
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_KEY=<anon key from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<service_role key from supabase status>
 
-# Keep other settings as default for now
-DATABASE_URL=sqlite:///./flux.db
-DEFAULT_WORK_START_HOUR=9
-DEFAULT_WORK_END_HOUR=18
-DEFAULT_TASK_DURATION_MINUTES=30
+# Database (Supabase local PostgreSQL)
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+# AI / LLM via OpenRouter (https://openrouter.ai/keys)
+OPEN_ROUTER_API_KEY=<your key>
+
+# Voice / Conversational Agent (https://console.deepgram.com)
+DEEPGRAM_API_KEY=<your key>
 ```
 
-**Save and close the file.**
+> **Docker users only:** If the backend will run inside a Docker container (via `docker compose`), set `SUPABASE_URL=http://host.docker.internal:54321` so the container can reach the Supabase instance on your host machine.
 
-### Step 5: Start the Server
+---
 
-```powershell
-python main.py
+## Step 5: Start Supabase Locally
+
+Docker Desktop must be running before this step.
+
+```bash
+# From the project root (Flux-Team-8/)
+supabase start
+supabase db reset     # applies all migrations and seeds test data
 ```
 
-You should see:
+Run `supabase status` to confirm the local endpoints are up and to retrieve your API keys.
 
-```
-🚀 Flux Agentic AI started successfully!
-INFO:     Started server process
-INFO:     Waiting for application startup.
-INFO:     Application startup complete.
-INFO:     Uvicorn running on http://0.0.0.0:8000
-```
+---
 
-**Keep this terminal window open!** The server needs to run continuously.
+## Step 6: Start the Backend Dev Server
 
-### Step 6: Verify It's Working
+From the `backend/` directory, with your virtual environment active:
 
-Open a **new PowerShell window** and run:
-
-```powershell
-curl http://localhost:8000
-```
-
-Or open your browser and visit: <http://localhost:8000>
-
-You should see a JSON response with the welcome message.
-
-## 🎯 Your First Goal
-
-Now let's create your first goal! Open a new PowerShell window.
-
-### Method 1: Using the Example Script
-
-```powershell
-cd c:\Users\HKALIDI3\GitRepos\Flux
-.\venv\Scripts\Activate.ps1
-python example_usage.py
-```
-
-This will create 3 sample goals and show you the breakdowns.
-
-### Method 2: Using the Test Script
-
-```powershell
-.\test_api.ps1
-```
-
-This will create a "Learn Python Machine Learning" goal and show all the details.
-
-### Method 3: Manual API Call
-
-```powershell
-$body = @{
-    title = "Get Fit in 30 Days"
-    description = "Exercise 4x per week, improve diet, and feel great"
-    due_date = (Get-Date).AddDays(30).ToString("yyyy-MM-ddTHH:mm:ss")
-    user_id = "my_user"
-} | ConvertTo-Json
-
-Invoke-RestMethod -Uri "http://localhost:8000/goals" `
-    -Method POST `
-    -Body $body `
-    -ContentType "application/json"
-```
-
-## 📖 Explore the API
-
-### Swagger UI (Interactive Documentation)
-
-Visit: <http://localhost:8000/docs>
-
-Here you can:
-
-- See all available endpoints
-- Try out API calls directly in your browser
-- View request/response schemas
-- Download API specification
-
-### ReDoc (Clean Documentation)
-
-Visit: <http://localhost:8000/redoc>
-
-Alternative documentation format with a cleaner layout.
-
-## 🧪 Testing
-
-### Run Unit Tests
-
-```powershell
-# Make sure virtual environment is activated
-.\venv\Scripts\Activate.ps1
-
-# Run tests
-pytest test_main.py -v
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
 Expected output:
 
 ```
-test_main.py::test_root_endpoint PASSED
-test_main.py::test_create_goal PASSED
-test_main.py::test_list_goals PASSED
-...
-========== 10 passed in 2.5s ==========
+INFO:     Uvicorn running on http://0.0.0.0:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process
+INFO:     Started server process
+INFO:     Application startup complete.
 ```
 
-## 📚 Next Steps
-
-1. **Read the Guides**
-   - `QUICK_REFERENCE.md` - Quick command reference
-   - `USAGE_GUIDE.md` - Comprehensive API guide
-   - `PROJECT_STRUCTURE.md` - Technical deep dive
-
-2. **Create Your Own Goals**
-   - Use the Swagger UI to create goals interactively
-   - Or use Python/PowerShell scripts
-   - Or build your own client application
-
-3. **Explore Features**
-   - Create multiple goals with different timelines
-   - Check the calendar to see scheduled tasks
-   - Acknowledge notifications when they arrive
-   - Complete tasks as you work on them
-
-4. **Customize Settings**
-   - Edit `.env` to match your schedule
-   - Adjust working hours
-   - Change task durations
-   - Modify notification timing
-
-## 🛠️ Common Issues
-
-### Issue: "Import could not be resolved"
-
-This is just a linting warning in VS Code. The code will run fine if dependencies are installed.
-
-**Solution:** Ignore these warnings or install the Python extension for VS Code.
-
-### Issue: "Address already in use"
-
-Another instance of the server is running.
-
-**Solution:**
-
-```powershell
-# Find process on port 8000
-netstat -ano | findstr :8000
-
-# Kill the process (replace PID)
-taskkill /PID <PID> /F
-```
-
-### Issue: "OpenAI API error"
-
-Your API key might be invalid or you've run out of credits.
-
-**Solution:**
-
-1. Check your key at <https://platform.openai.com/api-keys>
-2. Verify you have credits at <https://platform.openai.com/account/usage>
-3. Make sure the key in `.env` has no extra spaces
-
-### Issue: "No tasks created"
-
-The background processing might still be running.
-
-**Solution:**
-
-1. Wait 5-10 seconds after creating a goal
-2. Check `/goals/{id}/breakdown` endpoint
-3. Look at server logs for errors
-
-## 💡 Tips for Success
-
-1. **Start Small**: Create a short-term goal (7-14 days) to test the system
-
-2. **Realistic Goals**: The AI works best with clear, achievable goals
-
-3. **Good Descriptions**: Provide detailed descriptions to help the AI understand your goal
-
-4. **Check Logs**: The server terminal shows helpful debug information
-
-5. **Use Docs**: The Swagger UI at `/docs` is your friend!
-
-6. **Iterate**: Experiment with different goals and settings to find what works for you
-
-## 🎓 Example Workflows
-
-### Learning Workflow
-
-```
-1. Create goal: "Learn React in 8 weeks"
-2. AI breaks it down:
-   - Week 1-2: JavaScript fundamentals
-   - Week 3-4: React basics
-   - Week 5-6: Advanced React
-   - Week 7-8: Build projects
-3. Tasks scheduled automatically
-4. Get notifications when it's time to learn
-5. Complete tasks as you progress
-```
-
-### Fitness Workflow
-
-```
-1. Create goal: "Get fit in 12 weeks"
-2. AI creates:
-   - Weekly workout milestones
-   - Daily exercise tasks
-   - Nutrition planning tasks
-   - Progress tracking tasks
-3. Acknowledge notifications = start workout
-4. Complete task = mark workout done
-5. Miss notification = auto-reschedule
-```
-
-## 🤝 Getting Help
-
-1. **Check Documentation**
-   - Start with `QUICK_REFERENCE.md`
-   - Deep dive in `USAGE_GUIDE.md`
-
-2. **Server Logs**
-   - Look at the terminal where you ran `python main.py`
-   - Errors and debug info appear here
-
-3. **Verification Script**
-   - Run `python verify_setup.py` to diagnose issues
-
-4. **GitHub Issues**
-   - Open an issue if you find bugs
-   - Share your use cases and feedback
-
-## 🎉 You're Ready
-
-You now have a fully functional Agentic AI system that will help you achieve your goals!
-
-**Remember:**
-
-- Keep the server running (`python main.py`)
-- Check notifications regularly
-- Complete tasks to track progress
-- Create new goals as needed
-
-**Start achieving your goals with AI today! 🚀**
+The `--reload` flag watches for file changes and restarts automatically during development.
 
 ---
 
-Questions? Check the other documentation files or the Swagger UI at <http://localhost:8000/docs>
+## Step 7: Verify the Server is Running
+
+```bash
+curl http://localhost:8000/health
+```
+
+Expected response:
+
+```json
+{"status": "ok", "service": "flux-backend"}
+```
+
+The interactive API documentation (Swagger UI) is available at:
+
+```
+http://localhost:8000/docs
+```
+
+---
+
+## Running with Docker Compose
+
+To start the full stack (database, backend, and frontend) together:
+
+```bash
+# From the project root (Flux-Team-8/)
+docker compose up --build
+```
+
+The backend container uses `app.main:app` as the entry point and maps to `http://localhost:8000`. See `docs/SETUP.md` for full Docker Compose instructions, including the required `SUPABASE_URL` change for container networking.
+
+---
+
+## Running Tests
+
+The test suite uses pytest. Supabase must be running for integration tests.
+
+### Run all backend tests
+
+```bash
+# From the backend/ directory, with venv active
+pytest tests/ -v
+```
+
+### Run conv_agent tests
+
+```bash
+pytest conv_agent/tests/ -v
+```
+
+### Run unit tests only (no database required)
+
+```bash
+pytest tests/ -v -m "not integration"
+```
+
+### Run a specific test file
+
+```bash
+pytest tests/test_goals_router.py -v
+```
+
+---
+
+## Linting and Formatting
+
+```bash
+# Check formatting and lint rules (non-destructive)
+make lint
+
+# Auto-fix formatting and lint issues
+make format
+```
+
+These commands run `black` and `ruff` against the `app/` package.
+
+---
+
+## API Reference
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `GET` | `/health` | Service health check |
+| `POST` | `/goals` | Create a goal |
+| `GET` | `/goals` | List goals |
+| `POST` | `/api/v1/voice/session` | Start a voice session |
+| `POST` | `/api/v1/voice/messages` | Save a transcript message |
+| `GET` | `/api/v1/voice/sessions/{id}/messages` | Get session transcript |
+| `POST` | `/api/v1/voice/intents` | Process a function-call intent |
+| `DELETE` | `/api/v1/voice/session/{id}` | Close a voice session |
+
+The full OpenAPI spec is at `http://localhost:8000/docs` when the server is running.
+
+---
+
+## Voice / Conversational Agent
+
+The conv_agent is part of the main backend service — it requires no separate process. It provides a REST control plane for the Deepgram-powered voice assistant.
+
+To use voice features, set `DEEPGRAM_API_KEY` in `backend/.env`. The voice prompt and function-call intent definitions are loaded from:
+
+- `backend/conv_agent/config/voice_prompt.md`
+- `backend/conv_agent/config/intents.yaml`
+
+These paths are relative to `WORKDIR=/app` inside the Docker container, which maps to the `backend/` directory on your host.
+
+---
+
+## Common Issues
+
+### "Module not found" errors on startup
+
+Ensure your virtual environment is active and dependencies are installed:
+
+```bash
+source venv/bin/activate
+pip install -r requirements.txt
+```
+
+### Cannot connect to Supabase
+
+1. Confirm Supabase is running: `supabase status`
+2. Verify `SUPABASE_URL` and `SUPABASE_KEY` in `backend/.env` match the values from `supabase status`.
+3. If running in Docker, use `SUPABASE_URL=http://host.docker.internal:54321`.
+
+### Port 8000 is already in use
+
+```bash
+# macOS / Linux
+lsof -i :8000
+kill -9 <PID>
+```
+
+### Some scrum sprint routers fail to load
+
+You may see a warning on startup like:
+
+```
+Warning: Some scrum routers could not be loaded: ...
+```
+
+This is expected if optional dependencies (such as VAPID keys for push notifications) are not configured. The core API and conv_agent routes are unaffected.

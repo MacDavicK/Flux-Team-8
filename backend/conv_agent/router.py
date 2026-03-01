@@ -15,9 +15,12 @@ Endpoints:
 from __future__ import annotations
 
 import logging
+from typing import Optional
 
-from fastapi import APIRouter, HTTPException
+import httpx
+from fastapi import APIRouter, HTTPException, Request
 
+from app.config import settings as app_settings
 from conv_agent.schemas import (
     CloseSessionResponse,
     CreateSessionRequest,
@@ -37,21 +40,99 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api/v1/voice", tags=["voice"])
 
 
+async def _auth_user_from_bearer_token(request: Request) -> Optional[dict]:
+    """
+    If the request has Authorization: Bearer <jwt>, call Supabase Auth and return
+    the full user dict (id, email, user_metadata, ...). Otherwise return None.
+    Uses async httpx so the request is not used from another thread (ASGI-safe).
+    """
+    auth = request.headers.get("Authorization")
+    if not auth or not auth.startswith("Bearer "):
+        return None
+    token = auth[7:].strip()
+    if not token:
+        return None
+    url = f"{app_settings.supabase_url.rstrip('/')}/auth/v1/user"
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "apikey": app_settings.supabase_key,
+        "Content-Type": "application/json",
+    }
+    try:
+        async with httpx.AsyncClient() as client:
+            resp = await client.get(url, headers=headers)
+        if resp.status_code != 200:
+            return None
+        return resp.json()
+    except Exception as e:
+        logger.debug("Could not resolve user from Bearer token: %s", e)
+        return None
+
+
+def _ensure_public_user_from_auth(auth_user: dict) -> None:
+    """
+    Ensure the auth user exists in public.users (sync with Supabase Auth).
+    Idempotent: if the row already exists (e.g. from trigger), we do nothing.
+    Uses the admin client (service role key) so the insert bypasses RLS.
+    """
+    from app.database import get_supabase_admin_client
+    user_id = auth_user.get("id")
+    email = auth_user.get("email") or ""
+    if not user_id or not email:
+        return
+    meta = auth_user.get("user_metadata") or {}
+    name = meta.get("name") or meta.get("full_name") or ""
+    profile = {"name": name} if name else None
+    payload = {"id": user_id, "email": email}
+    if profile is not None:
+        payload["profile"] = profile
+    try:
+        supabase = get_supabase_admin_client()
+        supabase.table("users").insert(payload).execute()
+    except Exception as e:
+        err_str = str(e).lower()
+        if "duplicate" in err_str or "unique" in err_str or "23505" in err_str:
+            logger.debug("public.users row already exists for %s", user_id)
+            return
+        logger.warning("Could not ensure public user from auth: %s", e)
+        raise
+
+
 # -- POST /api/v1/voice/session ----------------------------------------------
 
 
 @router.post("/session", response_model=CreateSessionResponse)
-async def create_session(body: CreateSessionRequest):
+async def create_session(request: Request, body: CreateSessionRequest):
     """
     Start a new voice session.
 
     Creates a conversation row, mints a short-lived Deepgram token,
     loads the system prompt with user context, and returns everything
     the frontend needs to connect directly to Deepgram.
+
+    User identity: if the request includes a valid Authorization Bearer token
+    (Supabase JWT), the user_id is taken from the token. Otherwise body.user_id
+    is used (e.g. for tests or legacy clients).
+
+    If the user exists in Supabase Auth but not in public.users (e.g. trigger
+    didn't run), we sync them into public.users and retry.
     """
+    auth_user = await _auth_user_from_bearer_token(request)
+    user_id = (auth_user.get("id") if auth_user else None) or body.user_id
     try:
-        result = await voice_service.build_session_config(body.user_id)
+        result = await voice_service.build_session_config(user_id)
         return CreateSessionResponse(**result)
+    except ValueError as exc:
+        if "not found in the database" in str(exc) and auth_user:
+            _ensure_public_user_from_auth(auth_user)
+            try:
+                result = await voice_service.build_session_config(user_id)
+                return CreateSessionResponse(**result)
+            except Exception as retry_exc:
+                logger.error("Failed to create voice session after sync: %s", retry_exc, exc_info=True)
+                raise HTTPException(status_code=500, detail="Failed to create voice session")
+        logger.error("Failed to create voice session: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to create voice session")
     except Exception as exc:
         logger.error("Failed to create voice session: %s", exc, exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to create voice session")

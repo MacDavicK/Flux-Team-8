@@ -1,54 +1,42 @@
-# Flux API - Complete Usage Guide
+# Flux Backend — Usage Guide
+
+This guide covers running the backend server, making API calls, and understanding the core endpoints.
+
+---
 
 ## Table of Contents
 
-1. [Quick Start](#quick-start)
+1. [Starting the Server](#starting-the-server)
 2. [API Endpoints](#api-endpoints)
 3. [Workflow Examples](#workflow-examples)
 4. [Testing](#testing)
 5. [Troubleshooting](#troubleshooting)
 
-## Quick Start
+---
 
-### 1. Install and Run
+## Starting the Server
 
-```powershell
-# Run the setup script (automatically installs dependencies)
-.\run.ps1
+### Local development
+
+From the `backend/` directory with the virtual environment active:
+
+```bash
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-Or manually:
+The server starts at `http://localhost:8000`. The `--reload` flag watches for code changes and restarts automatically.
 
-```powershell
-# Create virtual environment
-python -m venv venv
-.\venv\Scripts\Activate.ps1
+### Docker Compose
 
-# Install dependencies
-pip install -r requirements.txt
+From the project root:
 
-# Set up environment
-cp .env.example .env
-# Edit .env and add your OPENAI_API_KEY
-
-# Run the server
-python main.py
+```bash
+docker compose up --build
 ```
 
-The server will start at `http://localhost:8000`
+The backend maps to `http://localhost:8000` on your host. See `docs/SETUP.md` for the full Docker Compose workflow.
 
-### 2. Test the API
-
-```powershell
-# Run the test script
-.\test_api.ps1
-```
-
-Or use the Python example:
-
-```powershell
-python example_usage.py
-```
+---
 
 ## API Endpoints
 
@@ -58,434 +46,288 @@ python example_usage.py
 http://localhost:8000
 ```
 
-### 1. Create a Goal
+### Interactive documentation
 
-**Endpoint:** `POST /goals`
-
-**Request Body:**
-
-```json
-{
-  "title": "Learn Python",
-  "description": "Master Python fundamentals and advanced concepts",
-  "due_date": "2026-03-15T00:00:00",
-  "user_id": "user123"
-}
-```
-
-**Response:** `201 Created`
-
-```json
-{
-  "id": 1,
-  "user_id": "user123",
-  "title": "Learn Python",
-  "description": "Master Python fundamentals and advanced concepts",
-  "due_date": "2026-03-15T00:00:00",
-  "status": "pending",
-  "created_at": "2026-02-12T10:00:00",
-  "updated_at": "2026-02-12T10:00:00",
-  "ai_analysis": null
-}
-```
-
-**What Happens:**
-
-- Goal is created in database
-- AI agent analyzes the goal (background task)
-- Goal is broken down into milestones and tasks
-- Tasks are scheduled on the calendar
-- Notifications are created for each task
-
-### 2. List All Goals
-
-**Endpoint:** `GET /goals?user_id=user123`
-
-**Response:** `200 OK`
-
-```json
-[
-  {
-    "id": 1,
-    "title": "Learn Python",
-    "status": "in_progress",
-    ...
-  }
-]
-```
-
-### 3. Get Goal Details
-
-**Endpoint:** `GET /goals/{goal_id}`
-
-**Response:** `200 OK`
-
-```json
-{
-  "id": 1,
-  "title": "Learn Python",
-  "status": "in_progress",
-  "ai_analysis": "This is a well-structured learning goal..."
-}
-```
-
-### 4. Get Goal Breakdown
-
-**Endpoint:** `GET /goals/{goal_id}/breakdown`
-
-**Response:** `200 OK`
-
-```json
-{
-  "goal": { ... },
-  "milestones": [
-    {
-      "id": 1,
-      "week_number": 1,
-      "title": "Python Fundamentals",
-      "description": "Learn basic syntax and data types",
-      "target_date": "2026-02-19T00:00:00",
-      "is_completed": false
-    }
-  ],
-  "tasks": [
-    {
-      "id": 1,
-      "title": "Learn Python variables and data types",
-      "scheduled_date": "2026-02-13T09:00:00",
-      "duration_minutes": 30,
-      "status": "scheduled"
-    }
-  ],
-  "total_weeks": 4,
-  "total_tasks": 20
-}
-```
-
-### 5. Get Calendar Events
-
-**Endpoint:** `GET /calendar/events?start_date=2026-02-12T00:00:00&end_date=2026-02-19T00:00:00`
-
-**Response:** `200 OK`
-
-```json
-[
-  {
-    "id": 1,
-    "task_id": 1,
-    "title": "Learn Python variables and data types",
-    "start_time": "2026-02-13T09:00:00",
-    "end_time": "2026-02-13T09:30:00",
-    "is_task_related": true
-  }
-]
-```
-
-### 6. List Tasks
-
-**Endpoint:** `GET /tasks?goal_id=1&status=scheduled`
-
-**Response:** `200 OK`
-
-```json
-[
-  {
-    "id": 1,
-    "goal_id": 1,
-    "title": "Learn Python variables",
-    "scheduled_date": "2026-02-13T09:00:00",
-    "status": "scheduled",
-    "reschedule_count": 0
-  }
-]
-```
-
-### 7. Acknowledge Notification
-
-**Endpoint:** `POST /notifications/acknowledge`
-
-**Request Body:**
-
-```json
-{
-  "notification_id": 1,
-  "acknowledged": true
-}
-```
-
-**Response:** `200 OK`
-
-```json
-{
-  "message": "Task started successfully",
-  "success": true
-}
-```
-
-**What Happens:**
-
-- If `acknowledged: true`: Task status changes to "in_progress"
-- If `acknowledged: false`: Task is rescheduled to next available slot
-
-### 8. Complete Task
-
-**Endpoint:** `POST /tasks/{task_id}/complete`
-
-**Response:** `200 OK`
-
-```json
-{
-  "message": "Task completed successfully",
-  "success": true
-}
-```
-
-## Workflow Examples
-
-### Example 1: Complete Goal Creation Workflow
-
-```python
-import requests
-from datetime import datetime, timedelta
-
-BASE_URL = "http://localhost:8000"
-
-# 1. Create a goal
-response = requests.post(f"{BASE_URL}/goals", json={
-    "title": "Learn Machine Learning",
-    "description": "Master ML fundamentals and build projects",
-    "due_date": (datetime.now() + timedelta(days=60)).isoformat(),
-    "user_id": "user123"
-})
-goal = response.json()
-goal_id = goal['id']
-
-# 2. Wait for processing (or poll the goal endpoint)
-import time
-time.sleep(5)
-
-# 3. Get the breakdown
-response = requests.get(f"{BASE_URL}/goals/{goal_id}/breakdown")
-breakdown = response.json()
-
-print(f"Created {breakdown['total_tasks']} tasks across {breakdown['total_weeks']} weeks")
-
-# 4. Check calendar
-response = requests.get(f"{BASE_URL}/calendar/events")
-events = response.json()
-print(f"Scheduled {len(events)} calendar events")
-```
-
-### Example 2: Notification Handling
-
-```python
-# When you receive a notification (notification_id = 1)
-
-# Option A: Acknowledge and start the task
-response = requests.post(f"{BASE_URL}/notifications/acknowledge", json={
-    "notification_id": 1,
-    "acknowledged": True
-})
-# Task status becomes "in_progress"
-
-# Option B: Dismiss and reschedule
-response = requests.post(f"{BASE_URL}/notifications/acknowledge", json={
-    "notification_id": 1,
-    "acknowledged": False
-})
-# Task is automatically rescheduled
-result = response.json()
-print(f"Task rescheduled to {result.get('new_time')}")
-```
-
-### Example 3: Completing Tasks
-
-```python
-# When you finish working on a task
-task_id = 1
-
-response = requests.post(f"{BASE_URL}/tasks/{task_id}/complete")
-result = response.json()
-print(result['message'])  # "Task completed successfully"
-```
-
-## Testing
-
-### Run Unit Tests
-
-```powershell
-# Run all tests
-pytest test_main.py -v
-
-# Run with coverage
-pytest test_main.py --cov=. --cov-report=html
-
-# Run specific test
-pytest test_main.py::test_create_goal -v
-```
-
-### Manual API Testing
-
-Use the provided scripts:
-
-```powershell
-# PowerShell script
-.\test_api.ps1
-
-# Python script
-python example_usage.py
-```
-
-Or use curl:
-
-```powershell
-# Create a goal
-curl -X POST "http://localhost:8000/goals" `
-  -H "Content-Type: application/json" `
-  -d '{\"title\":\"Learn Python\",\"description\":\"Master Python\",\"due_date\":\"2026-03-15T00:00:00\",\"user_id\":\"user123\"}'
-
-# Get goals
-curl "http://localhost:8000/goals?user_id=user123"
-```
-
-### Using Swagger UI
-
-Navigate to `http://localhost:8000/docs` for an interactive API interface where you can:
-
-- View all endpoints
-- Try out API calls
-- See request/response schemas
-- Download OpenAPI specification
-
-## Troubleshooting
-
-### Common Issues
-
-#### 1. Import Errors When Running
-
-**Problem:** `Import "fastapi" could not be resolved`
-
-**Solution:**
-
-```powershell
-# Make sure virtual environment is activated
-.\venv\Scripts\Activate.ps1
-
-# Reinstall dependencies
-pip install -r requirements.txt
-```
-
-#### 2. OpenAI API Errors
-
-**Problem:** `AuthenticationError: Invalid API key`
-
-**Solution:**
-
-- Check your `.env` file has correct `OPENAI_API_KEY`
-- Verify the API key is valid at <https://platform.openai.com/api-keys>
-- Make sure there are no extra spaces or quotes
-
-#### 3. Database Errors
-
-**Problem:** `OperationalError: no such table`
-
-**Solution:**
-
-- Delete `flux.db` if it exists
-- Restart the server (it will recreate tables)
-
-#### 4. Port Already in Use
-
-**Problem:** `OSError: [Errno 98] Address already in use`
-
-**Solution:**
-
-```powershell
-# Find process using port 8000
-netstat -ano | findstr :8000
-
-# Kill the process (replace PID with actual process ID)
-taskkill /PID <PID> /F
-
-# Or use a different port
-uvicorn main:app --port 8001
-```
-
-#### 5. Background Tasks Not Processing
-
-**Problem:** Goal created but no milestones/tasks generated
-
-**Solution:**
-
-- Check server logs for errors
-- Verify OpenAI API key is valid
-- Check you have sufficient OpenAI credits
-- Wait a few seconds and check `/goals/{id}/breakdown` again
-
-### Debug Mode
-
-Enable debug logging:
-
-```python
-# In config.py or .env
-DEBUG=True
-LOG_LEVEL=DEBUG
-```
-
-View detailed logs in the console.
-
-### Getting Help
-
-1. Check the logs in the terminal where the server is running
-2. Visit `http://localhost:8000/docs` for API documentation
-3. Review the error message in API responses
-4. Check the `test_main.py` for example usage patterns
-
-## Advanced Configuration
-
-### Custom Working Hours
-
-```env
-# .env
-DEFAULT_WORK_START_HOUR=8
-DEFAULT_WORK_END_HOUR=20
-```
-
-### Task Duration
-
-```env
-# .env
-DEFAULT_TASK_DURATION_MINUTES=45
-```
-
-### Notification Timing
-
-```env
-# .env
-NOTIFICATION_CHECK_INTERVAL_MINUTES=30  # Notify 30 min before task
-```
-
-### Reschedule Strategy
-
-```env
-# .env
-MISSED_TASK_RESCHEDULE_DAYS=2  # Reschedule 2 days out
-```
-
-## Performance Tips
-
-1. **Use Background Tasks**: Goal processing happens asynchronously
-2. **Batch Operations**: Create multiple goals at once
-3. **Pagination**: Add `?limit=10&offset=0` for large datasets (future enhancement)
-4. **Caching**: Consider caching calendar queries for frequent access
-
-## Security Notes
-
-- Currently uses a simple `user_id` for identification
-- No authentication implemented (add JWT/OAuth for production)
-- OpenAI API key is stored in `.env` (keep secure)
-- SQLite database is for development (use PostgreSQL for production)
+The Swagger UI is available at `http://localhost:8000/docs`. It lets you explore all endpoints, view request/response schemas, and make test calls directly from the browser.
 
 ---
 
-**For more information, visit the main README.md or open an issue on GitHub.**
+### Health check
+
+**`GET /health`**
+
+Confirms the service is running.
+
+```bash
+curl http://localhost:8000/health
+```
+
+Response:
+
+```json
+{"status": "ok", "service": "flux-backend"}
+```
+
+---
+
+### Goals
+
+#### Create a goal
+
+**`POST /goals`**
+
+```bash
+curl -X POST http://localhost:8000/goals \
+  -H "Content-Type: application/json" \
+  -d '{
+    "title": "Get fit for my wedding",
+    "description": "Lose 15 lbs and improve stamina over 12 weeks",
+    "user_id": "your-user-uuid"
+  }'
+```
+
+Response `201 Created`:
+
+```json
+{
+  "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
+  "user_id": "your-user-uuid",
+  "title": "Get fit for my wedding",
+  "status": "active",
+  "created_at": "2026-03-02T10:00:00Z"
+}
+```
+
+The AI planner decomposes the goal into weekly milestones and daily tasks asynchronously. Query the goal again after a few seconds to see the `plan_json` field populated.
+
+#### List goals
+
+**`GET /goals?user_id=<uuid>`**
+
+```bash
+curl "http://localhost:8000/goals?user_id=your-user-uuid"
+```
+
+#### Get a specific goal
+
+**`GET /goals/{goal_id}`**
+
+```bash
+curl http://localhost:8000/goals/3fa85f64-5717-4562-b3fc-2c963f66afa6
+```
+
+---
+
+### Voice / Conversational Agent
+
+The conv_agent endpoints are at `/api/v1/voice`. They require a running Deepgram API key (`DEEPGRAM_API_KEY` in `backend/.env`).
+
+#### Start a voice session
+
+**`POST /api/v1/voice/session`**
+
+```bash
+curl -X POST http://localhost:8000/api/v1/voice/session \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <supabase-jwt>" \
+  -d '{"user_id": "your-user-uuid"}'
+```
+
+Response:
+
+```json
+{
+  "session_id": "sess_...",
+  "deepgram_token": "<short-lived-token>",
+  "system_prompt": "You are Flux, an empathetic AI life assistant..."
+}
+```
+
+The frontend uses `deepgram_token` to open a WebSocket directly with Deepgram.
+
+#### Save a transcript message
+
+**`POST /api/v1/voice/messages`**
+
+Called by the frontend when Deepgram emits a `ConversationText` event. Fire-and-forget: errors are logged but the endpoint always returns 200.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/voice/messages \
+  -H "Content-Type: application/json" \
+  -d '{
+    "session_id": "sess_...",
+    "role": "user",
+    "content": "I want to lose weight before my wedding"
+  }'
+```
+
+#### Get session transcript
+
+**`GET /api/v1/voice/sessions/{session_id}/messages`**
+
+```bash
+curl http://localhost:8000/api/v1/voice/sessions/sess_.../messages
+```
+
+Response:
+
+```json
+{
+  "session_id": "sess_...",
+  "messages": [
+    {"role": "user", "content": "I want to lose weight before my wedding", "created_at": "..."},
+    {"role": "assistant", "content": "That's a meaningful goal! Tell me about your wedding date...", "created_at": "..."}
+  ]
+}
+```
+
+#### Process a function-call intent
+
+**`POST /api/v1/voice/intents`**
+
+The frontend forwards Deepgram `FunctionCallRequest` events here. The backend routes the call to the appropriate service and returns a text response for Deepgram to speak.
+
+```bash
+curl -X POST http://localhost:8000/api/v1/voice/intents \
+  -H "Content-Type: application/json" \
+  -d '{
+    "function_call_id": "fc_123",
+    "function_name": "create_goal",
+    "input": {"title": "Lose 15 lbs", "description": "Wedding prep"},
+    "session_id": "sess_..."
+  }'
+```
+
+#### Close a session
+
+**`DELETE /api/v1/voice/session/{session_id}`**
+
+```bash
+curl -X DELETE http://localhost:8000/api/v1/voice/session/sess_...
+```
+
+---
+
+## Workflow Examples
+
+### Example 1: Create a goal and check the plan
+
+```python
+import requests
+import time
+
+BASE_URL = "http://localhost:8000"
+USER_ID = "your-user-uuid"   # must exist in public.users
+
+# 1. Create the goal
+response = requests.post(f"{BASE_URL}/goals", json={
+    "title": "Learn Machine Learning",
+    "description": "Complete a structured 8-week ML curriculum",
+    "user_id": USER_ID,
+})
+goal = response.json()
+goal_id = goal["id"]
+print(f"Created goal: {goal_id}")
+
+# 2. Wait for the AI planner to run (background task)
+time.sleep(5)
+
+# 3. Retrieve the goal to see the generated plan
+response = requests.get(f"{BASE_URL}/goals/{goal_id}")
+plan = response.json()
+print(f"Plan JSON: {plan.get('plan_json')}")
+```
+
+### Example 2: Start a voice session
+
+```python
+import requests
+
+BASE_URL = "http://localhost:8000"
+SUPABASE_JWT = "your-supabase-jwt"   # from Supabase Auth sign-in
+
+response = requests.post(
+    f"{BASE_URL}/api/v1/voice/session",
+    headers={"Authorization": f"Bearer {SUPABASE_JWT}"},
+    json={"user_id": "your-user-uuid"},
+)
+session = response.json()
+print(f"Session ID: {session['session_id']}")
+print(f"Deepgram token expires in: use immediately")
+
+# The frontend connects to Deepgram WebSocket using session['deepgram_token']
+# and session['system_prompt']
+```
+
+---
+
+## Testing
+
+### Run all tests
+
+```bash
+# From backend/ with venv active
+pytest tests/ -v
+```
+
+### Run conv_agent tests
+
+```bash
+pytest conv_agent/tests/ -v
+```
+
+### Run a specific test file
+
+```bash
+pytest tests/test_goals_router.py -v
+```
+
+### Run with output on failure
+
+```bash
+pytest tests/ -v -s
+```
+
+---
+
+## Troubleshooting
+
+### Cannot connect to Supabase
+
+**Symptom:** Startup logs show connection errors, or API calls return `500` with database messages.
+
+**Steps:**
+1. Confirm Supabase is running: `supabase status`
+2. Check `SUPABASE_URL` and `SUPABASE_KEY` in `backend/.env`
+3. If running in Docker, use `SUPABASE_URL=http://host.docker.internal:54321`
+
+### Port 8000 is already in use
+
+```bash
+# macOS / Linux
+lsof -i :8000
+kill -9 <PID>
+```
+
+### Some sprint routers fail to load
+
+Expected behavior when optional configuration (e.g., VAPID keys for push notifications) is absent. The warning is printed at startup but does not affect the core API or voice endpoints:
+
+```
+Warning: Some scrum routers could not be loaded: ...
+```
+
+Configure the missing keys in `backend/.env` to enable those features.
+
+### OpenRouter API errors
+
+**Symptom:** Goal planner or RAG endpoints return `500` with an LLM-related error.
+
+**Steps:**
+1. Verify `OPEN_ROUTER_API_KEY` is set and valid in `backend/.env`
+2. Check your account credits at https://openrouter.ai
+3. Confirm `OPENAI_MODEL` is set to a model available under your OpenRouter plan (default: `openai/gpt-4o-mini`)
+
+### Debug logging
+
+Set `DEBUG=True` and `LOG_LEVEL=DEBUG` in `backend/.env` to see detailed request and agent logs in the console.

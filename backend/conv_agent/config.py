@@ -15,8 +15,8 @@ class ConvAgentSettings(BaseSettings):
     deepgram_listen_model: str = "nova-3"
     deepgram_llm_model: str = "gpt-4o-mini"
     deepgram_token_ttl: int = 3600                  # Temp token TTL in seconds (max 1hr)
-    voice_prompt_file: str = "backend/conv_agent/config/voice_prompt.md"
-    voice_intents_file: str = "backend/conv_agent/config/intents.yaml"
+    voice_prompt_file: str = "conv_agent/config/voice_prompt.md"
+    voice_intents_file: str = "conv_agent/config/intents.yaml"
     voice_daily_session_limit: int = 20
 
     # DAO Service (inter-service communication)
