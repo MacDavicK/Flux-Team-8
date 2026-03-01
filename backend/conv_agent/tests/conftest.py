@@ -70,7 +70,7 @@ async def conv_agent_client(dao_service_client):
     to return a client that talks to the in-process dao_service.
     """
     from unittest.mock import patch
-    from app.conv_agent.dao_client import ConvAgentDaoClient
+    from conv_agent.dao_client import ConvAgentDaoClient
 
     # Create a dao client that uses the test dao_service via ASGITransport
     test_dao_client = ConvAgentDaoClient(
@@ -87,8 +87,8 @@ async def conv_agent_client(dao_service_client):
         pytest.skip("Main app dependencies not available")
 
     with (
-        patch("app.conv_agent.voice_service.get_dao_client", return_value=test_dao_client),
-        patch("app.conv_agent.intent_handler.get_dao_client", return_value=test_dao_client),
+        patch("conv_agent.voice_service.get_dao_client", return_value=test_dao_client),
+        patch("conv_agent.intent_handler.get_dao_client", return_value=test_dao_client),
     ):
         transport = ASGITransport(app=main_app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

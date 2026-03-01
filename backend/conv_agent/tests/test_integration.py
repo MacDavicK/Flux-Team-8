@@ -12,7 +12,7 @@ Requirements:
   - Main app dependencies installed (openai, langchain, etc.)
 
 Run:
-  cd backend && DEEPGRAM_API_KEY=<key> pytest app/conv_agent/tests/test_integration.py -v -m integration
+  cd backend && DEEPGRAM_API_KEY=<key> pytest conv_agent/tests/test_integration.py -v -m integration
 """
 
 import os
@@ -87,7 +87,7 @@ async def test_process_intent_calls_mocked_goal_handler(conv_agent_client, test_
     session_id = session_resp.json()["session_id"]
 
     mock_handler = AsyncMock(return_value="Goal noted (test mock)")
-    with patch("app.conv_agent.intent_handler._handle_goal", mock_handler):
+    with patch("conv_agent.intent_handler._handle_goal", mock_handler):
         intent_resp = await conv_agent_client.post(
             "/api/v1/voice/intents",
             json={
