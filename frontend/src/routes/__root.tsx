@@ -18,7 +18,7 @@ import {
   SimulationProvider,
   useSimulation,
 } from "~/contexts/SimulationContext";
-import { goalPlannerService } from "~/services/GoalPlannerService";
+import { demoService } from "~/services/DemoService";
 import appCss from "~/styles/app.css?url";
 import { seo } from "~/utils/seo";
 
@@ -86,8 +86,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   const isFlowPage = location.pathname === "/";
   const showDemoUI = isFlowPage && !showSplash;
 
+  // Redirect as soon as auth resolves — do NOT wait for splash to finish.
+  // Splash is purely visual and should not gate the auth decision.
   useEffect(() => {
-    if (authLoading || showSplash) return;
+    if (authLoading) return;
 
     const currentPath = window.location.pathname;
 
@@ -101,20 +103,22 @@ function RootDocument({ children }: { children: React.ReactNode }) {
     ) {
       navigate({ to: "/chat" });
     }
-  }, [authLoading, isAuthenticated, user, showSplash, navigate]);
+  }, [authLoading, isAuthenticated, user, navigate]);
 
   const handleSplashComplete = () => {
     setShowSplash(false);
   };
 
   const handleSimulateLeavingHome = async () => {
-    const response = await goalPlannerService.triggerSimulation("leaving_home");
+    const raw = await demoService.triggerLocation();
+    const response = { message: String(raw.message ?? "You're out!"), type: "notification" as const };
     addNotification(response);
     startEscalation();
   };
 
   const handleSimulateNearStore = async () => {
-    const response = await goalPlannerService.triggerSimulation("near_grocery");
+    const raw = await demoService.triggerLocation();
+    const response = { message: String(raw.message ?? "You're near a store!"), type: "notification" as const };
     addNotification(response);
     startEscalation();
   };

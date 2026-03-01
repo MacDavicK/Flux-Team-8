@@ -1,6 +1,6 @@
 # Flux Backend — Task List
 
-> Derived from `../docs/flux-tsd.md` (v2.0). Each task is atomic and independently implementable.
+> Derived from `flux-tsd.md` (v2.0). Each task is atomic and independently implementable.
 > Reference section numbers (§) map back to the TSD.
 
 ---

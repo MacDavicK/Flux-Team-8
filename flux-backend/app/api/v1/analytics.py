@@ -34,7 +34,7 @@ def _compute_streak(done_dates: list) -> int:
 @router.get("/overview")
 @limiter.limit("30/minute")
 async def get_overview(request: Request, user=Depends(get_current_user)) -> dict:
-    user_id = str(user.id)
+    user_id = str(user["sub"])
     today = date.today()
     done_date_rows = await db.fetch(
         "SELECT DISTINCT DATE(scheduled_at) AS day FROM tasks WHERE user_id = $1 AND status = 'done' AND scheduled_at >= CURRENT_DATE - INTERVAL '90 days' ORDER BY day DESC",
@@ -57,7 +57,7 @@ async def get_overview(request: Request, user=Depends(get_current_user)) -> dict
 @router.get("/goals")
 @limiter.limit("30/minute")
 async def get_goals_progress(request: Request, user=Depends(get_current_user)) -> list:
-    user_id = str(user.id)
+    user_id = str(user["sub"])
     goals = await db.fetch("SELECT id, title, status FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY pipeline_order ASC", user_id)
     result = []
     for goal in goals:
@@ -71,7 +71,7 @@ async def get_goals_progress(request: Request, user=Depends(get_current_user)) -
 @router.get("/missed-by-cat")
 @limiter.limit("30/minute")
 async def get_missed_by_category(request: Request, user=Depends(get_current_user)) -> list:
-    user_id = str(user.id)
+    user_id = str(user["sub"])
     rows = await db.fetch("SELECT category, missed_count FROM missed_by_category WHERE user_id = $1 ORDER BY missed_count DESC", user_id)
     return [{"category": row["category"], "missed_count": row["missed_count"]} for row in rows]
 
@@ -79,6 +79,6 @@ async def get_missed_by_category(request: Request, user=Depends(get_current_user
 @router.get("/weekly")
 @limiter.limit("30/minute")
 async def get_weekly_stats(request: Request, weeks: int = Query(default=12, ge=1, le=52), user=Depends(get_current_user)) -> list:
-    user_id = str(user.id)
+    user_id = str(user["sub"])
     rows = await db.fetch("SELECT week_start, done, total FROM user_weekly_stats WHERE user_id = $1 ORDER BY week_start DESC LIMIT $2", user_id, weeks)
     return [{"week_start": str(row["week_start"]), "done": row["done"], "total": row["total"], "completion_pct": round(row["done"] / row["total"], 4) if row["total"] > 0 else 0.0} for row in rows]

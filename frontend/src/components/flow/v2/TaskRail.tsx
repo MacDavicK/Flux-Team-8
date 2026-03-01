@@ -3,9 +3,10 @@ import { cn } from "~/utils/cn";
 
 interface TaskRailProps {
   tasks: TaskRailItem[];
+  onComplete?: (taskId: string) => void;
 }
 
-export function TaskRail({ tasks }: TaskRailProps) {
+export function TaskRail({ tasks, onComplete }: TaskRailProps) {
   const uncompletedCount = tasks.filter((t) => !t.completed).length;
 
   return (
@@ -25,7 +26,12 @@ export function TaskRail({ tasks }: TaskRailProps) {
           <div key={task.id} className="snap-start shrink-0">
             <div className="glass-pebble-stone py-3 px-4 rounded-2xl w-[11rem] flex flex-col justify-center relative h-20 hover:shadow-lg transition-shadow cursor-pointer group mt-2 mr-1.5">
               <div className="absolute -top-3 -right-3 z-10">
-                <div className="w-8 h-8 bg-stone border border-white/50 shadow-sm rounded-full flex items-center justify-center group-hover:border-sage transition-colors">
+                <button
+                  type="button"
+                  aria-label={task.completed ? "Completed" : "Mark as done"}
+                  onClick={() => !task.completed && onComplete?.(task.id)}
+                  className="w-8 h-8 bg-stone border border-white/50 shadow-sm rounded-full flex items-center justify-center group-hover:border-sage transition-colors"
+                >
                   <div
                     className={cn(
                       "w-4 h-4 rounded-full border-2 transition-colors",
@@ -34,7 +40,7 @@ export function TaskRail({ tasks }: TaskRailProps) {
                         : "border-river group-hover:border-sage",
                     )}
                   />
-                </div>
+                </button>
               </div>
               <span className="text-sm font-medium text-charcoal leading-tight text-ellipsis-2-lines">
                 {task.title}

@@ -74,6 +74,8 @@ export type {
   BaseMessage,
   CallMessage,
   ChatMessage,
+  ChatMessageRequest,
+  ChatMessageResponse,
   ChatSession,
   MessageContent,
   NotificationMessage,
@@ -100,6 +102,7 @@ export {
 } from "./notification";
 // Task domain
 export type {
+  RescheduleRequest,
   Task,
   TaskFilter,
   TaskRailItem,
@@ -112,28 +115,21 @@ export {
 } from "./task";
 // User domain
 export type {
+  AccountMe,
+  AccountPatchRequest,
   AuthStatusResponse,
   Chronotype,
   ExistingCommitment,
   LocationLabels,
   LoginRequest,
   LoginResponse,
-  OnboardingChatResponse,
   OnboardingProfile,
-  OnboardingStatusResponse,
-  OnboardingStep,
   Preference,
   Profile,
   SignupRequest,
   SignupResponse,
   SleepWindow,
   User,
-  UserEnergyAuraResponse,
-  UserFocusDistributionResponse,
-  UserProfileResponse,
-  UserStatsResponse,
-  UserWeeklyInsightResponse,
-  WeeklyStatsPill,
   WorkHours,
 } from "./user";
 export { ColorTheme as UserColorTheme } from "./user";

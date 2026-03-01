@@ -12,6 +12,7 @@ AI-powered accountability coach backend — FastAPI + LangGraph + LiteLLM.
 - A [Supabase](https://supabase.com) project
 - An [OpenRouter](https://openrouter.ai) API key
 - A [Twilio](https://twilio.com) account (WhatsApp + Voice + Verify)
+- (Optional) A [Google Cloud](https://console.cloud.google.com) OAuth 2.0 Client ID for Google login
 
 ---
 
@@ -56,6 +57,41 @@ This stops all containers, removes Compose volumes, prunes the Docker build cach
 
 ---
 
+## Google OAuth Setup (One-Time)
+
+To enable "Continue with Google" on the login screen:
+
+### 1. Create a Google OAuth Client
+
+1. Go to [Google Cloud Console → Credentials](https://console.cloud.google.com/apis/credentials)
+2. Create → **OAuth 2.0 Client ID** → Application type: **Web application**
+3. Add Authorized redirect URIs:
+   - `https://<your-supabase-project>.supabase.co/auth/v1/callback` (Supabase-side exchange)
+   - `http://localhost:3000/auth/callback` (local dev — TanStack Start callback route)
+4. Copy the **Client ID** and **Client Secret**
+
+### 2. Configure Supabase
+
+1. **Supabase Dashboard → Authentication → Providers → Google**
+   - Enable the Google provider
+   - Paste in the Client ID and Client Secret from Step 1
+
+2. **Supabase Dashboard → Authentication → URL Configuration**
+   - Set **Site URL**: `http://localhost:3000` (or your production URL)
+   - Add to **Additional Redirect URLs**: `http://localhost:3000/auth/callback`
+
+### 3. Frontend Environment
+
+Add to `frontend/.env`:
+```
+VITE_SUPABASE_URL=https://<your-project>.supabase.co
+VITE_SUPABASE_ANON_KEY=<your-anon-key>
+```
+
+> **Note:** The backend does not require changes — it already validates Supabase JWTs regardless of whether the user authenticated via email/password or Google OAuth.
+
+---
+
 ## Local Development (uv, no Docker for the app)
 
 ### 1. Install dependencies
@@ -64,25 +100,13 @@ This stops all containers, removes Compose volumes, prunes the Docker build cach
 uv sync
 ```
 
-### 2. Configure environment and run migrations
+### 2. Configure environment, run migrations and spin up local dev environment
 
 ```bash
 bash dev-start.sh
 ```
 
 `dev-start.sh` will guide you through each section with inline instructions on where to find each value.
-
-### 3. Run the API server
-
-```bash
-uv run uvicorn app.main:app --reload --port 8000
-```
-
-### 4. Run the notifier worker (separate terminal)
-
-```bash
-uv run python -m notifier.main
-```
 
 ---
 

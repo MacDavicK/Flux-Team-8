@@ -13,13 +13,15 @@ import { WeeklyInsightLoadingState } from "~/components/reflection/WeeklyInsight
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { StatPill } from "~/components/ui/StatPill";
-import { userService } from "~/services/UserService";
-import type {
-  UserEnergyAuraResponse,
-  UserFocusDistributionResponse,
-  UserStatsResponse,
-  UserWeeklyInsightResponse,
-} from "~/types";
+import { accountService } from "~/services/AccountService";
+
+type StatsResponse = {
+  title: string;
+  stats: { icon: "check" | "clock" | "flame"; value: string; label: string }[];
+};
+type EnergyAuraResponse = { data: { date: string; intensity: number }[] };
+type FocusDistributionResponse = { work: number; personal: number; health: number };
+type WeeklyInsightResponse = { title: string; insight: string };
 
 const iconMap = {
   check: CheckCircle2,
@@ -30,29 +32,68 @@ const iconMap = {
 export const Route = createFileRoute("/reflection")({
   component: ReflectionPage,
   loader: async () => {
-    const profile = await userService.getProfile();
-    return { profile };
+    const me = await accountService.getMe();
+    return { profile: { id: me.id, name: me.email ?? "User", email: me.email ?? "" } };
   },
 });
 
 function ReflectionPage() {
   const { profile } = Route.useLoaderData();
 
-  const [stats, setStats] = useState<UserStatsResponse | null>(null);
-  const [energyData, setEnergyData] = useState<UserEnergyAuraResponse | null>(
-    null,
-  );
-  const [focusData, setFocusData] =
-    useState<UserFocusDistributionResponse | null>(null);
-  const [insight, setInsight] = useState<UserWeeklyInsightResponse | null>(
-    null,
-  );
+  const [stats, setStats] = useState<StatsResponse | null>(null);
+  const [energyData, setEnergyData] = useState<EnergyAuraResponse | null>(null);
+  const [focusData, setFocusData] = useState<FocusDistributionResponse | null>(null);
+  const [insight, setInsight] = useState<WeeklyInsightResponse | null>(null);
 
   useEffect(() => {
-    userService.getStats().then(setStats);
-    userService.getEnergyAura().then(setEnergyData);
-    userService.getFocusDistribution().then(setFocusData);
-    userService.getWeeklyInsight().then(setInsight);
+    accountService.getOverview().then((overview) => {
+      const o = overview as {
+        tasks_completed?: number;
+        focus_hours?: number;
+        streak_days?: number;
+        week_label?: string;
+        insight?: string;
+      };
+      setStats({
+        title: o.week_label ?? "This Week",
+        stats: [
+          { icon: "check", value: String(o.tasks_completed ?? 0), label: "Done" },
+          { icon: "clock", value: `${o.focus_hours ?? 0}h`, label: "Focus" },
+          { icon: "flame", value: String(o.streak_days ?? 0), label: "Streak" },
+        ],
+      });
+      setInsight({
+        title: "This Week's Insight",
+        insight: o.insight ?? "Keep up the great work! You're building strong habits.",
+      });
+    });
+
+    accountService.getWeeklyStats().then((weekly) => {
+      const data = (weekly as { week?: string; completed?: number }[]).map(
+        (w, i) => ({
+          date: new Date(
+            Date.now() - (6 - i) * 24 * 60 * 60 * 1000,
+          ).toISOString(),
+          intensity: Math.min(1, (w.completed ?? 0) / 6),
+        }),
+      );
+      setEnergyData({ data });
+    });
+
+    accountService.getMissedByCategory().then((missed) => {
+      const byCategory = missed as { category?: string; count?: number }[];
+      const work = byCategory.find((c) => c.category === "work")?.count ?? 0;
+      const personal =
+        byCategory.find((c) => c.category === "personal")?.count ?? 0;
+      const health =
+        byCategory.find((c) => c.category === "health")?.count ?? 0;
+      const total = work + personal + health || 1;
+      setFocusData({
+        work: Math.round((work / total) * 100),
+        personal: Math.round((personal / total) * 100),
+        health: Math.round((health / total) * 100),
+      });
+    });
   }, []);
 
   if (!profile) {
@@ -63,7 +104,7 @@ function ReflectionPage() {
     <div className="min-h-screen pb-32">
       <AmbientBackground />
 
-      <ProfileHeader name={profile.name} avatarUrl={profile.avatar} />
+      <ProfileHeader name={profile.name} avatarUrl={undefined} />
 
       <main className="px-5 space-y-6">
         <motion.div

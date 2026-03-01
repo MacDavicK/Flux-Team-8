@@ -19,19 +19,29 @@ router = APIRouter(prefix="/account", tags=["account"])
 async def get_me(request: Request, user=Depends(get_current_user)) -> AccountMeResponse:
     """17.6.1"""
     row = await db.fetchrow(
-        "SELECT id, email, timezone, onboarded, phone_verified, notification_preferences, monthly_token_usage FROM users WHERE id = $1",
-        str(user.id),
+        "SELECT id, email, timezone, onboarded, phone_verified, profile, notification_preferences, monthly_token_usage FROM users WHERE id = $1",
+        str(user["sub"]),
     )
     if row is None:
         raise HTTPException(status_code=404, detail="User not found")
+
+    def _parse_json(v):
+        if isinstance(v, str):
+            return json.loads(v)
+        return v
+
+    raw_profile = row["profile"]
+    profile = json.loads(raw_profile) if isinstance(raw_profile, str) else (raw_profile or {})
+
     return AccountMeResponse(
         id=str(row["id"]),
         email=row["email"],
+        name=profile.get("name"),
         timezone=row["timezone"],
         onboarded=row["onboarded"],
         phone_verified=row["phone_verified"],
-        notification_preferences=row["notification_preferences"],
-        monthly_token_usage=row["monthly_token_usage"],
+        notification_preferences=_parse_json(row["notification_preferences"]),
+        monthly_token_usage=_parse_json(row["monthly_token_usage"]),
     )
 
 
@@ -39,7 +49,7 @@ async def get_me(request: Request, user=Depends(get_current_user)) -> AccountMeR
 @limiter.limit("30/minute")
 async def patch_me(body: AccountPatchRequest, request: Request, user=Depends(get_current_user)) -> dict:
     """17.6.2"""
-    user_id = str(user.id)
+    user_id = str(user["sub"])
     if body.notification_preferences is not None:
         await db.execute(
             "UPDATE users SET notification_preferences = notification_preferences || $2::jsonb WHERE id = $1",
@@ -54,7 +64,7 @@ async def patch_me(body: AccountPatchRequest, request: Request, user=Depends(get
 @limiter.limit("3/hour")
 async def phone_verify_send(body: PhoneVerifySendRequest, request: Request, user=Depends(get_current_user)) -> dict:
     """17.6.3"""
-    user_id = str(user.id)
+    user_id = str(user["sub"])
     await send_otp(body.phone_number)
     await db.execute(
         "UPDATE users SET notification_preferences = notification_preferences || $2::jsonb WHERE id = $1",
@@ -69,7 +79,7 @@ async def phone_verify_confirm(body: PhoneVerifyConfirmRequest, request: Request
     """17.6.4"""
     verified = await confirm_otp(body.phone_number, body.code)
     if verified:
-        await db.execute("UPDATE users SET phone_verified = true WHERE id = $1", str(user.id))
+        await db.execute("UPDATE users SET phone_verified = true WHERE id = $1", str(user["sub"]))
         return {"verified": True}
     raise HTTPException(status_code=400, detail="Invalid code")
 
@@ -78,7 +88,7 @@ async def phone_verify_confirm(body: PhoneVerifyConfirmRequest, request: Request
 @limiter.limit("30/minute")
 async def whatsapp_opt_in(request: Request, user=Depends(get_current_user)) -> dict:
     """17.6.5"""
-    user_id = str(user.id)
+    user_id = str(user["sub"])
     row = await db.fetchrow("SELECT phone_verified FROM users WHERE id = $1", user_id)
     if row is None or not row["phone_verified"]:
         raise HTTPException(status_code=400, detail="Phone number must be verified before opting in to WhatsApp.")
@@ -93,7 +103,7 @@ async def whatsapp_opt_in(request: Request, user=Depends(get_current_user)) -> d
 @limiter.limit("30/minute")
 async def delete_account(request: Request, user=Depends(get_current_user)) -> Response:
     """17.6.6 — GDPR erasure: cascade-delete all user data."""
-    user_id = str(user.id)
+    user_id = str(user["sub"])
     await db.execute("DELETE FROM notification_log WHERE task_id IN (SELECT id FROM tasks WHERE user_id = $1)", user_id)
     await db.execute("DELETE FROM dispatch_log WHERE task_id IN (SELECT id FROM tasks WHERE user_id = $1)", user_id)
     await db.execute("DELETE FROM tasks WHERE user_id = $1", user_id)
@@ -114,7 +124,7 @@ async def delete_account(request: Request, user=Depends(get_current_user)) -> Re
 @limiter.limit("30/minute")
 async def export_account(request: Request, user=Depends(get_current_user)) -> dict:
     """17.6.7 — GDPR portability: return all user data as JSON."""
-    user_id = str(user.id)
+    user_id = str(user["sub"])
 
     def _rows(rows) -> list:
         result = []

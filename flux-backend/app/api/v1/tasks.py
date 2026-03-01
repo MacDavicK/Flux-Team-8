@@ -28,7 +28,7 @@ async def get_today_tasks(
     current_user=Depends(get_current_user),
 ) -> list[dict]:
     """17.3.1 — Return pending tasks scheduled for today in the user's local timezone."""
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     user_uuid = uuid.UUID(user_id)
 
     user_row = await db.fetchrow(
@@ -79,7 +79,7 @@ async def get_task(
     current_user=Depends(get_current_user),
 ) -> dict:
     """17.3.2 — Fetch a single task by ID; verify ownership."""
-    task = await _fetch_task_or_404(task_id, str(current_user.id))
+    task = await _fetch_task_or_404(task_id, str(current_user["sub"]))
     return _serialize_task(task)
 
 
@@ -92,7 +92,7 @@ async def complete_task(
     17.3.3 — Mark a task as done. If it is the last pending task on its goal,
     mark the goal completed and activate the next pipeline goal if present.
     """
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     user_uuid = uuid.UUID(user_id)
     task = await _fetch_task_or_404(task_id, user_id)
     task_uuid = uuid.UUID(task_id)
@@ -152,7 +152,7 @@ async def missed_task(
     current_user=Depends(get_current_user),
 ) -> dict:
     """17.3.4 — Mark a task as missed and trigger the pattern observer asynchronously."""
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     user_uuid = uuid.UUID(user_id)
     await _fetch_task_or_404(task_id, user_id)
     task_uuid = uuid.UUID(task_id)
@@ -175,7 +175,7 @@ async def reschedule_task(
     current_user=Depends(get_current_user),
 ) -> ChatMessageResponse:
     """17.3.5 — Run the LangGraph agent with a RESCHEDULE_TASK intent."""
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     task = await _fetch_task_or_404(task_id, user_id)
 
     correlation_id = str(uuid.uuid4())

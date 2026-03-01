@@ -155,6 +155,25 @@ type TaskSuggestion = {
 };
 
 /**
+ * Real backend: POST /api/v1/chat/message request body
+ */
+export interface ChatMessageRequest {
+  message: string;
+  conversation_id?: string | null;
+}
+
+/**
+ * Real backend: POST /api/v1/chat/message response
+ */
+export interface ChatMessageResponse {
+  conversation_id: string;
+  message: string;
+  agent_node?: string | null;
+  proposed_plan?: { [key: string]: unknown } | null;
+  requires_user_action: boolean;
+}
+
+/**
  * UI-specific chat message for React components
  * Allows React.ReactNode content for rendering rich UI
  */

@@ -1,95 +1,45 @@
-import type {
-  AuthStatusResponse,
-  LoginRequest,
-  LoginResponse,
-  SignupRequest,
-  SignupResponse,
-  User,
-} from "~/types";
-import { isClient } from "~/utils/env";
+import {
+  serverGetGoogleOAuthUrl,
+  serverLogin,
+  serverLogout,
+  serverSignup,
+} from "~/lib/authServerFns";
+import type { LoginRequest, LoginResponse, SignupRequest, SignupResponse } from "~/types";
 
-const AUTH_COOKIE_NAME = "flux_auth_token";
+// AuthService is now a thin wrapper around server functions.
+// No Supabase SDK is imported here. No localStorage is touched.
+// Session tokens are managed server-side via httpOnly cookies.
+// AuthContext owns the in-memory token lifecycle (see AuthContext.tsx).
 
 class AuthService {
-  private getCookie(name: string): string | undefined {
-    if (!isClient()) return undefined;
-    const value = `; ${document.cookie}`;
-    const parts = value.split(`; ${name}=`);
-    if (parts.length === 2) {
-      return parts.pop()?.split(";").shift();
-    }
-    return undefined;
-  }
-
-  private deleteCookie(name: string): void {
-    if (!isClient()) return;
-    // biome-ignore lint/suspicious/noDocumentCookie: Intentional cookie deletion for logout
-    document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
-  }
-
-  isAuthenticated(): boolean {
-    return !!this.getCookie(AUTH_COOKIE_NAME);
-  }
-
   async login(data: LoginRequest): Promise<LoginResponse> {
-    const response = await fetch("/api/auth/login", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
-
-    const result: LoginResponse = await response.json();
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || "Failed to login");
-    }
-
-    return result;
+    const result = await serverLogin({ data });
+    return {
+      success: true,
+      user: { ...result.user, onboarded: false },
+    };
   }
 
   async signup(data: SignupRequest): Promise<SignupResponse> {
-    const response = await fetch("/api/auth/signup", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(data),
-    });
+    const result = await serverSignup({ data });
+    return {
+      success: true,
+      user: { ...result.user, onboarded: false },
+    };
+  }
 
-    const result: SignupResponse = await response.json();
-
-    if (!response.ok || !result.success) {
-      throw new Error(result.message || "Failed to create account");
-    }
-
-    return result;
+  /**
+   * Initiates the Google OAuth flow.
+   * The OAuth redirect URL is generated server-side (keys hidden from client).
+   * The browser is then navigated to Google's consent screen.
+   */
+  async loginWithGoogle(): Promise<void> {
+    const { url } = await serverGetGoogleOAuthUrl();
+    window.location.href = url;
   }
 
   async logout(): Promise<void> {
-    try {
-      await fetch("/api/auth/logout", {
-        method: "POST",
-      });
-    } finally {
-      this.deleteCookie(AUTH_COOKIE_NAME);
-    }
-  }
-
-  async getAuthStatus(): Promise<AuthStatusResponse> {
-    const response = await fetch("/api/auth/status");
-
-    if (!response.ok) {
-      return { isAuthenticated: false };
-    }
-
-    return response.json();
-  }
-
-  async getCurrentUser(): Promise<User | undefined> {
-    const status = await this.getAuthStatus();
-    return status.user;
+    await serverLogout();
   }
 }
 

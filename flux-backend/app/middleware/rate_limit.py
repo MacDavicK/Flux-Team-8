@@ -22,10 +22,11 @@ def _user_key(request: Request) -> str:
     return get_remote_address(request)
 
 
-# 16.3.1 — Limiter with Redis storage
+# 16.3.1 — Limiter with Redis storage; disabled in non-production environments
 limiter = Limiter(
     key_func=_user_key,
     storage_uri=settings.redis_url,
+    enabled=settings.app_env == "production",
 )
 
 __all__ = ["limiter", "RateLimitExceeded"]

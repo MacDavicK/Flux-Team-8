@@ -93,6 +93,13 @@ export interface TaskFilter {
 }
 
 /**
+ * Real backend: POST /api/v1/tasks/{task_id}/reschedule request body
+ */
+export interface RescheduleRequest {
+  message: string;
+}
+
+/**
  * Simplified task item for UI display in TaskRail
  * Uses boolean completed instead of TaskStatus for UI convenience
  */

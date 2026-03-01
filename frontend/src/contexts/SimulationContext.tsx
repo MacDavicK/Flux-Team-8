@@ -7,7 +7,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { goalPlannerService } from "~/services/GoalPlannerService";
+import { demoService } from "~/services/DemoService";
 import type { AgentResponse } from "~/types/notification";
 
 interface SimulationContextType {
@@ -49,36 +49,42 @@ export const SimulationProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const handleNotificationAction = useCallback(
     (action: "done" | "snooze") => {
-      // Both actions stop further escalation
       stopEscalation();
-      // In a real app, this would also update the agent state, but for now stopping the cascade is the key visual requirement.
       console.log(`Action taken: ${action}`);
     },
     [stopEscalation],
   );
 
   const startEscalation = useCallback(
-    async (task?: string) => {
+    async (_task?: string) => {
       stopEscalation();
 
-      // Step 2: WhatsApp after 30 "simulated" seconds
       const whatsAppDelay = (30 * 1000) / escalationSpeed;
-      // Step 3: Call after another 45 "simulated" seconds (relative to WhatsApp)
       const callDelay = (45 * 1000) / escalationSpeed;
 
       escalationTimerRef.current = setTimeout(async () => {
-        const response = await goalPlannerService.triggerSimulation(
-          "whatsapp",
-          task,
-        );
-        addNotification(response);
+        try {
+          const raw = await demoService.triggerLocation();
+          const response: AgentResponse = {
+            message: String(raw.message ?? "WhatsApp reminder sent."),
+            type: "whatsapp",
+          };
+          addNotification(response);
+        } catch {
+          // ignore escalation errors silently
+        }
 
         escalationTimerRef.current = setTimeout(async () => {
-          const response = await goalPlannerService.triggerSimulation(
-            "call",
-            task,
-          );
-          addNotification(response);
+          try {
+            const raw = await demoService.triggerLocation();
+            const response: AgentResponse = {
+              message: String(raw.message ?? "Voice call reminder sent."),
+              type: "call",
+            };
+            addNotification(response);
+          } catch {
+            // ignore escalation errors silently
+          }
         }, callDelay);
       }, whatsAppDelay);
     },

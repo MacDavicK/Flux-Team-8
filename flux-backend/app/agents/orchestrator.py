@@ -1,3 +1,4 @@
+import uuid
 from pathlib import Path
 
 from app.agents.state import AgentState
@@ -25,7 +26,7 @@ async def orchestrator_node(state: AgentState) -> dict:
 
     # 9.1.4 — Check onboarding status; override intent if not yet onboarded
     user_row = await db.fetchrow(
-        "SELECT onboarded FROM users WHERE id = $1", user_id
+        "SELECT onboarded FROM users WHERE id = $1", uuid.UUID(user_id)
     )
     if user_row and not user_row["onboarded"]:
         return {"intent": "ONBOARDING"}

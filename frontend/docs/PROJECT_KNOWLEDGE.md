@@ -16,7 +16,8 @@
 | | clsx / tailwind-merge | - | For dynamic class construction |
 | **Animation** | Framer Motion | 12.x | Complex UI transitions & gestures |
 | **Icons** | Lucide React | 0.564.x | Standard icon set |
-| **API Mocking** | MSW | 2.12.x | Mock Service Worker for development |
+| **Auth** | Supabase SSR | 2.x | `@supabase/ssr` — server-side only. Keys in `process.env` (no `VITE_` prefix). Client: `src/lib/supabaseServer.ts`. Server fns: `src/lib/authServerFns.ts`. No Supabase SDK on client. |
+| **API Mocking** | MSW | — | **Removed** — app talks directly to the backend (localhost:8000 in dev) |
 | **Linting** | Biome | 2.3.x | Fast linter & formatter (replaces ESLint/Prettier) |
 
 ## 2. Key Commands
@@ -50,32 +51,39 @@ src/
 │   ├── splash/         # Splash screen components (initial load)
 │   ├── ui/             # Reusable UI primitives (GlassCard, etc.)
 │   └── modals/         # Modal dialogs
-├── mocks/              # MSW API mock handlers
-│   ├── browser.ts      # MSW browser setup
-│   ├── handlers.ts     # Combined handlers export
-│   ├── userHandlers.ts # User API mocks
-│   ├── tasksHandlers.ts # Tasks API mocks
-│   └── goalPlannerHandlers.ts # Goal planner API mocks
+│   # src/mocks/ — REMOVED. MSW has been deleted. App talks directly to backend.
 ├── services/           # API service layer
-│   ├── UserService.ts  # User API service
-│   ├── TasksService.ts # Tasks API service
-│   └── GoalPlannerService.ts # Goal planner API service
+│   ├── AccountService.ts     # GET/PATCH /api/v1/account/me + analytics endpoints
+│   ├── ChatService.ts        # POST /api/v1/chat/message, GET /api/v1/chat/history
+│   ├── TasksService.ts       # /api/v1/tasks/ CRUD + complete/miss/reschedule
+│   ├── GoalsService.ts       # /api/v1/goals/ CRUD + abandon/modify
+│   ├── PatternsService.ts    # /api/v1/patterns/ CRUD
+│   ├── DemoService.ts        # POST /api/v1/demo/trigger-location
+│   └── AuthService.ts        # Thin wrapper around authServerFns (no Supabase SDK)
 ├── types/              # Centralized TypeScript type definitions
-│   ├── user.ts         # User, Profile, Preference types + API response types
-│   ├── task.ts         # Task, TaskStatus, Priority, TaskCategory types
-│   ├── event.ts        # Event, EventType, EventStatus types
-│   ├── message.ts      # Message union types (Text, Plan, Task, Notification)
-│   ├── goal.ts         # Goal, Milestone, AgentState, GoalContext types
+│   ├── user.ts         # User, AccountMeResponse, AccountPatchRequest, auth types
+│   ├── task.ts         # Task, TaskStatus, Priority, TaskCategory, RescheduleRequest
+│   ├── event.ts        # Event, EventType, EventStatus types (UI timeline)
+│   ├── message.ts      # ChatMessageRequest/Response, ChatHistoryResponse, ApiMessage, MessageContent union
+│   ├── goal.ts         # Goal, GoalStatus, GoalModifyRequest, PlanMilestone, AgentState
+│   ├── pattern.ts      # Pattern, PatternPatchRequest (new domain)
 │   ├── notification.ts # Notification, EscalationLevel, LocationReminderState
 │   ├── analytics.ts    # EnergyPoint, FocusMetrics, ProductivityMetrics
 │   ├── demo.ts         # DemoMode, RescheduleOption, TimeWarpSettings
 │   ├── common.ts       # Utility types, ColorTheme, GlassEffect, AnimationConfig
+│   ├── api.d.ts        # Auto-generated OpenAPI types (DO NOT EDIT)
 │   └── index.ts        # Barrel exports for all types
+├── lib/                # Shared singletons and low-level utilities
+│   ├── supabaseServer.ts  # SERVER-ONLY: @supabase/ssr createServerClient with cookie adapters
+│   ├── authServerFns.ts   # TanStack Start server fns: serverLogin, serverSignup, serverLogout, serverGetAccessToken, serverGetGoogleOAuthUrl
+│   └── apiClient.ts       # apiFetch() — injects _inMemoryToken as Bearer JWT; exports setInMemoryToken/getInMemoryToken
 ├── routes/             # File-based routes (TanStack Router)
 │   ├── __root.tsx      # Root layout & HTML shell
 │   ├── index.tsx       # Home page (Flow)
 │   ├── chat.tsx        # Chat interface + Onboarding flow
-│   └── reflection.tsx  # Analytics/Reflection page (with loaders + data fetching)
+│   ├── reflection.tsx  # Analytics/Reflection page (with loaders + data fetching)
+│   └── auth/
+│       └── callback.tsx  # Google OAuth callback — exchanges code for session, redirects
 ├── styles/
 │   └── app.css         # Global styles & Tailwind @theme config
 ├── utils/              # Helper functions & constants
@@ -121,14 +129,24 @@ src/
 ### Service Layer
 - **Encapsulation**: All API calls must go through service classes in `src/services/`.
   - Services handle URL construction, error handling, and response parsing.
-  - Never use direct `fetch` calls in React components.
-- **Domain Organization**: Services are organized by domain (e.g., `UserService`, `TasksService`, `GoalPlannerService`).
+  - Never use direct `fetch` calls in React components or services.
+  - **Always use `apiFetch` from `~/lib/apiClient`** — it injects the Supabase JWT as `Authorization: Bearer <token>` automatically.
+- **Domain Organization**: Services are organized by domain matching the real `/api/v1/` endpoint groups:
+  - `AccountService` → `/api/v1/account/` and `/api/v1/analytics/`
+  - `ChatService` → `/api/v1/chat/`
+  - `TasksService` → `/api/v1/tasks/`
+  - `GoalsService` → `/api/v1/goals/`
+  - `PatternsService` → `/api/v1/patterns/`
+  - `DemoService` → `/api/v1/demo/`
+  - `AuthService` → thin wrapper around `authServerFns` (no Supabase SDK; no REST calls to `/api/auth/`)
 - **Usage Pattern**: Import and use services directly:
   ```typescript
-  import { userService } from "~/services/UserService";
-  const profile = await userService.getProfile();
+  import { accountService } from "~/services/AccountService";
+  const me = await accountService.getMe();
+  // me.onboarded determines if user needs onboarding
   ```
 - **Error Handling**: Services throw typed errors that can be caught by callers.
+- **Stale services deleted**: `UserService`, `GoalPlannerService`, `OnboardingService` have been removed from the codebase.
 
 ### SSR Safety
 - **Context**: This project uses TanStack Start with SSR. Browser globals (`document`, `window`, `navigator`) are **not available** in Node.js during server rendering.
@@ -139,12 +157,32 @@ src/
   if (!isClient()) return; // Safe to use document / window below
   ```
 - **Rule**: Never access `document`, `window`, or `navigator` at the module's top level or synchronously during render. Always guard with `isClient()`.
+- **Auth / Supabase**: `supabaseServer.ts` and `authServerFns.ts` are server-only — import them only inside `createServerFn` handlers. The old `src/lib/supabase.ts` browser singleton is deleted; do not recreate it.
+
+### Authentication
+- **Provider**: `@supabase/ssr` — server-side only. Supabase keys (`SUPABASE_URL`, `SUPABASE_ANON_KEY`) live in `process.env` with no `VITE_` prefix and are never bundled into client JS.
+- **Server client**: `src/lib/supabaseServer.ts` — `createServerClient` from `@supabase/ssr`, configured with TanStack Start cookie helpers. NEVER import from client code.
+- **Server functions** (`src/lib/authServerFns.ts`): All auth ops run on the server as `createServerFn`:
+  - `serverLogin` / `serverSignup` — sign in/up; `@supabase/ssr` writes session to httpOnly cookies automatically
+  - `serverLogout` — signs out; also explicitly deletes Supabase cookie names
+  - `serverGetAccessToken` — reads httpOnly session cookie server-side, returns `{ token, user }` for client hydration
+  - `serverGetGoogleOAuthUrl` — generates OAuth URL server-side (`skipBrowserRedirect: true`), returns `{ url }`
+- **AuthService** (`src/services/AuthService.ts`): Thin wrapper over server functions. No Supabase SDK import.
+- **AuthContext** (`src/contexts/AuthContext.tsx`): Calls `serverGetAccessToken` on mount to hydrate `_inMemoryToken` via `setInMemoryToken`. Re-runs every 45 min. Exposes: `login`, `signup`, `logout`, `loginWithGoogle`, `refreshAuthStatus`.
+- **Google OAuth Flow**:
+  1. `loginWithGoogle()` in `AuthContext` → `authService.loginWithGoogle()` → `serverGetGoogleOAuthUrl()` → returns URL
+  2. Client: `window.location.href = url` — browser navigates to Google
+  3. Google redirects to `/auth/callback?code=...`
+  4. `src/routes/auth/callback.tsx` **loader** (runs server-side) calls `exchangeOAuthCode` server fn → `exchangeCodeForSession` → `@supabase/ssr` sets httpOnly cookie → HTTP 302 to `/`
+  5. On `/` mount, `AuthContext.refreshAuthStatus()` hydrates `_inMemoryToken`
+- **JWT / Token Flow**: Token lives in httpOnly cookie (server-set) + React module memory (`_inMemoryToken` in `apiClient.ts`). Never in localStorage. `apiFetch` injects it as `Authorization: Bearer <token>`.
+- **`onboarded` Source of Truth**: `GET /api/v1/account/me` → `onboarded: boolean`. Fetched in `AuthContext.refreshAuthStatus()`.
+- **No client-side Supabase SDK**: `src/lib/supabase.ts` has been deleted. Do not recreate it or import `@supabase/supabase-js` in any client code.
 
 ### API Mocking
-- **MSW in Development**: All API endpoints are mocked using Mock Service Worker.
-- **Handler Organization**: Handlers are organized by domain in `src/mocks/{domain}Handlers.ts`.
-- **Realistic Delays**: Handlers include 300-500ms delays to simulate real API latency.
-- **Type Safety**: Mock responses are typed using the same types as real API responses.
+- **MSW removed**: `src/mocks/` and all MSW handler files have been deleted. Do not add them back.
+- The app talks directly to the backend. In development, the backend runs on `localhost:8000`.
+- **Real API Spec**: `src/types/api.d.ts` is the authoritative source of truth for all endpoint paths, request bodies, and response shapes.
 
 ### Loading States
 - **Feature-Specific Loading**: Each component section has its own loading state component.
@@ -160,7 +198,32 @@ src/
 - **Enums**: Extensive use of TypeScript enums for state machines (e.g., `AgentState`, `TaskStatus`, `EventType`).
 - **Import Pattern**: Always import types from `~/types` rather than deep imports (e.g., `import { User, Task } from '~/types'`).
 
-## 5. Design System Highlights
+## 5. Backend API Contract
+
+The real backend API spec is auto-generated in `src/types/api.d.ts`. **Do not edit it.** All endpoints use the `/api/v1/` prefix.
+
+### Chat Flow
+- `POST /api/v1/chat/message` — send a user message; returns `ChatMessageResponse`
+  - `conversation_id` must be persisted and sent on subsequent messages for multi-turn conversations
+  - `requires_user_action: true` signals the UI to show a confirmation/action prompt
+  - `proposed_plan` contains structured plan data when the agent proposes a goal plan
+- `GET /api/v1/chat/history?conversation_id=...` — retrieve past messages
+
+### User Onboarding
+- Onboarding state is determined by `GET /api/v1/account/me` → `onboarded: boolean`
+- There is no separate onboarding endpoint — the chat agent handles onboarding flow
+- When `onboarded === false`, the chat screen should present onboarding questions
+
+### Task Actions
+Tasks support four state transitions via dedicated PATCH/POST endpoints:
+- `complete` → marks done; may trigger goal completion or next pipeline goal
+- `missed` → marks missed; triggers pattern observer asynchronously
+- `reschedule` → POST with `{ message }` — LangGraph agent interprets the reschedule intent
+
+### Patterns (New Domain)
+AI-detected behavioral patterns. Stored per user, patchable with `user_override`. No UI currently. Managed via `PatternsService`.
+
+## 6. Design System Highlights
 
 - **Colors**: Sage (`#5C7C66`), Stone (`#EAE7E0`), Terracotta (`#C27D66`).
 - **Typography**:
@@ -169,7 +232,7 @@ src/
 - **Shapes**: High border-radius (24px - 32px) for organic feel.
 - **Motion**: Spring animations for interactions, "breathing" animations for idle states.
 
-## 6. Development Workflow
+## 7. Development Workflow
 1.  **Modify Route**: Add/Edit file in `src/routes` -> auto-update `routeTree.gen.ts`.
 2.  **Add Component**: Create in `src/components/{feature}`.
 3.  **Style**: Use Tailwind classes. For complex components, use `styles/app.css` `@layer components`.

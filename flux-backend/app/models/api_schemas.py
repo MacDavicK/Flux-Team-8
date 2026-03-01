@@ -37,8 +37,19 @@ class MessageSchema(BaseModel):
 
 
 class ChatHistoryResponse(BaseModel):
-    conversation_id: str
+    conversation_id: Optional[str] = None  # None when user has no conversations yet
     messages: list[MessageSchema]
+
+
+class ConversationSummary(BaseModel):
+    id: str
+    last_message_at: Optional[datetime] = None
+    created_at: datetime
+    preview: Optional[str] = None  # first user message, truncated
+
+
+class ConversationListResponse(BaseModel):
+    conversations: list[ConversationSummary]
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -127,6 +138,7 @@ class PatternPatchRequest(BaseModel):
 class AccountMeResponse(BaseModel):
     id: str
     email: Optional[str] = None
+    name: Optional[str] = None
     timezone: Optional[str] = None
     onboarded: Optional[bool] = None
     phone_verified: Optional[bool] = None

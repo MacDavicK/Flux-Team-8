@@ -28,7 +28,7 @@ async def list_goals(
     current_user=Depends(get_current_user),
 ) -> list[dict]:
     """17.2.1 — List goals; include pipeline sub-goals as nested array."""
-    user_id = uuid.UUID(str(current_user.id))
+    user_id = uuid.UUID(str(current_user["sub"]))
 
     if status is not None:
         rows = await db.fetch(
@@ -97,7 +97,7 @@ async def get_goal(
     current_user=Depends(get_current_user),
 ) -> dict:
     """17.2.2 — Fetch a single goal by ID; verify ownership."""
-    goal = await _fetch_goal_or_404(goal_id, str(current_user.id))
+    goal = await _fetch_goal_or_404(goal_id, str(current_user["sub"]))
     return _serialize_goal(goal)
 
 
@@ -107,7 +107,7 @@ async def abandon_goal(
     current_user=Depends(get_current_user),
 ) -> dict:
     """17.2.3 — Mark goal as abandoned and cancel its exclusive pending tasks."""
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     await _fetch_goal_or_404(goal_id, user_id)
 
     goal_uuid = uuid.UUID(goal_id)
@@ -141,7 +141,7 @@ async def modify_goal(
     current_user=Depends(get_current_user),
 ) -> ChatMessageResponse:
     """17.2.4 — Invoke the LangGraph agent with a MODIFY_GOAL intent."""
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     goal = await _fetch_goal_or_404(goal_id, user_id)
 
     correlation_id = str(uuid.uuid4())
@@ -188,7 +188,7 @@ async def get_goal_tasks(
     current_user=Depends(get_current_user),
 ) -> list[dict]:
     """17.2.5 — Return all tasks belonging to a goal."""
-    user_id = str(current_user.id)
+    user_id = str(current_user["sub"])
     await _fetch_goal_or_404(goal_id, user_id)
 
     rows = await db.fetch(

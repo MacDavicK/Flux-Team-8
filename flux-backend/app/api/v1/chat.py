@@ -1,8 +1,9 @@
 """
 Chat API endpoints — §17.1
 
-POST /api/v1/chat/message  — Send a message; runs the LangGraph agent and persists results.
-GET  /api/v1/chat/history  — Fetch paginated conversation history for a conversation.
+POST /api/v1/chat/message        — Send a message; runs the LangGraph agent and persists results.
+GET  /api/v1/chat/history        — Fetch paginated conversation history for a conversation.
+GET  /api/v1/chat/conversations  — List all conversations for the current user.
 """
 from __future__ import annotations
 
@@ -17,6 +18,8 @@ from app.models.api_schemas import (
     ChatHistoryResponse,
     ChatMessageRequest,
     ChatMessageResponse,
+    ConversationListResponse,
+    ConversationSummary,
     MessageSchema,
 )
 from app.services.context_manager import window_conversation_history
@@ -36,7 +39,7 @@ async def send_message(
     17.1.1–17.1.4 — Accept a user message, run the LangGraph agent, persist
     results to DB, and return the assistant reply with metadata.
     """
-    user_id: str = str(current_user.id)
+    user_id: str = str(current_user["sub"])
 
     # ── 17.1.2  Resolve or create conversation ──────────────────────────────
     if body.conversation_id is None:
@@ -97,11 +100,14 @@ async def send_message(
         user_profile = dict(raw) if not isinstance(raw, dict) else raw
 
     # ── Build initial AgentState ─────────────────────────────────────────────
+    # user_profile is only injected when the DB has a populated profile (i.e. the
+    # user is onboarded). For new users mid-onboarding, omitting the key lets the
+    # LangGraph checkpointer's accumulated onboarding state (tracking keys like
+    # _wake_collected, etc.) survive across turns without being overwritten.
     state: dict = {
         "user_id": user_id,
         "conversation_history": history,
         "intent": None,
-        "user_profile": user_profile,
         "goal_draft": None,
         "proposed_tasks": None,
         "classifier_output": None,
@@ -111,6 +117,7 @@ async def send_message(
         "error": None,
         "token_usage": {},
         "correlation_id": str(uuid.uuid4()),
+        **({"user_profile": user_profile} if user_profile else {}),
     }
 
     # ── Run LangGraph ────────────────────────────────────────────────────────
@@ -161,22 +168,45 @@ async def send_message(
 
 
 @router.get("/history", response_model=ChatHistoryResponse)
+@limiter.limit("30/minute")
 async def get_history(
-    conversation_id: str = Query(..., description="UUID of the conversation"),
+    request: Request,
+    conversation_id: str | None = Query(None, description="UUID of the conversation; omit to get the most recent one"),
     limit: int = Query(50, ge=1, le=200),
     current_user=Depends(get_current_user),
 ) -> ChatHistoryResponse:
-    """17.1.3 — Return paginated message history for a conversation, oldest first."""
-    user_id: str = str(current_user.id)
+    """17.1.3 — Return paginated message history for a conversation, oldest first.
 
-    conv = await db.fetchrow(
-        "SELECT id, user_id FROM conversations WHERE id = $1",
-        uuid.UUID(conversation_id),
-    )
-    if conv is None:
-        raise HTTPException(status_code=404, detail="Conversation not found")
-    if str(conv["user_id"]) != user_id:
-        raise HTTPException(status_code=403, detail="Access denied")
+    If conversation_id is omitted the user's most recently active conversation
+    is used. Returns an empty message list (with conversation_id=null) when the
+    user has no conversations yet.
+    """
+    user_id: str = str(current_user["sub"])
+
+    if conversation_id is None:
+        # Resolve most-recent conversation for this user.
+        conv = await db.fetchrow(
+            """
+            SELECT id, user_id FROM conversations
+            WHERE user_id = $1
+            ORDER BY last_message_at DESC NULLS LAST, created_at DESC
+            LIMIT 1
+            """,
+            uuid.UUID(user_id),
+        )
+        if conv is None:
+            # No conversations yet — return empty history so the chat page
+            # can display the appropriate greeting without erroring.
+            return ChatHistoryResponse(conversation_id=None, messages=[])
+    else:
+        conv = await db.fetchrow(
+            "SELECT id, user_id FROM conversations WHERE id = $1",
+            uuid.UUID(conversation_id),
+        )
+        if conv is None:
+            raise HTTPException(status_code=404, detail="Conversation not found")
+        if str(conv["user_id"]) != user_id:
+            raise HTTPException(status_code=403, detail="Access denied")
 
     rows = await db.fetch(
         """
@@ -202,6 +232,50 @@ async def get_history(
     ]
 
     return ChatHistoryResponse(
-        conversation_id=conversation_id,
+        conversation_id=str(conv["id"]),
         messages=messages,
     )
+
+
+@router.get("/conversations", response_model=ConversationListResponse)
+@limiter.limit("30/minute")
+async def list_conversations(
+    request: Request,
+    limit: int = Query(20, ge=1, le=50),
+    current_user=Depends(get_current_user),
+) -> ConversationListResponse:
+    """Return the user's conversations, newest first, with a preview of the first user message."""
+    user_id: str = str(current_user["sub"])
+
+    rows = await db.fetch(
+        """
+        SELECT
+            c.id,
+            c.last_message_at,
+            c.created_at,
+            (
+                SELECT content FROM messages
+                WHERE conversation_id = c.id AND role = 'user'
+                ORDER BY created_at ASC
+                LIMIT 1
+            ) AS preview
+        FROM conversations c
+        WHERE c.user_id = $1
+        ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
+        LIMIT $2
+        """,
+        uuid.UUID(user_id),
+        limit,
+    )
+
+    conversations = [
+        ConversationSummary(
+            id=str(row["id"]),
+            last_message_at=row["last_message_at"],
+            created_at=row["created_at"],
+            preview=row["preview"][:80] if row["preview"] else None,
+        )
+        for row in rows
+    ]
+
+    return ConversationListResponse(conversations=conversations)

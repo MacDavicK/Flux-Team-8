@@ -110,7 +110,7 @@ export interface LoginRequest {
  */
 export interface LoginResponse {
   user: User;
-  token: string;
+  token?: string;
   success: boolean;
   message?: string;
 }
@@ -129,7 +129,7 @@ export interface SignupRequest {
  */
 export interface SignupResponse {
   user: User;
-  token: string;
+  token?: string;
   success: boolean;
   message?: string;
 }
@@ -144,35 +144,25 @@ export interface AuthStatusResponse {
 }
 
 /**
- * Onboarding status response
+ * Real backend: GET /api/v1/account/me response
  */
-export interface OnboardingStatusResponse {
-  onboarded: boolean;
-  onboardingProfile?: OnboardingProfile;
+export interface AccountMe {
+  id: string;
+  email?: string | null;
+  name?: string | null;
+  timezone?: string | null;
+  onboarded?: boolean | null;
+  phone_verified?: boolean | null;
+  notification_preferences?: { [key: string]: unknown } | null;
+  monthly_token_usage?: { [key: string]: unknown } | null;
 }
 
 /**
- * Onboarding chat message type
+ * Real backend: PATCH /api/v1/account/me request body
  */
-export type OnboardingStep =
-  | "name"
-  | "wake_time"
-  | "sleep_time"
-  | "work_schedule"
-  | "chronotype"
-  | "locations"
-  | "existing_commitments"
-  | "first_goal"
-  | "complete";
-
-/**
- * Onboarding chat response
- */
-export interface OnboardingChatResponse {
-  message: string;
-  nextStep: OnboardingStep;
-  profile: Partial<OnboardingProfile>;
-  isComplete: boolean;
+export interface AccountPatchRequest {
+  timezone?: string | null;
+  notification_preferences?: { [key: string]: unknown } | null;
 }
 
 /**
@@ -186,56 +176,3 @@ export enum ColorTheme {
   CHARCOAL = "charcoal",
 }
 
-/**
- * User profile API response
- */
-export interface UserProfileResponse {
-  id: string;
-  name: string;
-  email: string;
-  avatar?: string;
-}
-
-/**
- * Weekly stats pill data
- */
-export interface WeeklyStatsPill {
-  icon: "check" | "clock" | "flame";
-  value: string;
-  label: string;
-}
-
-/**
- * User stats API response
- */
-export interface UserStatsResponse {
-  title: string;
-  stats: WeeklyStatsPill[];
-}
-
-/**
- * User energy aura API response
- */
-export interface UserEnergyAuraResponse {
-  data: Array<{
-    date: string;
-    intensity: number;
-  }>;
-}
-
-/**
- * User focus distribution API response
- */
-export interface UserFocusDistributionResponse {
-  work: number;
-  personal: number;
-  health: number;
-}
-
-/**
- * User weekly insight API response
- */
-export interface UserWeeklyInsightResponse {
-  title: string;
-  insight: string;
-}
