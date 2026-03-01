@@ -44,6 +44,28 @@ def get_user_profile(user_id: str) -> Optional[dict]:
     return result.data if result.data is not None else None
 
 
+def get_tasks_for_timeline(
+    user_id: str,
+    from_ts: datetime,
+    to_ts: datetime,
+) -> list[dict]:
+    """
+    Fetch tasks for timeline display (scheduled or drifted) in the given range.
+    Includes tasks with start_time in [from_ts, to_ts]; ignores missed/completed.
+    """
+    query = (
+        _db().table("tasks")
+        .select("*")
+        .eq("user_id", user_id)
+        .in_("state", ["scheduled", "drifted"])
+        .not_.is_("start_time", "null")
+        .gte("start_time", from_ts.isoformat())
+        .lte("start_time", to_ts.isoformat())
+    )
+    result = query.execute()
+    return result.data or []
+
+
 def get_tasks_in_range(
     user_id: str,
     range_start: datetime,

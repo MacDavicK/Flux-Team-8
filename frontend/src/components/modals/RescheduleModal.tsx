@@ -1,35 +1,80 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Calendar, Clock, Coffee, Sun, X } from "lucide-react";
-import { useState } from "react";
+import { X } from "lucide-react";
+import { useCallback, useEffect, useState } from "react";
 import { cn } from "~/utils/cn";
+import {
+  applyReschedule,
+  fetchSuggestions,
+  type SuggestResponse,
+} from "~/utils/api";
 
 interface RescheduleModalProps {
   isOpen: boolean;
-  onClose: () => void;
+  eventId: string;
   taskTitle: string;
-  onReschedule: (option: string) => void;
+  onClose: () => void;
+  onRescheduleDone: () => void;
 }
-
-const rescheduleOptions = [
-  { id: "later-today", label: "Later Today", icon: Clock, color: "sage" },
-  { id: "tomorrow", label: "Tomorrow Morning", icon: Sun, color: "terracotta" },
-  { id: "weekend", label: "This Weekend", icon: Coffee, color: "river" },
-  { id: "custom", label: "Pick Date", icon: Calendar, color: "charcoal" },
-];
 
 export function RescheduleModal({
   isOpen,
-  onClose,
+  eventId,
   taskTitle,
-  onReschedule,
+  onClose,
+  onRescheduleDone,
 }: RescheduleModalProps) {
-  const [draggedOption, setDraggedOption] = useState<string | null>(null);
+  const [data, setData] = useState<SuggestResponse | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [applying, setApplying] = useState(false);
+
+  const loadSuggestions = useCallback(async () => {
+    if (!eventId) return;
+    setLoading(true);
+    setError(null);
+    setData(null);
+    try {
+      const res = await fetchSuggestions(eventId);
+      setData(res);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to load suggestions");
+    } finally {
+      setLoading(false);
+    }
+  }, [eventId]);
+
+  useEffect(() => {
+    if (isOpen && eventId) loadSuggestions();
+  }, [isOpen, eventId, loadSuggestions]);
+
+  const handleReschedule = async (newStart: string, newEnd: string) => {
+    setApplying(true);
+    try {
+      await applyReschedule(eventId, "reschedule", newStart, newEnd);
+      onRescheduleDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to apply");
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const handleSkip = async () => {
+    setApplying(true);
+    try {
+      await applyReschedule(eventId, "skip");
+      onRescheduleDone();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Failed to skip");
+    } finally {
+      setApplying(false);
+    }
+  };
 
   return (
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -39,7 +84,6 @@ export function RescheduleModal({
             style={{ backdropFilter: "blur(8px)" }}
           />
 
-          {/* Modal */}
           <motion.div
             initial={{ y: "100%" }}
             animate={{ y: 0 }}
@@ -48,7 +92,6 @@ export function RescheduleModal({
             className="fixed bottom-0 left-0 right-0 z-50"
           >
             <div className="glass-card rounded-b-none p-6 pb-safe">
-              {/* Close button */}
               <button
                 type="button"
                 onClick={onClose}
@@ -57,13 +100,7 @@ export function RescheduleModal({
                 <X className="w-5 h-5 text-charcoal" />
               </button>
 
-              {/* Task Preview */}
-              <motion.div
-                className="mb-6"
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.1 }}
-              >
+              <div className="mb-6 pr-8">
                 <p className="text-river text-sm mb-2">Reschedule</p>
                 <div
                   className={cn(
@@ -73,53 +110,69 @@ export function RescheduleModal({
                 >
                   <p className="text-charcoal font-medium">{taskTitle}</p>
                 </div>
-              </motion.div>
-
-              {/* Options Grid */}
-              <div className="grid grid-cols-2 gap-3">
-                {rescheduleOptions.map((option, index) => {
-                  const Icon = option.icon;
-                  const isActive = draggedOption === option.id;
-
-                  return (
-                    <motion.button
-                      key={option.id}
-                      type="button"
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: 0.2 + index * 0.1 }}
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => onReschedule(option.id)}
-                      onMouseEnter={() => setDraggedOption(option.id)}
-                      onMouseLeave={() => setDraggedOption(null)}
-                      className={cn(
-                        "glass-bubble p-4 flex flex-col items-center gap-2",
-                        "transition-all duration-200",
-                        isActive && "scale-105 shadow-lg",
-                      )}
-                      style={{
-                        background: isActive
-                          ? `linear-gradient(135deg, rgba(255,255,255,0.6) 0%, rgba(255,255,255,0.3) 100%)`
-                          : undefined,
-                      }}
-                    >
-                      <Icon
-                        className={cn(
-                          "w-6 h-6",
-                          option.color === "sage" && "text-sage",
-                          option.color === "terracotta" && "text-terracotta",
-                          option.color === "river" && "text-river",
-                          option.color === "charcoal" && "text-charcoal",
-                        )}
-                      />
-                      <span className="text-charcoal text-sm font-medium text-center">
-                        {option.label}
-                      </span>
-                    </motion.button>
-                  );
-                })}
               </div>
+
+              {loading && (
+                <div className="space-y-3 animate-pulse">
+                  <div className="h-4 bg-charcoal/10 rounded w-3/4" />
+                  <div className="h-16 bg-charcoal/10 rounded" />
+                  <div className="h-16 bg-charcoal/10 rounded" />
+                </div>
+              )}
+
+              {error && (
+                <p className="text-terracotta text-sm mb-4">{error}</p>
+              )}
+
+              {!loading && data && (
+                <>
+                  <p className="text-charcoal text-sm mb-4">{data.ai_message}</p>
+                  <div className="space-y-3">
+                    {data.suggestions.map((s, i) => (
+                      <motion.button
+                        key={i}
+                        type="button"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: i * 0.05 }}
+                        disabled={applying}
+                        onClick={() =>
+                          handleReschedule(s.new_start, s.new_end)
+                        }
+                        className={cn(
+                          "w-full glass-bubble p-4 text-left flex flex-col gap-1",
+                          "hover:bg-charcoal/5 transition-colors",
+                          applying && "opacity-60 pointer-events-none",
+                        )}
+                      >
+                        <span className="text-charcoal font-medium">
+                          {s.label}
+                        </span>
+                        <span className="text-river text-xs">
+                          {s.rationale}
+                        </span>
+                      </motion.button>
+                    ))}
+                    {data.skip_option && (
+                      <motion.button
+                        type="button"
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: data.suggestions.length * 0.05 }}
+                        disabled={applying}
+                        onClick={handleSkip}
+                        className={cn(
+                          "w-full glass-bubble p-3 text-center text-river text-sm border border-river/20",
+                          "hover:bg-charcoal/5 transition-colors",
+                          applying && "opacity-60 pointer-events-none",
+                        )}
+                      >
+                        Skip Today
+                      </motion.button>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </motion.div>
         </>

@@ -153,15 +153,16 @@ class SchedulerAgent:
                     rationale=self._template_rationale(slot, is_today=True),
                 ))
 
-        # -- Tomorrow slots --
+        # -- Tomorrow slots (search within tomorrow only, not day-after-tomorrow) --
         tomorrow_search_start = tomorrow_start.replace(
             hour=sleep_end.hour, minute=sleep_end.minute
         )
+        tomorrow_search_end = tomorrow_start.replace(
+            hour=settings.scheduler_cutoff_hour, minute=0, second=0, microsecond=0
+        )
         tomorrow_slots = self._find_free_slots(
             search_start=tomorrow_search_start,
-            search_end=tomorrow_end.replace(
-                hour=settings.scheduler_cutoff_hour, minute=0
-            ),
+            search_end=tomorrow_search_end,
             duration=duration,
             existing_tasks=existing_tomorrow,
             sleep_start=sleep_start,

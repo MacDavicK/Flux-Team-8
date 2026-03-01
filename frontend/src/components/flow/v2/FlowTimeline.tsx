@@ -1,6 +1,6 @@
 import { TimelineEvent, type EventType } from "./TimelineEvent";
 
-interface Event {
+export interface TimelineEventData {
   id: string;
   title: string;
   description: string;
@@ -9,13 +9,21 @@ interface Event {
   type: EventType;
   avatars?: string[];
   isPast?: boolean;
+  isDrifted?: boolean;
+  eventId?: string;
 }
 
 interface FlowTimelineProps {
-  events: Event[];
+  events: TimelineEventData[];
+  onShuffleClick?: (eventId: string, taskTitle: string) => void;
 }
 
-export function FlowTimeline({ events }: FlowTimelineProps) {
+export function FlowTimeline({ events, onShuffleClick }: FlowTimelineProps) {
+  const nowIndex = events.findIndex(
+    (e) => e.time && e.period && !e.isPast
+  );
+  const insertNowAfter = nowIndex >= 0 ? nowIndex : 1;
+
   return (
     <div className="flex-1 relative overflow-hidden">
       <div className="absolute inset-0 overflow-y-auto scrollbar-hide px-6 space-y-4 pb-32">
@@ -28,11 +36,13 @@ export function FlowTimeline({ events }: FlowTimelineProps) {
               period={event.period}
               type={event.type}
               avatars={event.avatars}
+              isDrifted={event.isDrifted}
+              eventId={event.eventId ?? event.id}
+              onShuffleClick={onShuffleClick}
             />
-            {/* Simple logic for "Now" indicator - could be more dynamic */}
-            {index === 1 && (
+            {index === insertNowAfter && (
               <div className="relative py-4 flex items-center justify-end">
-                <div className="absolute left-0 w-full h-[1px] bg-now-line"></div>
+                <div className="absolute left-0 w-full h-[1px] bg-now-line" />
                 <div className="flex flex-col items-center w-12 shrink-0 relative z-10 mr-0">
                   <span className="text-xs font-bold text-sage bg-stone/80 backdrop-blur px-2 py-0.5 rounded-full shadow-sm border border-sage/10">
                     Now

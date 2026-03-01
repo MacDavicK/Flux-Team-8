@@ -463,6 +463,8 @@ class GoalPlannerAgent:
                     f"{formatted}"
                 )
                 rag_rules = RAG_RULES
+                # Avoid duplicating content: prompt has both placeholders; use only expert_context_section.
+                rag_section = ""
             else:
                 expert_context_section = ""
                 rag_rules = NO_RAG_RULES

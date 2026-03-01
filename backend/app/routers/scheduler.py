@@ -2,15 +2,17 @@
 Flux Backend — Scheduler Router
 
 API endpoints for the Scheduler Agent:
-  POST /scheduler/suggest  — Get reschedule suggestions for a drifted task
-  POST /scheduler/apply    — Apply a reschedule decision or skip
+  GET  /scheduler/tasks   — List tasks for timeline (today + tomorrow)
+  POST /scheduler/suggest — Get reschedule suggestions for a drifted task
+  POST /scheduler/apply   — Apply a reschedule decision or skip
 """
 
 from __future__ import annotations
 
 import logging
+from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 
 from app.agents.scheduler_agent import SchedulerAgent
 from app.config import settings
@@ -27,8 +29,28 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/scheduler", tags=["scheduler"])
 
+# Demo user from seed (Alice)
+DEMO_USER_ID = "a1000000-0000-0000-0000-000000000001"
+
 # Singleton agent instance (stateless — safe to reuse across requests)
 _agent = SchedulerAgent()
+
+
+@router.get("/tasks")
+async def list_tasks_for_timeline(
+    user_id: str | None = Query(default=None, description="User ID (default: demo user)"),
+):
+    """
+    List tasks for the timeline: today and tomorrow, scheduled or drifted.
+    For demo, omit user_id to use the seeded demo user (Alice).
+    """
+    uid = user_id or DEMO_USER_ID
+    now = datetime.now(timezone.utc)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # End of tomorrow
+    tomorrow_end = today_start + timedelta(days=2)
+    tasks = scheduler_service.get_tasks_for_timeline(uid, today_start, tomorrow_end)
+    return {"tasks": tasks}
 
 
 @router.post("/suggest", response_model=SchedulerSuggestResponse)
