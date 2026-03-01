@@ -39,20 +39,6 @@ class Settings(BaseSettings):
     scheduler_cutoff_hour: int = 21  # Don't suggest same-day slots after 9 PM
     scheduler_buffer_minutes: int = 15  # Buffer between tasks
 
-    # Deepgram Voice Agent
-    deepgram_api_key: str = ""
-    deepgram_voice_model: str = "aura-2-thalia-en"
-    deepgram_listen_model: str = "nova-3"
-    deepgram_llm_model: str = "gpt-4o-mini"
-    deepgram_token_ttl: int = 3600
-    voice_prompt_file: str = "backend/app/conv_agent/config/voice_prompt.md"
-    voice_intents_file: str = "backend/app/conv_agent/config/intents.yaml"
-    voice_daily_session_limit: int = 20
-
-    # DAO Service (inter-service communication)
-    dao_service_url: str = "http://localhost:8001"
-    dao_service_key: str = "goal-planner-key-abc"
-
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

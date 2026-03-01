@@ -17,8 +17,8 @@ from typing import Any
 import httpx
 import yaml
 
-from app.config import settings
-from app.conv_agent.dao_client import get_dao_client
+from conv_agent.config import settings
+from conv_agent.dao_client import get_dao_client
 
 logger = logging.getLogger(__name__)
 
@@ -56,7 +56,7 @@ def load_system_prompt() -> str:
     prompt_path = Path(settings.voice_prompt_file)
     if not prompt_path.is_absolute():
         # Resolve relative to project root (three levels up from this file)
-        prompt_path = Path(__file__).resolve().parents[3] / prompt_path
+        prompt_path = Path(__file__).resolve().parents[2] / prompt_path
     return prompt_path.read_text(encoding="utf-8")
 
 
@@ -69,7 +69,7 @@ def load_intents() -> list[dict[str, Any]]:
     """
     intents_path = Path(settings.voice_intents_file)
     if not intents_path.is_absolute():
-        intents_path = Path(__file__).resolve().parents[3] / intents_path
+        intents_path = Path(__file__).resolve().parents[2] / intents_path
 
     raw = yaml.safe_load(intents_path.read_text(encoding="utf-8"))
     functions: list[dict[str, Any]] = []

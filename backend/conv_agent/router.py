@@ -18,7 +18,7 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
-from app.conv_agent.schemas import (
+from conv_agent.schemas import (
     CloseSessionResponse,
     CreateSessionRequest,
     CreateSessionResponse,
@@ -29,8 +29,8 @@ from app.conv_agent.schemas import (
     SaveMessageResponse,
     SubmitIntentRequest,
 )
-from app.conv_agent import voice_service
-from app.conv_agent.intent_handler import handle_intent
+from conv_agent import voice_service
+from conv_agent.intent_handler import handle_intent
 
 logger = logging.getLogger(__name__)
 

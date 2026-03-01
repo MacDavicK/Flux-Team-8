@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.conv_agent import router as voice_router
+from conv_agent import router as voice_router
 from app.routers import goals, rag, scheduler
 
 # Scrum sprint feature routers (optional — conv_agent works without them)

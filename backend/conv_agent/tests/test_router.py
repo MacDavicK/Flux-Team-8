@@ -11,8 +11,8 @@ from httpx import ASGITransport, AsyncClient
 
 from fastapi import FastAPI
 
-from app.conv_agent.mocks import patch_conv_agent
-from app.conv_agent.router import router as voice_router
+from conv_agent.mocks import patch_conv_agent
+from conv_agent.router import router as voice_router
 
 # Minimal app for router tests — avoids importing app.main which
 # pulls in langchain_text_splitters and other unrelated dependencies.
