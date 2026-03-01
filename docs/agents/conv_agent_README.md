@@ -37,15 +37,9 @@ Browser                         Backend (FastAPI)            Deepgram
 | Supabase CLI      | latest    | Required to run Supabase locally (`brew install supabase/tap/supabase`) |
 | Docker Desktop    | latest    | Required for `docker compose up` deployment                |
 | DEEPGRAM_API_KEY  | --        | Required for live voice (not needed for unit tests)        |
-| Requirement      | Version | Notes                                          |
-| ---------------- | ------- | ---------------------------------------------- |
-| Python           | 3.11+   | Backend runtime                                |
-| Node.js          | 18+     | Frontend build                                 |
-| DAO Service      | --      | Must be running on port 8001 (see below)       |
-| DEEPGRAM_API_KEY | --      | Required for live voice (not unit tests)       |
-| Supabase         | --      | Required for dao_service and integration tests |
+| DAO Service       | --        | Must be running on port 8001 before starting the backend   |
 
-**Important:** The conv_agent does not connect to the database directly. All persistence goes through the DAO Service (`http://localhost:8001`). When running without Docker, start the DAO Service before starting the backend.
+**Important:** The conv_agent does not connect to the database directly. All persistence goes through the DAO Service (`http://localhost:8001`). Start the DAO Service before running the backend.
 
 ## Quick Setup
 
@@ -63,8 +57,6 @@ echo 'DEEPGRAM_API_KEY=your_key_here' >> backend/.env
 ## Running with Mocks (Recommended for Dev)
 
 The mock module (`backend/conv_agent/mocks.py`) provides in-memory replacements for:
-The mock module (`backend/app/conv_agent/mocks.py`) provides in-memory replacements for:
-
 - **DAO Service** -- `MockDaoClient` stores conversations, messages, users, tasks, and goals in Python dicts
 - **Deepgram token minting** -- Returns `MOCK_DEEPGRAM_TOKEN_FOR_TESTING`
 
@@ -98,41 +90,46 @@ brew install supabase/tap/supabase
 npx supabase
 ```
 
-- `app.conv_agent.dao_client.get_dao_client` -- `MockDaoClient` instance (replaces all DAO Service HTTP calls)
-- `app.conv_agent.voice_service.mint_deepgram_token` -- returns fake token
+- `conv_agent.dao_client.get_dao_client` -- `MockDaoClient` instance (replaces all DAO Service HTTP calls)
+- `conv_agent.voice_service.mint_deepgram_token` -- returns fake token
 
 ## Running the Full Stack
 
-1. **Start Supabase** (if not already running):
+### Step 1 — Start Supabase
 
-   ```bash
-   supabase start
-   ```
+The project uses [Supabase CLI](https://supabase.com/docs/guides/local-development/cli/getting-started) to run a local Supabase stack (PostgreSQL on port 54322, Studio on port 54323).
 
-2. **Set environment variables** in `backend/.env`:
+**Install the CLI (one-time):**
+```bash
+# macOS
+brew install supabase/tap/supabase
 
-   ```
-   DEEPGRAM_API_KEY=your_deepgram_key
-   DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:54322/postgres
-   ```
+# Linux / WSL
+npx supabase
+```
 
-3. **Start all three services** (dao_service + backend + frontend):
+**Start Supabase:**
+```bash
+supabase start
+```
 
-   ```bash
-   ./scripts/conv_agent.sh deploy
-   ```
+This automatically applies all migrations from `supabase/migrations/`, including `20260301120000_voice_session.sql` which creates the `messages` table and adds voice columns to `conversations`. No manual migration step is needed.
 
-   This starts:
-   - **dao_service** on `http://localhost:8001` (data persistence layer)
-   - **backend** on `http://localhost:8080` (conv_agent + other APIs)
-   - **frontend** on `http://localhost:3000` (React dev server)
+If Supabase is already running but you need to reset the schema:
+```bash
+supabase db reset      # drops + recreates from migrations (DESTROYS local data)
+```
 
-   Or start them separately:
+Useful ports after `supabase start`:
+| Service         | URL                        |
+|-----------------|----------------------------|
+| PostgreSQL      | `localhost:54322`          |
+| Supabase Studio | `http://localhost:54323`   |
+| Supabase API    | `http://localhost:54321`   |
 
-   ```bash
-   # Terminal 1: dao_service
-   cd backend && uvicorn dao_service.main:app --host 0.0.0.0 --port 8001
+### Step 2 — Start the DAO Service
 
+<<<<<<< HEAD
 **Start Supabase:**
 ```bash
 supabase start
@@ -176,6 +173,30 @@ docker compose up dao
 Check it is up:
 ```bash
 curl http://localhost:8001/health
+=======
+The DAO Service is a separate FastAPI microservice that handles all database operations. It must be running before you start the backend.
+
+**Option A — Docker (recommended):**
+```bash
+cd backend
+docker-compose -f docker-compose.dao-service.yml up -d
+```
+This starts the DAO Service on **port 8000** (host). If you use this option, set `DAO_SERVICE_URL` in `backend/.env`:
+```
+DAO_SERVICE_URL=http://localhost:8000
+```
+
+**Option B — Direct (uvicorn):**
+```bash
+cd backend
+uvicorn dao_service.main:app --host 0.0.0.0 --port 8001
+```
+This starts the DAO Service on port 8001, which is the default `DAO_SERVICE_URL` — no extra env var needed.
+
+Check it is up:
+```bash
+curl http://localhost:8001/health    # or :8000 if using Docker
+>>>>>>> 87fb2e3 (refactor(conv_agent): move module from app/conv_agent to conv_agent)
 ```
 
 ### Step 3 — Set environment variables
@@ -184,10 +205,16 @@ In `backend/.env`:
 ```
 DEEPGRAM_API_KEY=your_deepgram_key
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:54322/postgres
+<<<<<<< HEAD
+=======
+# Only needed if you started dao_service on a non-default port (e.g. Docker on 8000):
+# DAO_SERVICE_URL=http://localhost:8000
+>>>>>>> 87fb2e3 (refactor(conv_agent): move module from app/conv_agent to conv_agent)
 ```
 
 ### Step 4 — Start the full stack
 
+<<<<<<< HEAD
 **Option A — Docker Compose (recommended):**
 ```bash
 # From the project root
@@ -200,11 +227,14 @@ This starts:
 - **frontend** on `http://localhost:3000` (Vite dev server)
 
 **Option B — Local dev (`conv_agent.sh`):**
+=======
+>>>>>>> 87fb2e3 (refactor(conv_agent): move module from app/conv_agent to conv_agent)
 ```bash
 ./scripts/conv_agent.sh deploy
 ```
 
 This starts:
+<<<<<<< HEAD
 - **dao_service** on `http://localhost:8001`
 - **backend** on `http://localhost:8080`
 - **frontend** on `http://localhost:3000`
@@ -222,6 +252,25 @@ cd frontend && npm run dev
 ```
 
 Open the chat/voice UI and tap the mic button.
+=======
+- **dao_service** on `http://localhost:8001` (data persistence layer)
+- **backend** on `http://localhost:8080` (conv_agent + other APIs)
+- **frontend** on `http://localhost:3000` (React dev server)
+
+Or start services separately:
+```bash
+# Terminal 1: dao_service (direct)
+cd backend && uvicorn dao_service.main:app --host 0.0.0.0 --port 8001
+
+# Terminal 2: backend
+cd backend && uvicorn app.main:app --reload --host 0.0.0.0 --port 8080
+
+# Terminal 3: frontend (set VITE_API_BASE so voice API points to backend)
+cd frontend && VITE_API_BASE=http://localhost:8080 npm run dev
+```
+
+Open `http://localhost:3000/chat` and tap the mic button.
+>>>>>>> 87fb2e3 (refactor(conv_agent): move module from app/conv_agent to conv_agent)
 
 ### Service URLs reference
 
@@ -415,7 +464,7 @@ Integration tests are automatically skipped when `DEEPGRAM_API_KEY` is not set.
 ### Mic permission denied
 The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:3000` (both Docker and local `conv_agent.sh`), not an IP address.
 
-The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:5173`, not an IP address.
+The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:3000`, not an IP address.
 
 ### Deepgram token error
 
@@ -431,9 +480,9 @@ psql postgresql://postgres:postgres@localhost:54322/postgres \
 
 To start completely fresh:
 
-If Supabase tables are missing columns (e.g., `voice_session_id`, `ended_at`, `duration_seconds`), run the voice migration:
-
+If Supabase tables are missing columns (e.g., `voice_session_id`, `ended_at`, `duration_seconds`), the voice migration has not been applied. Fix with:
 ```bash
+<<<<<<< HEAD
 supabase db reset
 psql postgresql://postgres:postgres@localhost:54322/postgres \
   -f flux-backend/migrations/001_schema.sql
@@ -442,19 +491,32 @@ psql postgresql://postgres:postgres@localhost:54322/postgres \
 ### Import errors
 If you see `ModuleNotFoundError: No module named 'conv_agent'`, make sure you are running pytest from the `backend/` directory where `conv_agent/` is a top-level package:
 ### Import errors after restructure
+=======
+supabase db reset          # applies all migrations from scratch (DESTROYS local data)
+# or, to apply only new migrations without resetting:
+supabase migration up
+```
 
-If you see `ModuleNotFoundError: No module named 'app.services.voice_service'`, an import was not updated to the new `app.conv_agent` path. Search for old import paths:
+### Import errors
+>>>>>>> 87fb2e3 (refactor(conv_agent): move module from app/conv_agent to conv_agent)
+
+If you see `ModuleNotFoundError: No module named 'conv_agent'`, make sure you are running pytest from the `backend/` directory where `conv_agent/` is a top-level package:
 
 ```bash
 cd backend
 python -m pytest conv_agent/tests/ -v
 ```
 
+If you see errors about `app.services.voice_service` or other old paths, an import was not updated to the new `conv_agent` path. Search for old import paths and update them to `conv_agent.*`.
+
 ## Extending -- Adding a New Intent
 
 1. **Define the intent in YAML** -- Add a new entry to `backend/conv_agent/config/intents.yaml`:
+<<<<<<< HEAD
 1. **Define the intent in YAML** -- Add a new entry to `backend/app/conv_agent/config/intents.yaml`:
 
+=======
+>>>>>>> 87fb2e3 (refactor(conv_agent): move module from app/conv_agent to conv_agent)
    ```yaml
    - name: submit_my_new_intent
      route: MY_INTENT
