@@ -33,6 +33,12 @@ class Settings(BaseSettings):
     rag_top_k: int = 5
     rag_relevance_threshold: float = 0.2
 
+    # Scheduler Agent
+    scheduler_model: str = "openai/gpt-4o-mini"
+    scheduler_use_llm_rationale: bool = False  # True = LLM rationale, False = template
+    scheduler_cutoff_hour: int = 21  # Don't suggest same-day slots after 9 PM
+    scheduler_buffer_minutes: int = 15  # Buffer between tasks
+
     # Server
     host: str = "0.0.0.0"
     port: int = 8000

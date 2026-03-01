@@ -28,8 +28,15 @@ import time
 # Path setup
 # ---------------------------------------------------------------------------
 _SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-_BACKEND_DIR = os.path.join(_SCRIPT_DIR, os.pardir)
-sys.path.insert(0, os.path.abspath(_BACKEND_DIR))
+_BACKEND_DIR = os.path.abspath(os.path.join(_SCRIPT_DIR, os.pardir))
+sys.path.insert(0, _BACKEND_DIR)
+
+# Load backend/.env so OPEN_ROUTER_API_KEY is set when run from repo root
+try:
+    from dotenv import load_dotenv
+    load_dotenv(os.path.join(_BACKEND_DIR, ".env"))
+except ImportError:
+    pass
 
 # ---------------------------------------------------------------------------
 # Rich imports
