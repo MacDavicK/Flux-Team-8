@@ -3,7 +3,7 @@ Data models for Notification Priority
 """
 from enum import Enum
 from typing import List, Optional
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from datetime import datetime
 
 
@@ -30,24 +30,24 @@ class EscalationSpeedMultiplier(float, Enum):
 
 class EscalationStep(BaseModel):
     """Represents a single step in the escalation ladder"""
+    model_config = ConfigDict(use_enum_values=True)
+
     channel: EscalationChannel
     wait_time_seconds: int = Field(..., description="Time to wait before escalating if no acknowledgment")
-    
-    class Config:
-        use_enum_values = True
 
 
 class EscalationPath(BaseModel):
     """Complete escalation path for a notification priority"""
+    model_config = ConfigDict(use_enum_values=True)
+
     priority: NotificationPriority
     steps: List[EscalationStep]
-    
-    class Config:
-        use_enum_values = True
 
 
 class NotificationRequest(BaseModel):
     """Request to send a notification with priority"""
+    model_config = ConfigDict(use_enum_values=True)
+
     user_id: str = Field(..., description="ID of the user to notify")
     priority: NotificationPriority = Field(default=NotificationPriority.STANDARD)
     escalation_speed_multiplier: float = Field(
@@ -58,21 +58,21 @@ class NotificationRequest(BaseModel):
     )
     message: str = Field(..., description="Notification message content")
     metadata: Optional[dict] = Field(default=None, description="Additional metadata")
-    
-    @validator('escalation_speed_multiplier')
+
+    @field_validator('escalation_speed_multiplier')
+    @classmethod
     def validate_multiplier(cls, v):
         """Ensure multiplier is one of the valid values"""
         valid_multipliers = [1.0, 5.0, 10.0]
         if v not in valid_multipliers:
             raise ValueError(f"Escalation speed multiplier must be one of {valid_multipliers}")
         return v
-    
-    class Config:
-        use_enum_values = True
 
 
 class NotificationResponse(BaseModel):
     """Response after sending a notification"""
+    model_config = ConfigDict(use_enum_values=True)
+
     notification_id: str
     user_id: str
     priority: NotificationPriority
@@ -82,16 +82,12 @@ class NotificationResponse(BaseModel):
     )
     created_at: datetime
     status: str = "sent"
-    
-    class Config:
-        use_enum_values = True
 
 
 class EscalationConfig(BaseModel):
     """Configuration for all priority levels"""
+    model_config = ConfigDict(use_enum_values=True)
+
     standard: EscalationPath
     important: EscalationPath
     must_not_miss: EscalationPath
-    
-    class Config:
-        use_enum_values = True

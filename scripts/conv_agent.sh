@@ -21,6 +21,16 @@ fail()  { echo -e "${RED}[FAIL]${NC}  $*"; exit 1; }
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# -- Load backend .env (if present) -----------------------------------------
+
+ENV_FILE="$PROJECT_ROOT/backend/.env"
+if [ -f "$ENV_FILE" ]; then
+    set -a
+    # shellcheck source=/dev/null
+    source "$ENV_FILE"
+    set +a
+fi
+
 # -- Subcommands -------------------------------------------------------------
 
 cmd_setup() {

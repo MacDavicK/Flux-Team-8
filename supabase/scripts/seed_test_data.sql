@@ -240,7 +240,7 @@ INSERT INTO conversations (
 INSERT INTO messages (id, conversation_id, role, content, input_modality, metadata, created_at) VALUES
   -- Text messages in Alice's goal conversation
   (
-    'g1000000-0000-0000-0000-000000000001',
+    '01000000-0000-0000-0000-000000000001',
     'e1000000-0000-0000-0000-000000000001',
     'user',
     'How is my half marathon goal progressing?',
@@ -249,7 +249,7 @@ INSERT INTO messages (id, conversation_id, role, content, input_modality, metada
     now() - interval '2 days'
   ),
   (
-    'g1000000-0000-0000-0000-000000000002',
+    '01000000-0000-0000-0000-000000000002',
     'e1000000-0000-0000-0000-000000000001',
     'assistant',
     'You''re on track! You''ve completed 3 of 6 planned runs this week.',
@@ -259,7 +259,7 @@ INSERT INTO messages (id, conversation_id, role, content, input_modality, metada
   ),
   -- Text messages in Bob's task conversation
   (
-    'g1000000-0000-0000-0000-000000000003',
+    '01000000-0000-0000-0000-000000000003',
     'e1000000-0000-0000-0000-000000000002',
     'user',
     'Can you reschedule my API coding task to tomorrow morning?',
@@ -268,7 +268,7 @@ INSERT INTO messages (id, conversation_id, role, content, input_modality, metada
     now() - interval '1 day'
   ),
   (
-    'g1000000-0000-0000-0000-000000000004',
+    '01000000-0000-0000-0000-000000000004',
     'e1000000-0000-0000-0000-000000000002',
     'assistant',
     'Done! I''ve moved "Code API endpoints" to tomorrow at 09:00.',
@@ -278,7 +278,7 @@ INSERT INTO messages (id, conversation_id, role, content, input_modality, metada
   ),
   -- Voice messages in Alice's voice session
   (
-    'g1000000-0000-0000-0000-000000000005',
+    '01000000-0000-0000-0000-000000000005',
     'e1000000-0000-0000-0000-000000000004',
     'user',
     'Hey, can you move my morning run to 8am instead?',
@@ -287,7 +287,7 @@ INSERT INTO messages (id, conversation_id, role, content, input_modality, metada
     now() - interval '28 minutes'
   ),
   (
-    'g1000000-0000-0000-0000-000000000006',
+    '01000000-0000-0000-0000-000000000006',
     'e1000000-0000-0000-0000-000000000004',
     'assistant',
     'Sure! I''ve rescheduled your morning run to 8:00 AM. Anything else?',
@@ -296,7 +296,7 @@ INSERT INTO messages (id, conversation_id, role, content, input_modality, metada
     now() - interval '27 minutes 30 seconds'
   ),
   (
-    'g1000000-0000-0000-0000-000000000007',
+    '01000000-0000-0000-0000-000000000007',
     'e1000000-0000-0000-0000-000000000004',
     'user',
     'No, that''s all. Thanks!',

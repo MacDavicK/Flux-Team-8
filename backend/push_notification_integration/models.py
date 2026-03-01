@@ -5,7 +5,7 @@ Defines Pydantic models for push notification subscriptions, payloads, and respo
 
 from datetime import datetime
 from typing import List, Optional, Dict, Any
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import BaseModel, Field, HttpUrl, field_serializer
 from enum import Enum
 
 
@@ -132,7 +132,6 @@ class SubscriptionRecord(BaseModel):
     is_active: bool = Field(True, description="Subscription is active")
     user_agent: Optional[str] = Field(None, description="Browser user agent")
 
-    class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+    @field_serializer('created_at', 'updated_at', 'last_used_at')
+    def serialize_datetime(self, v: Optional[datetime]) -> Optional[str]:
+        return v.isoformat() if v is not None else None
