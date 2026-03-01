@@ -1,6 +1,6 @@
 # Flux — Development Setup Guide
 
-Detailed instructions for getting Flux running on your local machine.
+> **Quick start and run commands:** See [Getting Started](getting-started.md). This file adds troubleshooting and optional details.
 
 ---
 
@@ -111,10 +111,10 @@ Opens at [http://localhost:5173](http://localhost:5173). Hot-reloads on file cha
 ```bash
 cd backend
 source venv/bin/activate   # or .\venv\Scripts\Activate.ps1 on Windows
-make dev
+uvicorn app.main:app --reload
 ```
 
-Runs at [http://localhost:8000](http://localhost:8000). Auto-reloads on file changes.
+Runs at [http://localhost:8000](http://localhost:8000). Auto-reloads on file changes. If you have `make dev` configured to run the same command, you can use that instead.
 
 The API docs are available at [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI).
 

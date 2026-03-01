@@ -28,8 +28,8 @@ function taskToEvent(task: Task): {
   eventId: string;
 } {
   const start = task.start_time ? new Date(task.start_time) : new Date();
-  const hours = start.getUTCHours();
-  const mins = start.getUTCMinutes();
+  const hours = start.getHours();
+  const mins = start.getMinutes();
   const isPm = hours >= 12;
   const hour12 = hours % 12 || 12;
   const time = `${hour12.toString().padStart(2, "0")}:${mins.toString().padStart(2, "0")}`;

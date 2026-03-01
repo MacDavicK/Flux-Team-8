@@ -1,5 +1,7 @@
 # Notification Priority Model API
 
+> **Note:** This feature is documented in the main [Notification Escalation](../../docs/notification-escalation.md) guide. This file contains implementation-specific details for SCRUM-40.
+
 ## SCRUM-40: Notification Priority Model
 
 ### Overview

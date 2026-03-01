@@ -1,5 +1,7 @@
 # Escalation Demo UI (SCRUM-44)
 
+> **Note:** This feature is documented in the main [Notification Escalation](../../docs/notification-escalation.md) guide. This file contains implementation-specific details for SCRUM-44.
+
 ## Overview
 
 This module provides a Python-based REST API for the Escalation Demo UI feature. It implements a multi-channel notification escalation system that progressively sends notifications through different channels (Push → WhatsApp → Phone Call) with configurable speed multipliers for demonstration purposes.

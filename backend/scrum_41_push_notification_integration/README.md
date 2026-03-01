@@ -1,5 +1,7 @@
 # Push Notification Integration API
 
+> **Note:** This feature is documented in the main [Notification Escalation](../../docs/notification-escalation.md) guide. This file contains implementation-specific details for SCRUM-41.
+
 ## SCRUM-41: Push Notification Integration
 
 **Owner:** BE-B · **Points:** 3 · **Component:** `notifications`
