@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock, Plane, Home, Navigation, Zap } from "lucide-react";
+import { Clock, Home, Navigation, Plane } from "lucide-react";
 import { useState } from "react";
 import { cn } from "~/utils/cn";
 
@@ -31,7 +31,7 @@ export function DemoPanel({
   };
 
   const handleSpeedChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const speed = Number.parseInt(e.target.value);
+    const speed = Number.parseInt(e.target.value, 10);
     setEscalationSpeed(speed);
     onEscalationSpeedChange?.(speed);
   };

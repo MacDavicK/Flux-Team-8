@@ -1,12 +1,24 @@
 /// <reference types="vite/client" />
-import { createRootRoute, HeadContent, Scripts } from "@tanstack/react-router";
-import { useState } from "react";
+import {
+  createRootRoute,
+  HeadContent,
+  Scripts,
+  useLocation,
+  useNavigate,
+} from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { DefaultCatchBoundary } from "~/components/DefaultCatchBoundary";
-import { NotFound } from "~/components/NotFound";
 import { DemoPanel } from "~/components/demo/DemoPanel";
-import { DemoButton } from "~/components/flow/v2/DemoButton";
 import { NotificationCenter } from "~/components/demo/NotificationCenter";
-import { SimulationProvider, useSimulation } from "~/agents/SimulationContext";
+import { DemoButton } from "~/components/flow/v2/DemoButton";
+import { NotFound } from "~/components/NotFound";
+import { SplashScreen } from "~/components/splash/SplashScreen";
+import { AuthProvider, useAuth } from "~/contexts/AuthContext";
+import {
+  SimulationProvider,
+  useSimulation,
+} from "~/contexts/SimulationContext";
+import { demoService } from "~/services/DemoService";
 import appCss from "~/styles/app.css?url";
 import { seo } from "~/utils/seo";
 
@@ -51,29 +63,62 @@ export const Route = createRootRoute({
 
 function RootShell({ children }: { children: React.ReactNode }) {
   return (
-    <SimulationProvider>
-      <RootDocument>{children}</RootDocument>
-    </SimulationProvider>
+    <AuthProvider>
+      <SimulationProvider>
+        <RootDocument>{children}</RootDocument>
+      </SimulationProvider>
+    </AuthProvider>
   );
 }
 
-function RootDocument({ children }: { children: React.ReactNode }) {
-  const [isDemoOpen, setIsDemoOpen] = useState(false);
-  const {
-    locationAgent,
-    addNotification,
-    setEscalationSpeed,
-    startEscalation,
-  } = useSimulation();
+import { FluxNotificationModal } from "~/components/modals/FluxNotificationModal";
 
-  const handleSimulateLeavingHome = () => {
-    const response = locationAgent.simulateTrigger("leaving_home");
+function RootDocument({ children }: { children: React.ReactNode }) {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [isDemoOpen, setIsDemoOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
+  const { addNotification, setEscalationSpeed, startEscalation } =
+    useSimulation();
+  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
+
+  const isFlowPage = location.pathname === "/";
+  const showDemoUI = isFlowPage && !showSplash;
+
+  // Redirect as soon as auth resolves — do NOT wait for splash to finish.
+  // Splash is purely visual and should not gate the auth decision.
+  useEffect(() => {
+    if (authLoading) return;
+
+    const currentPath = window.location.pathname;
+
+    if (!isAuthenticated && currentPath !== "/login") {
+      navigate({ to: "/login" });
+    } else if (
+      isAuthenticated &&
+      user &&
+      !user.onboarded &&
+      currentPath !== "/chat"
+    ) {
+      navigate({ to: "/chat" });
+    }
+  }, [authLoading, isAuthenticated, user, navigate]);
+
+  const handleSplashComplete = () => {
+    setShowSplash(false);
+  };
+
+  const handleSimulateLeavingHome = async () => {
+    const raw = await demoService.triggerLocation();
+    const response = { message: String(raw.message ?? "You're out!"), type: "notification" as const };
     addNotification(response);
     startEscalation();
   };
 
-  const handleSimulateNearStore = () => {
-    const response = locationAgent.simulateTrigger("near_grocery");
+  const handleSimulateNearStore = async () => {
+    const raw = await demoService.triggerLocation();
+    const response = { message: String(raw.message ?? "You're near a store!"), type: "notification" as const };
     addNotification(response);
     startEscalation();
   };
@@ -84,22 +129,37 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         <HeadContent />
       </head>
       <body>
-        <main className="relative min-h-screen bg-offwhite overflow-x-hidden">
+        {showSplash && (
+          <SplashScreen onComplete={handleSplashComplete} minDuration={3000} />
+        )}
+        <main className="relative min-h-screen overflow-x-hidden">
           {children}
 
-          <NotificationCenter />
+          {showDemoUI && (
+            <>
+              <NotificationCenter />
 
-          <DemoButton onClick={() => setIsDemoOpen(true)} />
+              <DemoButton onClick={() => setIsDemoOpen(true)} />
 
-          <DemoPanel
-            isOpen={isDemoOpen}
-            onClose={() => setIsDemoOpen(false)}
-            onTimeWarp={() => console.log("Time warp activated")}
-            onTravelMode={() => console.log("Travel mode activated")}
-            onSimulateLeavingHome={handleSimulateLeavingHome}
-            onSimulateNearStore={handleSimulateNearStore}
-            onEscalationSpeedChange={setEscalationSpeed}
-          />
+              <DemoPanel
+                isOpen={isDemoOpen}
+                onClose={() => setIsDemoOpen(false)}
+                onTimeWarp={() => {
+                  setIsDemoOpen(false);
+                  setIsNotificationOpen(true);
+                }}
+                onTravelMode={() => console.log("Travel mode activated")}
+                onSimulateLeavingHome={handleSimulateLeavingHome}
+                onSimulateNearStore={handleSimulateNearStore}
+                onEscalationSpeedChange={setEscalationSpeed}
+              />
+
+              <FluxNotificationModal
+                isOpen={isNotificationOpen}
+                onClose={() => setIsNotificationOpen(false)}
+              />
+            </>
+          )}
         </main>
         <Scripts />
       </body>

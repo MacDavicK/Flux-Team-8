@@ -1,7 +1,6 @@
 import { motion } from "framer-motion";
+import type { EventType } from "~/types/event";
 import { cn } from "~/utils/cn";
-
-export type EventType = "sage" | "terra" | "stone";
 
 interface TimelineEventProps {
   title: string;
@@ -19,7 +18,6 @@ export function TimelineEvent({
   time,
   period,
   type,
-  avatars,
 }: TimelineEventProps) {
   const typeClasses = {
     sage: "glass-pebble-sage rounded-tl-md",

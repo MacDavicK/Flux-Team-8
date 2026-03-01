@@ -1,7 +1,15 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, Clock, Coffee, Sun, X } from "lucide-react";
 import { useState } from "react";
+import type { RescheduleOption } from "~/types/demo";
 import { cn } from "~/utils/cn";
+
+const rescheduleOptions: RescheduleOption[] = [
+  { id: "later-today", label: "Later Today", icon: Clock, color: "sage" },
+  { id: "tomorrow", label: "Tomorrow Morning", icon: Sun, color: "terracotta" },
+  { id: "weekend", label: "This Weekend", icon: Coffee, color: "river" },
+  { id: "custom", label: "Pick Date", icon: Calendar, color: "charcoal" },
+];
 
 interface RescheduleModalProps {
   isOpen: boolean;
@@ -9,13 +17,6 @@ interface RescheduleModalProps {
   taskTitle: string;
   onReschedule: (option: string) => void;
 }
-
-const rescheduleOptions = [
-  { id: "later-today", label: "Later Today", icon: Clock, color: "sage" },
-  { id: "tomorrow", label: "Tomorrow Morning", icon: Sun, color: "terracotta" },
-  { id: "weekend", label: "This Weekend", icon: Coffee, color: "river" },
-  { id: "custom", label: "Pick Date", icon: Calendar, color: "charcoal" },
-];
 
 export function RescheduleModal({
   isOpen,
@@ -127,3 +128,6 @@ export function RescheduleModal({
     </AnimatePresence>
   );
 }
+
+export type { RescheduleOption };
+export { rescheduleOptions };
