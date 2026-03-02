@@ -158,11 +158,7 @@ Open two terminal windows:
 ```bash
 cd frontend
 npm run dev
-<<<<<<< HEAD
 # Opens at http://localhost:3000
-=======
-# Opens at http://localhost:5173
->>>>>>> 5bbc870 (fix(conv_agent): JWT-based user resolution, RLS-safe user sync, and frontend auth)
 ```
 
 **Terminal 2 — Backend:**
@@ -237,23 +233,8 @@ See `backend/.env.example` for the complete list with descriptions.
 ---
 
 ## Common Issues and Troubleshooting
-<<<<<<< HEAD
-=======
 
 ### Backend cannot connect to Supabase when running in Docker
-
-**Symptom:** The backend container starts but logs show connection errors to `127.0.0.1:54321`.
-
-**Cause:** Inside a Docker container, `127.0.0.1` refers to the container itself, not your host machine.
-
-**Fix:** Set `SUPABASE_URL=http://host.docker.internal:54321` in `backend/.env`.
-
----
->>>>>>> 5bbc870 (fix(conv_agent): JWT-based user resolution, RLS-safe user sync, and frontend auth)
-
-### Backend cannot connect to Supabase when running in Docker
-
-<<<<<<< HEAD
 **Symptom:** The backend container starts but logs show connection errors to `127.0.0.1:54321`.
 
 **Cause:** Inside a Docker container, `127.0.0.1` refers to the container itself, not your host machine.
@@ -271,15 +252,6 @@ kill -9 <PID>
 
 # Windows
 netstat -ano | findstr 3000
-=======
-```bash
-# macOS / Linux
-lsof -i :5173
-kill -9 <PID>
-
-# Windows
-netstat -ano | findstr 5173
->>>>>>> 5bbc870 (fix(conv_agent): JWT-based user resolution, RLS-safe user sync, and frontend auth)
 taskkill /PID <PID> /F
 ```
 
