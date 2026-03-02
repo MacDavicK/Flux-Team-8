@@ -22,7 +22,7 @@ cp .env.example .env
 npm run dev
 ```
 
-App: [http://localhost:5173](http://localhost:5173). Hot-reloads on file changes.
+App: [http://localhost:3000](http://localhost:3000). Hot-reloads on file changes.
 
 ---
 
@@ -52,7 +52,7 @@ See [docs/feature-flags.md](../docs/feature-flags.md) for how these affect behav
   - POST `/scheduler/suggest` (reschedule suggestions)
   - POST `/scheduler/apply` (apply or skip)
 
-Ensure the backend is running (`uvicorn app.main:app --reload`) and CORS allows your dev origin (e.g. http://localhost:5173). Restart `npm run dev` after changing `.env`.
+Ensure the backend is running (`uvicorn app.main:app --reload`) and CORS allows your dev origin (e.g. http://localhost:3000). Restart `npm run dev` after changing `.env`.
 
 ---
 

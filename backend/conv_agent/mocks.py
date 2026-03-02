@@ -6,7 +6,7 @@ data stores. Import these in tests to isolate the conv_agent
 from all external dependencies.
 
 Usage:
-    from app.conv_agent.mocks import (
+    from conv_agent.mocks import (
         MockDaoClient, mock_deepgram_token, patch_conv_agent
     )
 """
@@ -235,23 +235,23 @@ def patch_conv_agent():
     Context manager that patches all external dependencies used by conv_agent.
 
     Patches:
-      - app.conv_agent.voice_service.get_dao_client -> MockDaoClient()
-      - app.conv_agent.intent_handler.get_dao_client -> MockDaoClient()
-      - app.conv_agent.voice_service.mint_deepgram_token -> mock token
+      - conv_agent.voice_service.get_dao_client -> MockDaoClient()
+      - conv_agent.intent_handler.get_dao_client -> MockDaoClient()
+      - conv_agent.voice_service.mint_deepgram_token -> mock token
     """
     mock_client = MockDaoClient()
 
     with (
         patch(
-            "app.conv_agent.voice_service.get_dao_client",
+            "conv_agent.voice_service.get_dao_client",
             return_value=mock_client,
         ),
         patch(
-            "app.conv_agent.intent_handler.get_dao_client",
+            "conv_agent.intent_handler.get_dao_client",
             return_value=mock_client,
         ),
         patch(
-            "app.conv_agent.voice_service.mint_deepgram_token",
+            "conv_agent.voice_service.mint_deepgram_token",
             side_effect=mock_deepgram_token,
         ),
     ):

@@ -39,7 +39,7 @@ cd frontend && npm run dev
 cd backend && source venv/bin/activate && uvicorn app.main:app --reload
 ```
 
-Frontend: [http://localhost:5173](http://localhost:5173). Backend API: [http://localhost:8000](http://localhost:8000). API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
+Frontend: [http://localhost:3000](http://localhost:3000). Backend API: [http://localhost:8000](http://localhost:8000). API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
 
 > **Note:** The first Supabase run downloads ~2–3 GB of Docker images. Subsequent runs are fast.
 
@@ -94,7 +94,7 @@ Copy from `backend/.env.example`. Key variables:
 - **Database:** `SUPABASE_URL`, `SUPABASE_KEY` (from `supabase status` when running locally)
 - **AI:** `OPEN_ROUTER_API_KEY` (for Goal Planner and Scheduler; get at [openrouter.ai/keys](https://openrouter.ai/keys))
 - **RAG (optional):** `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`
-- **CORS:** `CORS_ORIGINS` (default includes localhost:5173 and 3000)
+- **CORS:** `CORS_ORIGINS` (default includes localhost:3000)
 
 ### Frontend (`frontend/.env`)
 
@@ -109,7 +109,7 @@ Copy from `frontend/.env.example`. Key variables:
 ## Connecting Frontend to Backend
 
 - **Mock mode (`VITE_USE_MOCK=true`):** The frontend uses in-memory or local mock data. No backend required. Useful when the backend is down or you are working only on UI.
-- **Live backend (`VITE_USE_MOCK=false`):** The frontend calls `VITE_API_URL` for timeline tasks, suggestions, and reschedule. Ensure the backend is running (`uvicorn app.main:app --reload`) and CORS allows your dev origin (e.g. `http://localhost:5173`).
+- **Live backend (`VITE_USE_MOCK=false`):** The frontend calls `VITE_API_URL` for timeline tasks, suggestions, and reschedule. Ensure the backend is running (`uvicorn app.main:app --reload`) and CORS allows your dev origin (e.g. `http://localhost:3000`).
 
 Switch by editing `frontend/.env` and restarting `npm run dev`.
 

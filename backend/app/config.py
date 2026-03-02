@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://user:password@localhost:5432/flux"
     supabase_url: str = "http://127.0.0.1:54321"
     supabase_key: str = ""
+    # Service role key bypasses RLS; required for server-side writes (e.g. syncing auth user to public.users).
+    supabase_service_role_key: str = ""
 
     # AI / LLM — OpenRouter (chat + embeddings; single API key)
     # AI / LLM (all via OpenRouter)
@@ -39,20 +41,6 @@ class Settings(BaseSettings):
     scheduler_cutoff_hour: int = 21  # Don't suggest same-day slots after 9 PM
     scheduler_buffer_minutes: int = 15  # Buffer between tasks
 
-    # Deepgram Voice Agent
-    deepgram_api_key: str = ""
-    deepgram_voice_model: str = "aura-2-thalia-en"
-    deepgram_listen_model: str = "nova-3"
-    deepgram_llm_model: str = "gpt-4o-mini"
-    deepgram_token_ttl: int = 3600
-    voice_prompt_file: str = "backend/app/conv_agent/config/voice_prompt.md"
-    voice_intents_file: str = "backend/app/conv_agent/config/intents.yaml"
-    voice_daily_session_limit: int = 20
-
-    # DAO Service (inter-service communication)
-    dao_service_url: str = "http://localhost:8001"
-    dao_service_key: str = "goal-planner-key-abc"
-
     # Server
     host: str = "0.0.0.0"
     port: int = 8000
@@ -61,7 +49,6 @@ class Settings(BaseSettings):
     # CORS — allowed origins for the frontend
     cors_origins: list[str] = [
         "http://localhost:3000",
-        "http://localhost:5173",
     ]
 
     model_config = {
