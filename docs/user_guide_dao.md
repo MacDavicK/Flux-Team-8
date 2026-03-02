@@ -624,22 +624,22 @@ bash dao_service/scripts/build_and_test.sh
 ### Testing with Docker
 
 ```bash
-# Build and deploy
-docker compose -f backend/docker-compose.dao-service.yml up -d
+# Start the dao service (from the project root)
+docker compose up dao
 
 # Check health
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Test an endpoint
-curl -X POST http://localhost:8000/api/v1/users/ \
+curl -X POST http://localhost:8001/api/v1/users/ \
   -H "Content-Type: application/json" \
   -d '{"email": "test@example.com"}'
 
 # View logs
-docker logs flux-dao-service
+docker compose logs dao
 
 # Stop
-docker compose -f backend/docker-compose.dao-service.yml down
+docker compose down dao
 ```
 
 ### Writing Your Own Tests

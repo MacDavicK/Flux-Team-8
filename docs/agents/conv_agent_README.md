@@ -39,7 +39,7 @@ Browser                         Backend (FastAPI)            Deepgram
 | Docker Desktop    | latest    | Required for `docker compose up` deployment                |
 | DEEPGRAM_API_KEY  | --        | Required for live voice (not needed for unit tests)        |
 
-**Important:** The conv_agent does not connect to the database directly. All persistence goes through the DAO Service (`http://localhost:8001`). When running without Docker, start the DAO Service before starting the backend. Docker Compose does not include the DAO Service container — see Step 2 for options.
+**Important:** The conv_agent does not connect to the database directly. All persistence goes through the DAO Service (`http://localhost:8001`). When running without Docker, start the DAO Service before starting the backend.
 
 ## Quick Setup
 
@@ -122,28 +122,17 @@ Useful ports after `supabase start`:
 
 ### Step 2 — Start the DAO Service
 
-The DAO Service is a separate FastAPI microservice that handles all database operations. It must be running before you start the backend.
+The DAO service is included in the main `docker-compose.yml`. `docker compose up --build` from the project root starts it alongside the backend and frontend. It is available at `http://localhost:8001` (host) and `http://dao:8001` (container-to-container).
 
-**Option A — Docker (recommended):**
+For standalone use:
 ```bash
-cd backend
-docker-compose -f docker-compose.dao-service.yml up -d
+# From the project root
+docker compose up dao
 ```
-This starts the DAO Service on **port 8000** (host). If you use this option, set `DAO_SERVICE_URL` in `backend/.env`:
-```
-DAO_SERVICE_URL=http://localhost:8000
-```
-
-**Option B — Direct (uvicorn):**
-```bash
-cd backend
-uvicorn dao_service.main:app --host 0.0.0.0 --port 8001
-```
-This starts the DAO Service on port 8001, which is the default `DAO_SERVICE_URL` — no extra env var needed.
 
 Check it is up:
 ```bash
-curl http://localhost:8001/health    # or :8000 if using Docker
+curl http://localhost:8001/health
 ```
 
 ### Step 3 — Set environment variables
@@ -152,8 +141,6 @@ In `backend/.env`:
 ```
 DEEPGRAM_API_KEY=your_deepgram_key
 DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:54322/postgres
-# Only needed if you started dao_service on a non-default port (e.g. Docker on 8000):
-# DAO_SERVICE_URL=http://localhost:8000
 ```
 
 ### Step 4 — Start the full stack
@@ -165,10 +152,9 @@ docker compose up --build
 ```
 
 This starts:
+- **dao** on `http://localhost:8001` (data persistence microservice)
 - **backend** on `http://localhost:8000` (conv_agent + other APIs)
 - **frontend** on `http://localhost:5173` (Vite dev server)
-
-> **Note:** The DAO Service is not included in `docker-compose.yml`. Voice session intents that write goals and tasks require the DAO Service to be running separately (see Step 2). Unit tests and the router tests use in-memory mocks and do not require it.
 
 **Option B — Local dev (`conv_agent.sh`):**
 ```bash
@@ -201,7 +187,7 @@ Open the chat/voice UI and tap the mic button.
 | **App UI (chat + voice)** | http://localhost:5173/chat | http://localhost:3000/chat |
 | Backend API docs (Swagger) | http://localhost:8000/docs | http://localhost:8080/docs |
 | Backend health check | http://localhost:8000/health | http://localhost:8080/health |
-| dao_service health | _(not in compose)_ | http://localhost:8001/health |
+| dao_service health | http://localhost:8001/health | http://localhost:8001/health |
 | Supabase API | http://localhost:54321 | http://localhost:54321 |
 | Supabase Studio | http://localhost:54323 | http://localhost:54323 |
 
