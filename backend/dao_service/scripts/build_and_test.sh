@@ -98,17 +98,26 @@ else
         success "Supabase started successfully"
         record_step "Supabase check" "PASS"
     else
-        error "Failed to start Supabase."
-        error ""
-        error "How to fix:"
-        error "  1. Install Supabase CLI: brew install supabase/tap/supabase"
-        error "  2. Navigate to project root: cd $PROJECT_ROOT"
-        error "  3. Start Supabase: supabase start"
-        error "  4. Run setup script: bash backend/dao_service/scripts/setup_dao.sh"
-        error ""
-        error "Then re-run this script."
-        record_step "Supabase check" "FAIL"
-        exit 1
+        # 'supabase start' may report "already running" yet have an exited DB container.
+        # Recover by stopping all Supabase containers and restarting cleanly.
+        warn "Initial start failed (possibly stale containers). Stopping and retrying..."
+        supabase stop >/dev/null 2>&1 || true
+        if supabase start 2>&1; then
+            success "Supabase started successfully (after recovery)"
+            record_step "Supabase check" "PASS"
+        else
+            error "Failed to start Supabase."
+            error ""
+            error "How to fix:"
+            error "  1. Install Supabase CLI: brew install supabase/tap/supabase"
+            error "  2. Navigate to project root: cd $PROJECT_ROOT"
+            error "  3. Start Supabase: supabase stop && supabase start"
+            error "  4. Run setup script: bash backend/dao_service/scripts/setup_dao.sh"
+            error ""
+            error "Then re-run this script."
+            record_step "Supabase check" "FAIL"
+            exit 1
+        fi
     fi
 fi
 

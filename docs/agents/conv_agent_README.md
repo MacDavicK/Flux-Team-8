@@ -154,7 +154,7 @@ docker compose up --build
 This starts:
 - **dao** on `http://localhost:8001` (data persistence microservice)
 - **backend** on `http://localhost:8000` (conv_agent + other APIs)
-- **frontend** on `http://localhost:5173` (Vite dev server)
+- **frontend** on `http://localhost:3000` (Vite dev server)
 
 **Option B — Local dev (`conv_agent.sh`):**
 ```bash
@@ -184,7 +184,7 @@ Open the chat/voice UI and tap the mic button.
 
 | What you want | Docker Compose | Local dev (`conv_agent.sh`) |
 |--------------|----------------|------------------------------|
-| **App UI (chat + voice)** | http://localhost:5173/chat | http://localhost:3000/chat |
+| **App UI (chat + voice)** | http://localhost:3000/chat | http://localhost:3000/chat |
 | Backend API docs (Swagger) | http://localhost:8000/docs | http://localhost:8080/docs |
 | Backend health check | http://localhost:8000/health | http://localhost:8080/health |
 | dao_service health | http://localhost:8001/health | http://localhost:8001/health |
@@ -355,7 +355,7 @@ Integration tests are automatically skipped when `DEEPGRAM_API_KEY` is not set.
 ## Common Issues
 
 ### Mic permission denied
-The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:5173` (Docker) or `http://localhost:3000` (local `conv_agent.sh`), not an IP address.
+The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:3000` (both Docker and local `conv_agent.sh`), not an IP address.
 
 ### Deepgram token error
 If you see "Failed to create voice session", check that `DEEPGRAM_API_KEY` is set in `backend/.env`. For local development without a key, run tests with mocks instead.

@@ -254,7 +254,7 @@ flowchart TB
         PROXY[["Reverse Proxy<br/>nginx / Traefik<br/>:80  ·  :443"]]
 
         subgraph FE_CONT["Service: flux-frontend   ·   node:20-alpine"]
-            VITE["Vite Dev Server<br/>React 18 · TypeScript<br/>Tailwind CSS · Zustand<br/>Port 5173"]
+            VITE["Vite Dev Server<br/>React 18 · TypeScript<br/>Tailwind CSS · Zustand<br/>Port 3000"]
         end
 
         subgraph BE_CONT["Service: flux-backend   ·   python:3.11-slim"]
@@ -294,7 +294,7 @@ flowchart TB
 
     %% User → Proxy → Containers
     USER      -->|"HTTPS :443"| PROXY
-    PROXY     -->|"HTTP  :5173<br/>Serve PWA assets"| VITE
+    PROXY     -->|"HTTP  :3000<br/>Serve PWA assets"| VITE
     PROXY     -->|"HTTP  :8000<br/>API + SSE"| UVI
     UVI       -.->|"serves"| FAPI
 

@@ -110,7 +110,7 @@ cmd_test() {
     info "Running conv_agent unit tests..."
 
     cd "$PROJECT_ROOT/backend"
-    python3 -m pytest conv_agent/tests/ -v --tb=short -k "not integration"
+    python3 -m pytest conv_agent/tests/ -v --tb=short -m "not integration"
 
     if [ $? -eq 0 ]; then
         ok "Unit tests passed"
@@ -150,55 +150,52 @@ cmd_build() {
 }
 
 cmd_deploy() {
-    info "Starting full stack (dao_service + backend + frontend)..."
+    info "Starting full stack via Docker Compose (dao + backend + frontend)..."
 
-    # Start dao_service on port 8001
-    info "Starting dao_service on port 8001..."
-    cd "$PROJECT_ROOT/backend"
-    DAO_PORT=8001 uvicorn dao_service.main:app --host 0.0.0.0 --port 8001 &
-    DAO_PID=$!
-    ok "dao_service starting (PID: $DAO_PID)"
+    # Supabase must be running before Docker Compose services start,
+    # because dao and backend connect to it on host port 54322 / 54321.
+    SUPABASE_CONTAINER="supabase_db_Flux-Team-8"
+    if ! docker ps --format '{{.Names}}' | grep -q "$SUPABASE_CONTAINER"; then
+        warn "Supabase is not running. Attempting to start..."
+        cd "$PROJECT_ROOT"
+        if supabase start 2>&1; then
+            ok "Supabase started"
+        else
+            warn "Initial start failed (possibly stale containers). Stopping and retrying..."
+            supabase stop >/dev/null 2>&1 || true
+            supabase start 2>&1 || fail "Failed to start Supabase. Run: bash scripts/supabase_setup.sh"
+        fi
+    else
+        ok "Supabase is running"
+    fi
 
-    # Wait for dao_service readiness (poll /ready up to 10s)
-    for i in $(seq 1 10); do
-        if curl -sf http://localhost:8001/ready > /dev/null 2>&1; then
-            info "dao_service ready"
+    cd "$PROJECT_ROOT"
+
+    info "Building and starting all services in Docker..."
+    docker compose up --build -d
+
+    info "Waiting for backend to be healthy (up to 60s)..."
+    for i in $(seq 1 30); do
+        if curl -sf http://localhost:8000/health > /dev/null 2>&1; then
+            ok "Backend is healthy"
             break
         fi
-        if [ "$i" -eq 10 ]; then
-            warn "dao_service readiness check timed out (may still be starting)"
+        if [ "$i" -eq 30 ]; then
+            warn "Backend health check timed out. Check: docker compose logs backend"
         fi
-        sleep 1
+        sleep 2
     done
 
-    # Start main app on port 8080 (avoids conflict with Docker on 8000)
-    info "Starting backend on port 8080..."
-    uvicorn app.main:app --reload --host 0.0.0.0 --port 8080 &
-    BACKEND_PID=$!
-    ok "Backend started (PID: $BACKEND_PID)"
-
-    # Start frontend dev server (VITE_API_BASE tells conv_agent API client where backend lives)
-    info "Installing frontend dependencies..."
-    cd "$PROJECT_ROOT/frontend"
-    npm install
-    ok "Frontend dependencies installed"
-
-    info "Starting frontend dev server..."
-    VITE_API_BASE=http://localhost:8080 npm run dev &
-    FRONTEND_PID=$!
-    ok "Frontend started (PID: $FRONTEND_PID)"
-
     echo ""
-    info "All servers running. Press Ctrl+C to stop."
-    info "  dao_service: http://localhost:8001"
-    info "  backend:     http://localhost:8080"
+    ok "All services running in Docker."
+    info "  dao_service: http://localhost:8001  (Swagger: http://localhost:8001/docs)"
+    info "  backend:     http://localhost:8000  (Swagger: http://localhost:8000/docs)"
     info "  frontend:    http://localhost:3000"
-
-    # Trap Ctrl+C to clean up all processes
-    trap "kill $DAO_PID $BACKEND_PID $FRONTEND_PID 2>/dev/null; echo ''; ok 'Servers stopped.'; exit 0" INT TERM
-
-    # Wait for any process to exit
-    wait
+    echo ""
+    info "Useful commands:"
+    info "  docker compose logs -f           — tail all logs"
+    info "  docker compose logs -f backend   — tail backend only"
+    info "  docker compose down              — stop all services"
 }
 
 # -- Main --------------------------------------------------------------------

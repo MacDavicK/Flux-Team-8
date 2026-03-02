@@ -63,8 +63,8 @@ services:
   # ---------- React Frontend ----------
   # Vite/TanStack Start dev server. Auth runs server-side (SSR) inside this
   # container, so SUPABASE_URL must point to the host via host.docker.internal.
-  # The browser calls the backend directly via localhost:8000, so VITE_API_URL
-  # must stay as localhost:8000 (resolved by the user's browser, not the container).
+  # The Vite dev-server proxy runs inside this container, so VITE_API_URL must
+  # use the backend service name (not localhost) to reach the backend container.
   frontend:
     build:
       context: ./frontend
@@ -77,6 +77,10 @@ services:
     environment:
       # Override 127.0.0.1 so SSR auth calls reach the host's Supabase instance.
       - SUPABASE_URL=http://host.docker.internal:54321
+      # The Vite dev-server proxy forwards /api/* from the browser to this URL.
+      # Inside Docker, "localhost" refers to the frontend container itself, so we
+      # must use the backend service name on the internal Docker network instead.
+      - VITE_API_URL=http://backend:8000
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:

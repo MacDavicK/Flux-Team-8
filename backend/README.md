@@ -79,7 +79,7 @@ Copy from `.env.example`. Key variables (names match `app.config.Settings`; Pyda
 | `OPEN_ROUTER_API_KEY` | OpenRouter API key (Goal Planner + Scheduler + embeddings) |
 | `PINECONE_API_KEY` | Optional; required for RAG ingest/search |
 | `PINECONE_INDEX_NAME` | Default `flux-articles` |
-| `CORS_ORIGINS` | JSON array of allowed origins (e.g. http://localhost:5173) |
+| `CORS_ORIGINS` | JSON array of allowed origins (e.g. http://localhost:3000) |
 
 Scheduler: `SCHEDULER_CUTOFF_HOUR` (default 21), `SCHEDULER_BUFFER_MINUTES` (default 15), `SCHEDULER_USE_LLM_RATIONALE` (default false). RAG: `RAG_CHUNK_SIZE`, `RAG_TOP_K`, etc. See `app/config.py` for the full list.
 
@@ -123,7 +123,7 @@ source venv/bin/activate
 pytest
 ```
 
-Config: `pytest.ini` (asyncio_mode=auto, testpaths=tests). Unit and integration tests live under `tests/`.
+Config: `pytest.ini` (asyncio_mode=auto, testpaths=`tests conv_agent/tests`). Unit and integration tests live under `tests/`; conv_agent tests (unit + integration) live under `conv_agent/tests/`.
 
 ---
 

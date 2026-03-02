@@ -161,7 +161,7 @@ Flux uses a **multi-agent architecture**. The **Goal Planner** (implemented) dec
 
 ### Option A: Docker Compose (Recommended)
 
-Docker Compose builds and starts the backend (port `8000`), frontend (port `5173`), and a local PostgreSQL instance (port `5432`) in one command.
+Docker Compose builds and starts the DAO service (port `8001`), backend (port `8000`), and frontend (port `3000`) in one command. Requires local Supabase running first (`supabase start`).
 
 > **Before running:** copy the example env files and fill in your API keys.
 
@@ -197,7 +197,7 @@ Once all services are healthy:
 
 | Service | URL |
 |---------|-----|
-| Frontend (Vite dev server) | http://localhost:5173 |
+| Frontend (Vite dev server) | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
 | Backend API docs (Swagger) | http://localhost:8000/docs |
 | Health check | http://localhost:8000/health |
@@ -214,7 +214,7 @@ cd frontend
 npm install
 cp .env.example .env          # edit if needed
 npm run dev
-# Opens at http://localhost:5173
+# Opens at http://localhost:3000
 
 # Terminal 2 — Backend
 cd backend
@@ -226,7 +226,7 @@ uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 # API available at http://localhost:8000
 ```
 
-Frontend: [http://localhost:5173](http://localhost:5173). Backend: [http://localhost:8000](http://localhost:8000). API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
+Frontend: [http://localhost:3000](http://localhost:3000). Backend: [http://localhost:8000](http://localhost:8000). API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ### Connecting Frontend to Backend
 

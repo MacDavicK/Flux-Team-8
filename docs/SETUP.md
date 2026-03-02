@@ -18,7 +18,7 @@
 
 ## Option A: Docker Compose
 
-Docker Compose builds and starts all three services — PostgreSQL (`5432`), backend (`8000`), and frontend (`5173`) — from a single command. This is the recommended path for integration testing and demo runs.
+Docker Compose builds and starts all three services — backend (`8000`), frontend (`3000`), and DAO service (`8001`) — from a single command. Requires local Supabase running first. This is the recommended path for integration testing and demo runs.
 
 ### 1. Clone and create env files
 
@@ -71,7 +71,7 @@ docker compose up
 
 | Service | URL |
 |---------|-----|
-| Frontend (Vite dev server) | http://localhost:5173 |
+| Frontend (Vite dev server) | http://localhost:3000 |
 | Backend API | http://localhost:8000 |
 | Backend API docs (Swagger) | http://localhost:8000/docs |
 | Health check | http://localhost:8000/health |
@@ -158,7 +158,7 @@ Open two terminal windows:
 ```bash
 cd frontend
 npm run dev
-# Opens at http://localhost:5173
+# Opens at http://localhost:3000
 ```
 
 **Terminal 2 — Backend:**
@@ -244,15 +244,15 @@ See `backend/.env.example` for the complete list with descriptions.
 
 ---
 
-### Port 5173 is already in use
+### Port 3000 is already in use
 
 ```bash
 # macOS / Linux
-lsof -i :5173
+lsof -i :3000
 kill -9 <PID>
 
 # Windows
-netstat -ano | findstr 5173
+netstat -ano | findstr 3000
 taskkill /PID <PID> /F
 ```
 
