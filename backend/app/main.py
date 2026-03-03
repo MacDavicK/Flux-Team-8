@@ -9,7 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
 from app.conv_agent import router as voice_router
-from app.routers import analytics, goals, rag, scheduler, tasks
+from app.routers import analytics, chat, goals, rag, scheduler, tasks
 
 # Scrum sprint feature routers (optional — conv_agent works without them)
 # Catches both ImportError (missing packages like pywebpush) and any startup
@@ -39,6 +39,7 @@ app.add_middleware(
 )
 
 # ── Routers ─────────────────────────────────────────────────
+app.include_router(chat.router)
 app.include_router(goals.router)
 app.include_router(rag.router)
 app.include_router(scheduler.router)
