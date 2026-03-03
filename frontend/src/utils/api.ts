@@ -62,6 +62,41 @@ export interface ChatMessageResponse {
   sources?: RAGSource[];
 }
 
+// ─── Analytics (FE-3 · SCRUM-59) ─────────────────────────────────────────────
+
+export interface AnalyticsOverviewResponse {
+  streak_days: number;
+  today_done: number;
+  today_total: number;
+  today_completion_pct?: number;
+  heatmap?: { day: string; done_count: number }[];
+}
+
+export interface AnalyticsWeeklyItem {
+  week_start: string;
+  done: number;
+  total: number;
+  completion_pct: number;
+}
+
+export interface AnalyticsGoalItem {
+  goal_id: string;
+  title: string;
+  tasks_done: number;
+  tasks_total: number;
+  completion_pct: number;
+}
+
+export interface AnalyticsMissedByCategoryItem {
+  category: string;
+  missed_count: number;
+}
+
+export interface AnalyticsHeatmapItem {
+  day: string;
+  done_count: number;
+}
+
 class FluxAPI {
   private token: string | null = null;
 
@@ -177,27 +212,29 @@ class FluxAPI {
     });
   }
 
-  analyticsOverview(): Promise<unknown> {
-    return this.request("/analytics/overview");
+  analyticsOverview(): Promise<AnalyticsOverviewResponse> {
+    return this.request<AnalyticsOverviewResponse>("/analytics/overview");
   }
 
-  analyticsWeekly(): Promise<unknown> {
-    return this.request("/analytics/weekly");
+  analyticsWeekly(weeks = 12): Promise<AnalyticsWeeklyItem[]> {
+    return this.request<AnalyticsWeeklyItem[]>(
+      `/analytics/weekly?weeks=${weeks}`,
+    );
   }
 
-  analyticsGoals(): Promise<unknown> {
-    return this.request("/analytics/goals");
+  analyticsGoals(): Promise<AnalyticsGoalItem[]> {
+    return this.request<AnalyticsGoalItem[]>("/analytics/goals");
   }
 
-  analyticsMissedByCategory(): Promise<unknown> {
-    return this.request("/analytics/missed-by-cat");
+  analyticsMissedByCategory(): Promise<AnalyticsMissedByCategoryItem[]> {
+    return this.request<AnalyticsMissedByCategoryItem[]>(
+      "/analytics/missed-by-cat",
+    );
   }
 
-  analyticsHeatmap(): Promise<unknown> {
-    return this.request("/analytics/overview").then((data: unknown) =>
-      typeof data === "object" && data !== null && "heatmap" in data
-        ? (data as { heatmap: unknown }).heatmap
-        : data,
+  analyticsHeatmap(): Promise<AnalyticsHeatmapItem[]> {
+    return this.request<AnalyticsOverviewResponse>("/analytics/overview").then(
+      (data) => data.heatmap ?? [],
     );
   }
 }
