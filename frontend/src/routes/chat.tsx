@@ -18,10 +18,14 @@ import type {
 } from "~/services/ChatService";
 import type { ChatMessage, PlanMilestone } from "~/types";
 import { MessageVariant } from "~/types/message";
-import { api } from "~/utils/api";
+import { api, type RAGSource } from "~/utils/api";
 import { useBackendReady } from "~/utils/useMockFallback";
 
 const MAX_CHAT_RETRIES = 2;
+
+/** Substring that indicates the "no expert guidance" fallback message (show in plan card banner). */
+const FALLBACK_EXPERT_PREFIX =
+  "I don't have expert guidance for this specific goal yet";
 const RETRY_DELAY_MS = 1500;
 
 export const Route = createFileRoute("/chat")({
@@ -236,18 +240,32 @@ function ChatPage() {
             setConversationId(result.conversation_id);
           }
           setIsThinking(false);
+          const hasFallback = result.message.includes(FALLBACK_EXPERT_PREFIX);
+          const fallbackBannerText = hasFallback ? result.message : undefined;
+          const displayMessage = hasFallback ? "" : result.message;
+          const rawSources =
+            result.sources ??
+            (result.proposed_plan &&
+            typeof result.proposed_plan === "object" &&
+            "sources" in result.proposed_plan
+              ? (result.proposed_plan as { sources: RAGSource[] }).sources
+              : undefined);
+          const sources = Array.isArray(rawSources) ? rawSources : undefined;
+
           const aiMessage: ChatMessage = {
             id: (Date.now() + 1).toString(),
             type: MessageVariant.AI,
             content: (
               <div className="space-y-3">
-                <p>{result.message}</p>
+                {displayMessage ? <p>{displayMessage}</p> : null}
                 {result.proposed_plan && (
                   <PlanView
                     plan={result.proposed_plan as unknown as PlanMilestone[]}
                     onConfirm={() =>
                       handleSendMessage("Yes, this looks great!")
                     }
+                    sources={sources}
+                    fallbackBannerText={fallbackBannerText}
                   />
                 )}
                 {result.requires_user_action && (

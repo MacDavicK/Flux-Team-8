@@ -45,12 +45,21 @@ export type RescheduleSuggestion = Suggestion;
 /** Alias for modal compatibility (SCRUM-33). */
 export type SchedulerSuggestResponse = SuggestResponse;
 
+/** RAG citation source (title, optional url, optional source label). */
+export interface RAGSource {
+  title: string;
+  url?: string;
+  source?: string;
+}
+
 export interface ChatMessageResponse {
   conversation_id: string;
   message: string;
   agent_node?: string | null;
   proposed_plan?: { [key: string]: unknown } | null;
   requires_user_action: boolean;
+  /** RAG citations when plan is expert-grounded. */
+  sources?: RAGSource[];
 }
 
 class FluxAPI {
