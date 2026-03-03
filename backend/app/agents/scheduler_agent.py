@@ -92,7 +92,7 @@ class SchedulerAgent:
 
         # 3. Load user profile for schedule preferences
         user_profile = scheduler_service.get_user_profile(task["user_id"])
-        prefs = (user_profile or {}).get("preferences", {}) or {}
+        prefs = (user_profile or {}).get("profile", {}) or {}
 
         sleep_window = prefs.get("sleep_window", {})
         work_hours = prefs.get("work_hours", {})
