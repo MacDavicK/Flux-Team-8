@@ -63,6 +63,7 @@ async def chat_message(
             "progress": result.get("progress"),
             "is_complete": result.get("is_complete", False),
             "profile": result.get("profile"),
+            "sources": [],
         }
 
     # Already onboarded — respond briefly; goal chat can be added here later
@@ -72,6 +73,7 @@ async def chat_message(
         "progress": 1.0,
         "is_complete": False,
         "profile": None,
+        "sources": [],
     }
 
 

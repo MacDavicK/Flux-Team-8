@@ -4,6 +4,8 @@ Flux Backend — FastAPI Application Entrypoint
 Configures the FastAPI app with CORS, routers, and a health check.
 """
 
+from datetime import datetime, timezone
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -57,10 +59,9 @@ if SCRUM_ROUTERS_AVAILABLE:
 # ── Health Check ────────────────────────────────────────────
 @app.get("/health", tags=["system"])
 async def health_check():
-    return {"status": "ok", "service": "flux-backend"}
+    return {"status": "ok", "service": "flux-backend", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 
 @app.get("/api/v1/health", tags=["system"])
 async def health_check_v1():
-    from datetime import datetime, timezone
     return {"status": "ok", "timestamp": datetime.now(timezone.utc).isoformat()}
