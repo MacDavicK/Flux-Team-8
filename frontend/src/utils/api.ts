@@ -246,7 +246,7 @@ class FluxAPI {
 
   analyticsMissedByCategory(): Promise<AnalyticsMissedByCategoryItem[]> {
     return this.request<AnalyticsMissedByCategoryItem[]>(
-      "/analytics/missed-by-cat",
+      "/analytics/missed-by-category",
     );
   }
 

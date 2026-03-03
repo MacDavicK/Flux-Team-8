@@ -76,7 +76,7 @@ async def analytics_goals(user: dict = Depends(get_current_user)):
 
 
 # ── GET /api/v1/analytics/missed-by-cat ────────────────────
-@router.get("/missed-by-cat", response_model=list[AnalyticsMissedByCategoryItem])
+@router.get("/missed-by-category", response_model=list[AnalyticsMissedByCategoryItem])
 async def analytics_missed_by_category(user: dict = Depends(get_current_user)):
     """
     Return missed task counts grouped by goal category tag.

@@ -17,9 +17,9 @@ from app.routers import analytics, chat, goals, rag, scheduler, tasks
 # Catches both ImportError (missing packages like pywebpush) and any startup
 # errors such as ValueError when VAPID keys are not configured.
 try:
-    from scrum_40_notification_priority_model.routes import priority_router as scrum40_router
-    from scrum_41_push_notification_integration.routes import router as scrum41_router
-    from scrum_43_phone_call_trigger.routes import router as scrum43_router
+    from notification_priority_model.routes import priority_router as scrum40_router
+    from push_notification_integration.routes import router as scrum41_router
+    from phone_call_trigger.routes import router as scrum43_router
     SCRUM_ROUTERS_AVAILABLE = True
 except Exception as e:
     print(f"Warning: Some scrum routers could not be loaded: {e}")
@@ -44,7 +44,7 @@ app.add_middleware(
 app.include_router(chat.router)
 app.include_router(goals.router)
 app.include_router(rag.router)
-app.include_router(scheduler.router)
+app.include_router(scheduler.router, prefix="/api/v1")
 app.include_router(voice_router.router)
 app.include_router(tasks.router)
 app.include_router(analytics.router)
