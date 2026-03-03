@@ -62,6 +62,24 @@ export interface ChatMessageResponse {
   sources?: RAGSource[];
 }
 
+// ─── Onboarding (FE-4 · SCRUM-60) ───────────────────────────────────────────
+
+/** Response from GET /account/me or GET /onboarding/status. */
+export interface OnboardingStatusResponse {
+  onboarded: boolean;
+  current_step?: number;
+  total_steps?: number;
+}
+
+/** Response from POST /onboarding/chat (or POST /chat/message during onboarding). */
+export interface OnboardingChatResponse {
+  message: string;
+  state?: string;
+  progress?: number;
+  is_complete?: boolean;
+  profile?: object | null;
+}
+
 // ─── Analytics (FE-3 · SCRUM-59) ─────────────────────────────────────────────
 
 export interface AnalyticsOverviewResponse {
@@ -160,14 +178,14 @@ class FluxAPI {
     return this.request(`/chat/conversations?limit=${limit}`);
   }
 
-  /** Onboarding uses same POST /chat/message; optional convenience. */
+  /** Onboarding: POST /chat/message (Option B). Returns message; completion via refreshAuthStatus. */
   onboardingChat(message: string): Promise<ChatMessageResponse> {
     return this.chatMessage(message);
   }
 
-  /** Onboarding status comes from /account/me; no dedicated endpoint. */
-  onboardingStatus(): Promise<{ onboarded: boolean; current_step?: number }> {
-    return this.request("/account/me");
+  /** Onboarding status from /account/me. Option A would be GET /onboarding/status. */
+  onboardingStatus(): Promise<OnboardingStatusResponse> {
+    return this.request<OnboardingStatusResponse>("/account/me");
   }
 
   todayTasks(): Promise<Task[]> {
