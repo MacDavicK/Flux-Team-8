@@ -266,14 +266,14 @@ async def run_tests():
         # T8d: Missed by category
         try:
             r = await c.get(
-                f"{API}/analytics/missed-by-cat", headers=headers
+                f"{API}/analytics/missed-by-category", headers=headers
             )
             data = r.json()
-            log("GET /analytics/missed-by-cat",
+            log("GET /analytics/missed-by-category",
                 r.status_code == 200,
                 f"type={type(data).__name__}")
         except Exception as e:
-            log("GET /analytics/missed-by-cat", False, str(e))
+            log("GET /analytics/missed-by-category", False, str(e))
 
         # T8e: Heatmap standalone (may not exist — that's OK)
         try:
