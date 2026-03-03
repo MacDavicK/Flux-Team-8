@@ -10,15 +10,14 @@ import {
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
-  applyReschedule,
-  fetchSuggestions,
+  api,
   type RescheduleSuggestion,
   type SchedulerSuggestResponse,
 } from "~/utils/api";
 import { cn } from "~/utils/cn";
+import { useBackendReady } from "~/utils/useMockFallback";
 import { useVoiceNegotiation } from "~/utils/useVoiceNegotiation";
 
-const USE_MOCK = import.meta.env.VITE_USE_MOCK === "true";
 const USE_VOICE =
   (import.meta as ImportMeta & { env?: Record<string, string> }).env
     ?.VITE_ENABLE_VOICE === "true";
@@ -71,6 +70,7 @@ export function RescheduleModal({
     null,
   );
   const voiceActionHandledRef = useRef(false);
+  const { ready: backendReady } = useBackendReady();
 
   const {
     isSupported: isVoiceSupported,
@@ -93,7 +93,7 @@ export function RescheduleModal({
     const loadSuggestions = async () => {
       setModalState("loading");
       try {
-        if (USE_MOCK) {
+        if (!backendReady) {
           await new Promise((r) => setTimeout(r, 800));
           setData({
             ...MOCK_RESPONSE,
@@ -101,7 +101,7 @@ export function RescheduleModal({
             task_title: taskTitle,
           });
         } else {
-          const result = await fetchSuggestions(eventId);
+          const result = await api.schedulerSuggest(eventId);
           setData(result);
         }
         setModalState("ready");
@@ -114,7 +114,7 @@ export function RescheduleModal({
     };
 
     loadSuggestions();
-  }, [isOpen, eventId, taskTitle]);
+  }, [isOpen, eventId, taskTitle, backendReady]);
 
   useEffect(() => {
     if (modalState !== "ready" || !data || !USE_VOICE || !isVoiceSupported) {
@@ -179,14 +179,13 @@ export function RescheduleModal({
     setApplyingId(suggestion.label);
     setModalState("applying");
     try {
-      if (USE_MOCK) {
+      if (!backendReady) {
         await new Promise((r) => setTimeout(r, 500));
         onRescheduleDone();
         onClose();
       } else {
-        await applyReschedule(
+        await api.schedulerApply(
           eventId,
-          "reschedule",
           suggestion.new_start,
           suggestion.new_end,
         );
@@ -205,12 +204,12 @@ export function RescheduleModal({
     setApplyingId("skip");
     setModalState("applying");
     try {
-      if (USE_MOCK) {
+      if (!backendReady) {
         await new Promise((r) => setTimeout(r, 500));
         onRescheduleDone();
         onClose();
       } else {
-        await applyReschedule(eventId, "skip");
+        await api.schedulerApply(eventId);
         onRescheduleDone();
         onClose();
       }
@@ -295,13 +294,13 @@ export function RescheduleModal({
                       setModalState("loading");
                       const reload = async () => {
                         try {
-                          const result = USE_MOCK
+                          const result = !backendReady
                             ? {
                                 ...MOCK_RESPONSE,
                                 event_id: eventId,
                                 task_title: taskTitle,
                               }
-                            : await fetchSuggestions(eventId);
+                            : await api.schedulerSuggest(eventId);
                           setData(result);
                           setModalState("ready");
                         } catch (err) {

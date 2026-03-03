@@ -7,14 +7,8 @@ import type { EventType } from "~/components/flow/v2/TimelineEvent";
 import { RescheduleModal } from "~/components/modals/RescheduleModal";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
-import { fetchTimelineTasks, type Task } from "~/utils/api";
-
-// Fallback tasks when API is unavailable (e.g. backend not running)
-const sampleTasks = [
-  { id: "1", title: "Email Sarah regarding brand", completed: false },
-  { id: "2", title: "Sketch logo concepts", completed: false },
-  { id: "3", title: "Update documentation", completed: true },
-];
+import type { TaskRailItem } from "~/types";
+import { api, type Task } from "~/utils/api";
 
 function taskToEvent(task: Task): {
   id: string;
@@ -27,7 +21,11 @@ function taskToEvent(task: Task): {
   isDrifted: boolean;
   eventId: string;
 } {
-  const start = task.start_time ? new Date(task.start_time) : new Date();
+  const startAt =
+    task.start_time ??
+    (task as { scheduled_at?: string }).scheduled_at ??
+    new Date().toISOString();
+  const start = new Date(startAt);
   const hours = start.getHours();
   const mins = start.getMinutes();
   const isPm = hours >= 12;
@@ -50,12 +48,22 @@ function taskToEvent(task: Task): {
   };
 }
 
+function taskToRailItem(task: Task): TaskRailItem {
+  const status = (task as { status?: string }).status ?? task.state;
+  return {
+    id: task.id,
+    title: task.title,
+    completed: status === "done",
+  };
+}
+
 export const Route = createFileRoute("/")({
   component: FlowPage,
 });
 
 function FlowPage() {
   const [events, setEvents] = useState<ReturnType<typeof taskToEvent>[]>([]);
+  const [railTasks, setRailTasks] = useState<TaskRailItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [rescheduleModal, setRescheduleModal] = useState<{
     isOpen: boolean;
@@ -66,10 +74,15 @@ function FlowPage() {
   const loadTasks = useCallback(async () => {
     setLoading(true);
     try {
-      const tasks = await fetchTimelineTasks();
-      setEvents(tasks.map(taskToEvent));
+      const [timelineTasks, todayTasks] = await Promise.all([
+        api.timelineTasks().catch(() => [] as Task[]),
+        api.todayTasks().catch(() => [] as Task[]),
+      ]);
+      setEvents(timelineTasks.map(taskToEvent));
+      setRailTasks(todayTasks.map(taskToRailItem));
     } catch {
       setEvents([]);
+      setRailTasks([]);
     } finally {
       setLoading(false);
     }
@@ -78,6 +91,16 @@ function FlowPage() {
   useEffect(() => {
     loadTasks();
   }, [loadTasks]);
+
+  const handleCompleteTask = useCallback(
+    (taskId: string) => {
+      api
+        .completeTask(taskId)
+        .then(() => loadTasks())
+        .catch(() => {});
+    },
+    [loadTasks],
+  );
 
   const openShuffle = (eventId: string, taskTitle: string) => {
     setRescheduleModal({ isOpen: true, eventId, taskTitle });
@@ -98,7 +121,7 @@ function FlowPage() {
 
       <DateHeader />
 
-      <TaskRail tasks={sampleTasks} />
+      <TaskRail tasks={railTasks} onComplete={handleCompleteTask} />
 
       {loading ? (
         <div className="flex-1 flex items-center justify-center text-river text-sm">
