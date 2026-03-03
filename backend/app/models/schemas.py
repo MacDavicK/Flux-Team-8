@@ -164,3 +164,47 @@ class SchedulerApplyResponse(BaseModel):
     new_start: Optional[datetime] = None
     new_end: Optional[datetime] = None
     message: str
+
+
+# ── Analytics Response Models (BE-3 · SCRUM-59) ──────────
+
+class HeatmapDay(BaseModel):
+    """A single day in the activity heatmap."""
+    day: str = Field(..., description="ISO date string, e.g. '2026-03-01'")
+    done_count: int = Field(..., description="Number of tasks completed on this day")
+
+
+class AnalyticsOverviewResponse(BaseModel):
+    """GET /analytics/overview"""
+    streak_days: int = Field(0, description="Consecutive days with ≥1 done task")
+    today_done: int = Field(0, description="Tasks completed today")
+    today_total: int = Field(0, description="Total tasks scheduled today")
+    today_completion_pct: Optional[float] = Field(
+        None, description="Today's completion ratio (0.0–1.0), None if no tasks"
+    )
+    heatmap: Optional[list[HeatmapDay]] = Field(
+        None, description="Daily done counts for the last 365 days"
+    )
+
+
+class AnalyticsWeeklyItem(BaseModel):
+    """A single row in GET /analytics/weekly."""
+    week_start: str = Field(..., description="ISO date of the Monday starting the week")
+    done: int
+    total: int
+    completion_pct: float = Field(..., description="Completion ratio 0.0–1.0")
+
+
+class AnalyticsGoalItem(BaseModel):
+    """A single goal in GET /analytics/goals."""
+    goal_id: str
+    title: str
+    tasks_done: int
+    tasks_total: int
+    completion_pct: float = Field(..., description="Completion ratio 0.0–1.0")
+
+
+class AnalyticsMissedByCategoryItem(BaseModel):
+    """A single category in GET /analytics/missed-by-cat."""
+    category: str
+    missed_count: int
