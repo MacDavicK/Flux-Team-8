@@ -20,6 +20,7 @@ from app.models.schemas import (
     ConversationState,
     GoalConversationResponse,
     RespondRequest,
+    SourceReference,
     StartGoalRequest,
 )
 from app.services import goal_service
@@ -32,6 +33,13 @@ router = APIRouter(prefix="/goals", tags=["goals"])
 # Maps conversation_id → GoalPlannerAgent
 # In production this would be Redis or similar; fine for MVP.
 _active_agents: dict[str, GoalPlannerAgent] = {}
+
+
+def _to_source_refs(raw: list[dict] | None) -> list[SourceReference] | None:
+    """Convert internal ``{"title": str, "source": str}`` dicts to ``SourceReference``."""
+    if not raw:
+        return None
+    return [SourceReference(title=s["title"], url=s.get("source", "")) for s in raw]
 
 
 # ── POST /goals/start ──────────────────────────────────────
@@ -81,6 +89,7 @@ async def start_goal(body: StartGoalRequest):
             suggested_action=result.get("suggested_action"),
             plan=result.get("plan"),
             goal_id=None,
+            sources=None,
         )
 
     except Exception as e:
@@ -166,6 +175,7 @@ async def respond_to_goal(conversation_id: str, body: RespondRequest):
         suggested_action=result.get("suggested_action"),
         plan=result.get("plan"),
         goal_id=goal_id,
+        sources=_to_source_refs(result.get("sources")),
     )
 
 
@@ -208,4 +218,5 @@ async def get_goal_conversation(conversation_id: str):
         suggested_action=None,
         plan=[m for m in agent.plan] if agent.plan else None,
         goal_id=None,
+        sources=_to_source_refs(agent._sources) if agent._sources else None,
     )

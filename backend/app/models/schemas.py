@@ -74,6 +74,12 @@ class AgentMessage(BaseModel):
     content: str
 
 
+class SourceReference(BaseModel):
+    """A single RAG source citation returned alongside a generated plan."""
+    title: str
+    url: str
+
+
 class GoalConversationResponse(BaseModel):
     """Returned by both /start and /respond endpoints."""
     conversation_id: str
@@ -82,6 +88,7 @@ class GoalConversationResponse(BaseModel):
     suggested_action: Optional[str] = None
     plan: Optional[list[PlanMilestone]] = None
     goal_id: Optional[str] = None
+    sources: Optional[list[SourceReference]] = None
 
 
 # ── DB Record Models ───────────────────────────────────────
