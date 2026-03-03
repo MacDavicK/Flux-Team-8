@@ -21,7 +21,7 @@ def _db():
 
 
 def get_task_by_id(task_id: str) -> Optional[dict]:
-    """Fetch a single task by ID. Returns None if not found (use .maybe_single() to avoid exception)."""
+    """Fetch a single task by ID. Returns None if not found."""
     result = (
         _db().table("tasks")
         .select("*")
@@ -29,6 +29,8 @@ def get_task_by_id(task_id: str) -> Optional[dict]:
         .maybe_single()
         .execute()
     )
+    if result is None:
+        return None
     return result.data if result.data is not None else None
 
 
@@ -36,11 +38,13 @@ def get_user_profile(user_id: str) -> Optional[dict]:
     """Fetch user preferences (sleep window, work hours, etc.). Returns None if not found."""
     result = (
         _db().table("users")
-        .select("id, name, preferences")
+        .select("id, profile, notification_preferences")
         .eq("id", user_id)
         .maybe_single()
         .execute()
     )
+    if result is None:
+        return None
     return result.data if result.data is not None else None
 
 

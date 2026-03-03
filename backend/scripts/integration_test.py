@@ -32,6 +32,12 @@ TEST_PASSWORD = os.environ.get("TEST_PASSWORD", "FluxTest123!")
 
 SUPABASE_URL = os.environ["SUPABASE_URL"]
 SUPABASE_KEY = os.environ["SUPABASE_KEY"]
+SUPABASE_ANON_KEY = os.environ.get(
+    "SUPABASE_ANON_KEY",
+    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9"
+    ".eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9"
+    ".CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0",
+)
 
 results = []
 
@@ -75,14 +81,14 @@ async def run_tests():
             r = await c.post(
                 f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
                 json={"email": TEST_EMAIL, "password": TEST_PASSWORD},
-                headers={"apikey": SUPABASE_KEY}
+                headers={"apikey": SUPABASE_ANON_KEY}
             )
             if r.status_code != 200:
                 # Try sign up
                 r = await c.post(
                     f"{SUPABASE_URL}/auth/v1/signup",
                     json={"email": TEST_EMAIL, "password": TEST_PASSWORD},
-                    headers={"apikey": SUPABASE_KEY}
+                    headers={"apikey": SUPABASE_ANON_KEY}
                 )
             data = r.json()
             token = data.get("access_token")
@@ -230,11 +236,11 @@ async def run_tests():
         try:
             r = await c.get(f"{API}/analytics/overview", headers=headers)
             data = r.json()
-            has_streak = "streak" in data
+            has_streak = "streak_days" in data
             has_heatmap = "heatmap" in data
             log("GET /analytics/overview",
                 r.status_code == 200 and has_streak,
-                f"streak={data.get('streak')}, "
+                f"streak_days={data.get('streak_days')}, "
                 f"has_heatmap={has_heatmap}, "
                 f"heatmap_count={len(data.get('heatmap', []))}")
         except Exception as e:
