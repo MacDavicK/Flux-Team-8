@@ -27,6 +27,9 @@ pinecone==5.4.2
 # YAML parsing (voice agent config)
 pyyaml==6.0.2
 
+# Auth (JWT validation via Supabase JWKS)
+pyjwt[crypto]>=2.8.0
+
 # Utilities
 python-dotenv==1.0.1
 httpx==0.28.1

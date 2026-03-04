@@ -280,7 +280,7 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  "/api/v1/analytics/missed-by-cat": {
+  "/api/v1/analytics/missed-by-category": {
     parameters: {
       query?: never;
       header?: never;

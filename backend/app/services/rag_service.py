@@ -389,21 +389,25 @@ def retrieve(query: str, top_k: Optional[int] = None) -> list[dict]:
 # 6. Format context (utility for SCRUM-47 Goal Planner integration)
 # ---------------------------------------------------------------------------
 
-def format_rag_context(chunks: list[dict]) -> str:
+def format_rag_context(
+    chunks: list[dict],
+    relevance_threshold: Optional[float] = None,
+) -> str:
     """Format retrieved chunks into a numbered context block with citations.
 
-    Only includes chunks above the relevance threshold.
-    Returns an empty string if no chunks pass the threshold.
+    Only includes chunks above *relevance_threshold* (defaults to
+    ``settings.rag_relevance_threshold``).  Returns an empty string if no
+    chunks pass the threshold.
 
     Example output::
 
-        [1] Source: "Aim for a Healthy Weight" — https://www.nhlbi.nih.gov/...
-        Content: A safe rate of weight loss is 1 to 2 pounds per week...
+        [1] "A safe rate of weight loss is 1 to 2 pounds per week..."
+            — Source: Aim for a Healthy Weight (https://www.nhlbi.nih.gov/...)
 
-        [2] Source: "Steps for Losing Weight" — https://www.cdc.gov/...
-        Content: Evidence shows that people who lose weight gradually...
+        [2] "Evidence shows that people who lose weight gradually..."
+            — Source: Steps for Losing Weight (https://www.cdc.gov/...)
     """
-    threshold = settings.rag_relevance_threshold
+    threshold = relevance_threshold if relevance_threshold is not None else settings.rag_relevance_threshold
     relevant = [c for c in chunks if c["score"] > threshold]
 
     if not relevant:
@@ -412,8 +416,8 @@ def format_rag_context(chunks: list[dict]) -> str:
     blocks: list[str] = []
     for i, chunk in enumerate(relevant, 1):
         blocks.append(
-            f'[{i}] Source: "{chunk["title"]}" — {chunk["source"]}\n'
-            f'Content: {chunk["text"]}'
+            f'[{i}] "{chunk["text"]}"\n'
+            f'    — Source: {chunk["title"]} ({chunk["source"]})'
         )
 
     return "\n\n".join(blocks)

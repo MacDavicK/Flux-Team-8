@@ -41,3 +41,15 @@ def test_reschedule_with_event_id_routes_scheduler_suggest():
     )
     assert decision.intent == OrchestratorIntent.SUGGEST_RESCHEDULE
     assert decision.route == "scheduler.suggest"
+
+
+def test_voice_action_routes_voice_create_session():
+    agent = OrchestratorAgent(use_langgraph=False)
+    decision = agent.decide(
+        OrchestratorMessageRequest(
+            voice_action="create_session",
+            message="",
+        )
+    )
+    assert decision.intent == OrchestratorIntent.VOICE_CREATE_SESSION
+    assert decision.route == "voice.session.create"

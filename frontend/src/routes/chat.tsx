@@ -16,9 +16,17 @@ import type {
   ConversationSummary,
   HistoryMessage,
 } from "~/services/ChatService";
-import { chatService } from "~/services/ChatService";
 import type { ChatMessage, PlanMilestone } from "~/types";
 import { MessageVariant } from "~/types/message";
+import { api, type RAGSource } from "~/utils/api";
+import { useBackendReady } from "~/utils/useMockFallback";
+
+const MAX_CHAT_RETRIES = 2;
+
+/** Substring that indicates the "no expert guidance" fallback message (show in plan card banner). */
+const FALLBACK_EXPERT_PREFIX =
+  "I don't have expert guidance for this specific goal yet";
+const RETRY_DELAY_MS = 1500;
 
 export const Route = createFileRoute("/chat")({
   component: ChatPage,
@@ -66,6 +74,7 @@ function ChatPage() {
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const { stopEscalation } = useSimulation();
   const initDoneRef = useRef(false);
+  const { ready: backendReady } = useBackendReady();
 
   const isOnboarding = user && !user.onboarded;
 
@@ -108,20 +117,19 @@ function ChatPage() {
   }, [authLoading, isAuthenticated, user?.onboarded, navigate]);
 
   // Initialise chat once auth is ready.
-  // Onboarding: resume the most recent conversation so the user picks up where
-  // they left off. The agent drives the questions — no hardcoded greeting.
-  // Onboarded: always start fresh. History is accessible via the History drawer.
+  // Onboarding: resume the most recent conversation when backend is ready.
+  // Onboarded: leave messages empty; history is available via History drawer.
   useEffect(() => {
     if (authLoading || !isAuthenticated || initDoneRef.current) return;
     initDoneRef.current = true;
 
-    if (isOnboarding) {
-      chatService
-        .getHistory()
+    if (isOnboarding && backendReady) {
+      api
+        .chatHistory()
         .then(({ messages: history, conversation_id }) => {
           if (conversation_id) setConversationId(conversation_id);
-
-          const uiMessages: ChatMessage[] = history
+          const list = Array.isArray(history) ? history : [];
+          const uiMessages: ChatMessage[] = list
             .filter(
               (m: HistoryMessage) =>
                 m.role === "user" || m.role === "assistant",
@@ -131,16 +139,13 @@ function ChatPage() {
               type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
               content: m.content,
             }));
-
           setMessages(uiMessages);
         })
         .catch(() => {
           // No prior history — leave empty; agent responds on first send.
         });
     }
-    // Onboarded: leave messages empty and conversationId undefined.
-    // A new conversation is created server-side on the first POST /chat/message.
-  }, [authLoading, isAuthenticated, isOnboarding]);
+  }, [authLoading, isAuthenticated, isOnboarding, backendReady]);
 
   // Clear state and start a brand-new conversation.
   const startNewChat = useCallback(() => {
@@ -151,108 +156,172 @@ function ChatPage() {
   }, []);
 
   // Load a specific past conversation from the history drawer.
-  const loadConversation = useCallback(async (id: string) => {
-    setIsHistoryOpen(false);
-    setIsLoadingHistory(true);
-    try {
-      const { messages: history, conversation_id } =
-        await chatService.getHistory(id);
-      if (conversation_id) setConversationId(conversation_id);
-
-      const uiMessages: ChatMessage[] = history
-        .filter(
-          (m: HistoryMessage) => m.role === "user" || m.role === "assistant",
-        )
-        .map((m: HistoryMessage, i: number) => ({
-          id: `history-${i}`,
-          type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
-          content: m.content,
-        }));
-
-      setMessages(uiMessages);
-    } catch {
-      // Silently fail — keep current chat state.
-    } finally {
-      setIsLoadingHistory(false);
-    }
-  }, []);
+  const loadConversation = useCallback(
+    async (id: string) => {
+      setIsHistoryOpen(false);
+      setIsLoadingHistory(true);
+      try {
+        if (!backendReady) {
+          setMessages([]);
+          return;
+        }
+        const { messages: history, conversation_id } =
+          await api.chatHistory(id);
+        if (conversation_id) setConversationId(conversation_id);
+        const list = Array.isArray(history) ? history : [];
+        const uiMessages: ChatMessage[] = list
+          .filter(
+            (m: HistoryMessage) => m.role === "user" || m.role === "assistant",
+          )
+          .map((m: HistoryMessage, i: number) => ({
+            id: `history-${i}`,
+            type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
+            content: m.content,
+          }));
+        setMessages(uiMessages);
+      } catch {
+        // Silently fail — keep current chat state.
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    },
+    [backendReady],
+  );
 
   // Open history drawer and fetch the conversations list.
   const openHistory = useCallback(async () => {
     setIsHistoryOpen(true);
     try {
-      const list = await chatService.getConversations();
+      if (!backendReady) {
+        setConversations([]);
+        return;
+      }
+      const data = await api.chatConversations();
+      const list =
+        (data as { conversations: ConversationSummary[] }).conversations ?? [];
       setConversations(list);
     } catch {
       setConversations([]);
     }
-  }, []);
+  }, [backendReady]);
 
-  const handleSendMessage = async (text: string) => {
-    const userMessage: ChatMessage = {
-      id: Date.now().toString(),
-      type: MessageVariant.USER,
-      content: text,
-    };
+  const handleSendMessage = useCallback(
+    async (text: string) => {
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        type: MessageVariant.USER,
+        content: text,
+      };
+      setMessages((prev) => [...prev, userMessage]);
+      setIsThinking(true);
+      scrollToBottom();
+      stopEscalation();
 
-    setMessages((prev) => [...prev, userMessage]);
-    setIsThinking(true);
-    scrollToBottom();
-    stopEscalation();
-
-    try {
-      const result = await chatService.sendMessage(text, conversationId);
-
-      if (!conversationId) {
-        setConversationId(result.conversation_id);
+      if (!backendReady) {
+        setIsThinking(false);
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: (Date.now() + 1).toString(),
+            type: MessageVariant.AI,
+            content:
+              "Backend unavailable. Demo mode — your message was received.",
+          },
+        ]);
+        scrollToBottom();
+        return;
       }
 
-      setTimeout(() => {
-        setIsThinking(false);
+      let lastError: Error | null = null;
+      for (let attempt = 0; attempt <= MAX_CHAT_RETRIES; attempt++) {
+        try {
+          const result = await api.chatMessage(text, conversationId);
+          if (!conversationId) {
+            setConversationId(result.conversation_id);
+          }
+          setIsThinking(false);
+          const hasFallback = result.message.includes(FALLBACK_EXPERT_PREFIX);
+          const fallbackBannerText = hasFallback ? result.message : undefined;
+          const displayMessage = hasFallback ? "" : result.message;
+          const rawSources =
+            result.sources ??
+            (result.proposed_plan &&
+            typeof result.proposed_plan === "object" &&
+            "sources" in result.proposed_plan
+              ? (result.proposed_plan as { sources: RAGSource[] }).sources
+              : undefined);
+          const sources = Array.isArray(rawSources) ? rawSources : undefined;
 
-        const aiMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
-          type: MessageVariant.AI,
-          content: (
-            <div className="space-y-3">
-              <p>{result.message}</p>
-              {result.proposed_plan && (
-                <PlanView
-                  plan={result.proposed_plan as unknown as PlanMilestone[]}
-                  onConfirm={() => handleSendMessage("Yes, this looks great!")}
-                />
-              )}
-              {result.requires_user_action && (
-                <button
-                  type="button"
-                  onClick={() => handleSendMessage("OK")}
-                  className="text-sage font-medium text-sm hover:underline"
-                >
-                  Confirm
-                </button>
-              )}
-            </div>
-          ),
-        };
-
-        setMessages((prev) => [...prev, aiMessage]);
-        scrollToBottom();
-
-        if (isOnboarding) {
-          refreshAuthStatus().catch(() => {});
+          const aiMessage: ChatMessage = {
+            id: (Date.now() + 1).toString(),
+            type: MessageVariant.AI,
+            content: (
+              <div className="space-y-3">
+                {displayMessage ? <p>{displayMessage}</p> : null}
+                {result.proposed_plan && (
+                  <PlanView
+                    plan={result.proposed_plan as unknown as PlanMilestone[]}
+                    onConfirm={() =>
+                      handleSendMessage("Yes, this looks great!")
+                    }
+                    sources={sources}
+                    fallbackBannerText={fallbackBannerText}
+                  />
+                )}
+                {result.requires_user_action && (
+                  <button
+                    type="button"
+                    onClick={() => handleSendMessage("OK")}
+                    className="text-sage font-medium text-sm hover:underline"
+                  >
+                    Confirm
+                  </button>
+                )}
+              </div>
+            ),
+          };
+          setMessages((prev) => [...prev, aiMessage]);
+          scrollToBottom();
+          if (isOnboarding) {
+            refreshAuthStatus().catch(() => {});
+          }
+          return;
+        } catch (err) {
+          lastError = err instanceof Error ? err : new Error(String(err));
+          if (attempt < MAX_CHAT_RETRIES) {
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: `retry-${Date.now()}`,
+                type: MessageVariant.AI,
+                content: "Connection lost. Retrying…",
+              },
+            ]);
+            scrollToBottom();
+            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+          }
         }
-      }, 800);
-    } catch {
+      }
+
       setIsThinking(false);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: MessageVariant.AI,
         content:
+          lastError?.message ??
           "Sorry, I had trouble understanding that. Could you try again?",
       };
       setMessages((prev) => [...prev, errorMessage]);
-    }
-  };
+    },
+    [
+      backendReady,
+      conversationId,
+      isOnboarding,
+      scrollToBottom,
+      stopEscalation,
+      refreshAuthStatus,
+    ],
+  );
 
   if (authLoading) {
     return (

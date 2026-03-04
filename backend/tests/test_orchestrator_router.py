@@ -58,6 +58,61 @@ def patch_orchestrator_delegates(monkeypatch):
     monkeypatch.setattr(orch_router, "suggest_reschedule", AsyncMock(return_value=fake_suggest))
     monkeypatch.setattr(orch_router, "apply_reschedule", AsyncMock(return_value=fake_apply))
 
+    monkeypatch.setattr(
+        orch_router,
+        "voice_create_session",
+        AsyncMock(
+            return_value=type(
+                "VoiceCreateResp",
+                (),
+                {"model_dump": lambda self, mode="json": {"session_id": "voice-s-1"}},
+            )()
+        ),
+    )
+    monkeypatch.setattr(
+        orch_router,
+        "voice_save_message",
+        AsyncMock(
+            return_value=type(
+                "VoiceSaveResp",
+                (),
+                {"model_dump": lambda self, mode="json": {"message_id": "m-1", "status": "saved"}},
+            )()
+        ),
+    )
+    monkeypatch.setattr(
+        orch_router,
+        "voice_get_session_messages",
+        AsyncMock(
+            return_value=type(
+                "VoiceGetResp",
+                (),
+                {"model_dump": lambda self, mode="json": {"session_id": "voice-s-1", "messages": []}},
+            )()
+        ),
+    )
+    monkeypatch.setattr(
+        orch_router,
+        "voice_process_intent",
+        AsyncMock(
+            return_value=type(
+                "VoiceIntentResp",
+                (),
+                {"model_dump": lambda self, mode="json": {"function_call_id": "fc-1", "result": "ok"}},
+            )()
+        ),
+    )
+    monkeypatch.setattr(
+        orch_router,
+        "voice_close_session",
+        AsyncMock(
+            return_value=type(
+                "VoiceCloseResp",
+                (),
+                {"model_dump": lambda self, mode="json": {"session_id": "voice-s-1", "status": "closed"}},
+            )()
+        ),
+    )
 
 class TestOrchestratorRouter:
     def test_orchestrator_mode_endpoint(self, app_client):
@@ -169,3 +224,36 @@ class TestOrchestratorRouter:
         data = resp.json()
         assert data["intent"] == "APPLY_RESCHEDULE"
         assert data["route"] == "scheduler.apply"
+
+    def test_voice_create_session_route(self, app_client, patch_orchestrator_delegates):
+        resp = app_client.post(
+            "/orchestrator/message",
+            json={
+                "voice_action": "create_session",
+                "user_id": "a1000000-0000-0000-0000-000000000001",
+                "message": "",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["intent"] == "VOICE_CREATE_SESSION"
+        assert data["route"] == "voice.session.create"
+        assert data["voice_payload"]["session_id"] == "voice-s-1"
+
+    def test_voice_process_intent_route(self, app_client, patch_orchestrator_delegates):
+        resp = app_client.post(
+            "/orchestrator/message",
+            json={
+                "voice_action": "process_intent",
+                "session_id": "voice-s-1",
+                "function_call_id": "fc-1",
+                "function_name": "submit_goal_intent",
+                "input": {"goal_statement": "run a marathon"},
+                "message": "",
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert data["intent"] == "VOICE_PROCESS_INTENT"
+        assert data["route"] == "voice.intents.process"
+        assert data["voice_payload"]["function_call_id"] == "fc-1"

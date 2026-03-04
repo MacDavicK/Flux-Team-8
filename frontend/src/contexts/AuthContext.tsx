@@ -10,6 +10,7 @@ import { setInMemoryToken } from "~/lib/apiClient";
 import { serverGetAccessToken } from "~/lib/authServerFns";
 import { authService } from "~/services/AuthService";
 import type { User } from "~/types";
+import { api } from "~/utils/api";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -46,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const { token, user: serverUser } = await serverGetAccessToken();
       setInMemoryToken(token);
+      api.setToken(token);
 
       if (!token || !serverUser) {
         setIsAuthenticated(false);
@@ -67,6 +69,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (res.status === 401 || res.status === 403) {
           // Session rejected by the backend — clear everything.
           setInMemoryToken(null);
+          api.setToken(null);
           setIsAuthenticated(false);
           setUser(undefined);
           setHasTasks(false);
@@ -95,6 +98,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return resolvedUser;
     } catch {
       setInMemoryToken(null);
+      api.setToken(null);
       setIsAuthenticated(false);
       setUser(undefined);
       setHasTasks(false);
@@ -141,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const logout = useCallback(async () => {
     await authService.logout();
     setInMemoryToken(null);
+    api.setToken(null);
     setIsAuthenticated(false);
     setUser(undefined);
     setHasTasks(false);

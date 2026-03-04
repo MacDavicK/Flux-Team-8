@@ -80,6 +80,39 @@ class OrchestratorAgent:
     ) -> OrchestratorDecision:
         text = (body.message or "").strip().lower()
 
+        # 0) Explicit voice action override
+        voice_action = (body.voice_action or "").strip().lower()
+        if voice_action == "create_session":
+            return OrchestratorDecision(
+                intent=OrchestratorIntent.VOICE_CREATE_SESSION,
+                route="voice.session.create",
+                reason="Explicit voice action override",
+            )
+        if voice_action == "save_message":
+            return OrchestratorDecision(
+                intent=OrchestratorIntent.VOICE_SAVE_MESSAGE,
+                route="voice.messages.save",
+                reason="Explicit voice action override",
+            )
+        if voice_action == "get_messages":
+            return OrchestratorDecision(
+                intent=OrchestratorIntent.VOICE_GET_MESSAGES,
+                route="voice.messages.get",
+                reason="Explicit voice action override",
+            )
+        if voice_action == "process_intent":
+            return OrchestratorDecision(
+                intent=OrchestratorIntent.VOICE_PROCESS_INTENT,
+                route="voice.intents.process",
+                reason="Explicit voice action override",
+            )
+        if voice_action == "close_session":
+            return OrchestratorDecision(
+                intent=OrchestratorIntent.VOICE_CLOSE_SESSION,
+                route="voice.session.close",
+                reason="Explicit voice action override",
+            )
+
         # 1) Explicit action override for scheduler apply
         if body.action in {"reschedule", "skip"} and body.event_id:
             return OrchestratorDecision(

@@ -16,6 +16,15 @@ load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
 @pytest.fixture()
+def sample_user_data():
+    """Simple sample user payload for smoke/infrastructure tests."""
+    return {
+        "email": "testuser@flux.dev",
+        "name": "Test User",
+    }
+
+
+@pytest.fixture()
 def mock_supabase():
     """
     Patch get_supabase_client in goal_service so no real DB calls happen.

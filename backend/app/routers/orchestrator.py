@@ -10,6 +10,18 @@ from fastapi import APIRouter, HTTPException
 
 from app.agents.orchestrator import OrchestratorAgent
 from app.config import settings
+from app.conv_agent.router import (
+    close_session as voice_close_session,
+    create_session as voice_create_session,
+    get_session_messages as voice_get_session_messages,
+    process_intent as voice_process_intent,
+    save_message as voice_save_message,
+)
+from app.conv_agent.schemas import (
+    CreateSessionRequest,
+    SaveMessageRequest,
+    SubmitIntentRequest,
+)
 from app.models.schemas import (
     OrchestratorIntent,
     OrchestratorMessageRequest,
@@ -57,6 +69,88 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
     try:
         decision = _orchestrator.decide(body)
         user_id = body.user_id or DEMO_USER_ID
+
+        if decision.intent == OrchestratorIntent.VOICE_CREATE_SESSION:
+            payload = await voice_create_session(CreateSessionRequest(user_id=user_id))
+            data = payload.model_dump(mode="json")
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message="Voice session created.",
+                voice_payload=data,
+            )
+
+        if decision.intent == OrchestratorIntent.VOICE_SAVE_MESSAGE:
+            if not body.session_id:
+                raise HTTPException(status_code=400, detail="session_id required for voice save_message")
+            if not body.role:
+                raise HTTPException(status_code=400, detail="role required for voice save_message")
+            payload = await voice_save_message(
+                SaveMessageRequest(
+                    session_id=body.session_id,
+                    role=body.role,
+                    content=body.message or "",
+                )
+            )
+            data = payload.model_dump(mode="json")
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message="Voice transcript saved.",
+                conversation_id=body.session_id,
+                voice_payload=data,
+            )
+
+        if decision.intent == OrchestratorIntent.VOICE_GET_MESSAGES:
+            if not body.session_id:
+                raise HTTPException(status_code=400, detail="session_id required for voice get_messages")
+            payload = await voice_get_session_messages(body.session_id)
+            data = payload.model_dump(mode="json")
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message="Voice messages fetched.",
+                conversation_id=body.session_id,
+                voice_payload=data,
+            )
+
+        if decision.intent == OrchestratorIntent.VOICE_PROCESS_INTENT:
+            if not body.session_id:
+                raise HTTPException(status_code=400, detail="session_id required for voice process_intent")
+            if not body.function_call_id:
+                raise HTTPException(status_code=400, detail="function_call_id required for voice process_intent")
+            if not body.function_name:
+                raise HTTPException(status_code=400, detail="function_name required for voice process_intent")
+
+            payload = await voice_process_intent(
+                SubmitIntentRequest(
+                    session_id=body.session_id,
+                    function_call_id=body.function_call_id,
+                    function_name=body.function_name,
+                    input=body.input or {},
+                )
+            )
+            data = payload.model_dump(mode="json")
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message="Voice intent processed.",
+                conversation_id=body.session_id,
+                voice_payload=data,
+            )
+
+        if decision.intent == OrchestratorIntent.VOICE_CLOSE_SESSION:
+            if not body.session_id:
+                raise HTTPException(status_code=400, detail="session_id required for voice close_session")
+            payload = await voice_close_session(body.session_id)
+            data = payload.model_dump(mode="json")
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message="Voice session closed.",
+                conversation_id=body.session_id,
+                voice_payload=data,
+            )
 
         if decision.intent == OrchestratorIntent.START_GOAL:
             goal = await start_goal(
