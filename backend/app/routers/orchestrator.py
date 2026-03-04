@@ -1,0 +1,157 @@
+"""
+Flux Backend — Orchestrator Router
+
+Unified entrypoint for message routing across agents.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, HTTPException
+
+from app.agents.orchestrator import OrchestratorAgent
+from app.config import settings
+from app.models.schemas import (
+    OrchestratorIntent,
+    OrchestratorMessageRequest,
+    OrchestratorMessageResponse,
+    RespondRequest,
+    SchedulerApplyRequest,
+    SchedulerSuggestRequest,
+    StartGoalRequest,
+)
+from app.models.schemas import ConversationState
+from app.routers.goals import respond_to_goal, start_goal
+from app.routers.scheduler import (
+    DEMO_USER_ID,
+    apply_reschedule,
+    list_tasks_for_timeline,
+    suggest_reschedule,
+)
+
+router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
+
+_orchestrator = OrchestratorAgent(
+    use_langgraph=settings.use_langgraph_orchestrator
+)
+
+
+@router.get("/mode")
+async def orchestrator_mode():
+    """Return active orchestrator mode for debugging/demo visibility."""
+    return {
+        "mode": "langgraph" if settings.use_langgraph_orchestrator else "deterministic",
+        "use_langgraph_orchestrator": settings.use_langgraph_orchestrator,
+    }
+
+
+@router.post("/message", response_model=OrchestratorMessageResponse)
+async def orchestrate_message(body: OrchestratorMessageRequest):
+    """
+    Route an incoming user message to Goal Planner or Scheduler.
+
+    Supports:
+    - Goal start / continue
+    - Task timeline fetch
+    - Reschedule suggestion / apply
+    """
+    try:
+        decision = _orchestrator.decide(body)
+        user_id = body.user_id or DEMO_USER_ID
+
+        if decision.intent == OrchestratorIntent.START_GOAL:
+            goal = await start_goal(
+                StartGoalRequest(user_id=user_id, message=body.message)
+            )
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message=goal.message,
+                conversation_id=goal.conversation_id,
+                goal_state=goal.state,
+                goal_id=goal.goal_id,
+                suggested_action=goal.suggested_action,
+                proposed_plan=goal.plan,
+                requires_user_action=goal.state == ConversationState.AWAITING_CONFIRMATION,
+            )
+
+        if decision.intent == OrchestratorIntent.CONTINUE_GOAL:
+            if not body.conversation_id:
+                raise HTTPException(status_code=400, detail="conversation_id required")
+            goal = await respond_to_goal(
+                body.conversation_id,
+                RespondRequest(message=body.message),
+            )
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message=goal.message,
+                conversation_id=goal.conversation_id,
+                goal_state=goal.state,
+                goal_id=goal.goal_id,
+                suggested_action=goal.suggested_action,
+                proposed_plan=goal.plan,
+                requires_user_action=goal.state == ConversationState.AWAITING_CONFIRMATION,
+            )
+
+        if decision.intent == OrchestratorIntent.LIST_TASKS:
+            try:
+                tasks_payload = await list_tasks_for_timeline(user_id=user_id)
+            except Exception:
+                tasks_payload = {"tasks": []}
+
+            task_count = len(tasks_payload.get("tasks", []))
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message=f"Found {task_count} task(s) in your timeline.",
+                scheduler_payload=tasks_payload,
+            )
+
+        if decision.intent == OrchestratorIntent.SUGGEST_RESCHEDULE:
+            event_id = body.event_id or _orchestrator.extract_event_id(body.message.lower())
+            if not event_id:
+                raise HTTPException(status_code=400, detail="event_id required for reschedule suggestions")
+            suggestion = await suggest_reschedule(
+                SchedulerSuggestRequest(event_id=event_id)
+            )
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message=suggestion.ai_message,
+                scheduler_payload=suggestion.model_dump(mode="json"),
+            )
+
+        if decision.intent == OrchestratorIntent.APPLY_RESCHEDULE:
+            event_id = body.event_id or _orchestrator.extract_event_id(body.message.lower())
+            if not event_id:
+                raise HTTPException(status_code=400, detail="event_id required for apply action")
+
+            action = body.action
+            if not action:
+                action = "skip" if "skip" in body.message.lower() else "reschedule"
+
+            applied = await apply_reschedule(
+                SchedulerApplyRequest(
+                    event_id=event_id,
+                    action=action,
+                    new_start=body.new_start,
+                    new_end=body.new_end,
+                )
+            )
+            return OrchestratorMessageResponse(
+                intent=decision.intent,
+                route=decision.route,
+                message=applied.message,
+                scheduler_payload=applied.model_dump(mode="json"),
+            )
+
+        return OrchestratorMessageResponse(
+            intent=OrchestratorIntent.UNKNOWN,
+            route="none",
+            message="I couldn't determine the right route for that message.",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Orchestration failed: {exc}") from exc

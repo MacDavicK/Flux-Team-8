@@ -157,3 +157,53 @@ class SchedulerApplyResponse(BaseModel):
     new_start: Optional[datetime] = None
     new_end: Optional[datetime] = None
     message: str
+
+
+# ── Orchestrator Models ───────────────────────────────────
+
+class OrchestratorIntent(str, Enum):
+    START_GOAL = "START_GOAL"
+    CONTINUE_GOAL = "CONTINUE_GOAL"
+    LIST_TASKS = "LIST_TASKS"
+    SUGGEST_RESCHEDULE = "SUGGEST_RESCHEDULE"
+    APPLY_RESCHEDULE = "APPLY_RESCHEDULE"
+    UNKNOWN = "UNKNOWN"
+
+
+class OrchestratorMessageRequest(BaseModel):
+    """Body for POST /orchestrator/message"""
+
+    user_id: Optional[str] = Field(
+        default=None,
+        description="UUID of the user. Defaults to demo user when omitted.",
+    )
+    message: str = Field(..., description="User chat message")
+    conversation_id: Optional[str] = Field(
+        default=None,
+        description="Goal conversation ID for follow-up messages",
+    )
+    event_id: Optional[str] = Field(
+        default=None,
+        description="Task/event ID for scheduler actions",
+    )
+    action: Optional[str] = Field(
+        default=None,
+        description="Scheduler action override: 'reschedule' or 'skip'",
+    )
+    new_start: Optional[datetime] = None
+    new_end: Optional[datetime] = None
+
+
+class OrchestratorMessageResponse(BaseModel):
+    """Unified response for orchestration requests."""
+
+    intent: OrchestratorIntent
+    route: str = Field(..., description="Route selected by orchestrator")
+    message: str = Field(..., description="Top-level orchestration message")
+    conversation_id: Optional[str] = None
+    goal_state: Optional[ConversationState] = None
+    goal_id: Optional[str] = None
+    suggested_action: Optional[str] = None
+    proposed_plan: Optional[list[PlanMilestone]] = None
+    requires_user_action: bool = False
+    scheduler_payload: Optional[dict] = None
