@@ -11,8 +11,8 @@ Analyze the user's message and classify it into exactly one of the following int
 
 Rules:
 - For greetings, small talk, or messages that don't clearly map to a goal or task, always use CHITCHAT — never CLARIFY.
-- For NEW_TASK or RESCHEDULE_TASK: verify there is enough context (a specific time, a recurrence pattern, or a location trigger). If not, set intent to CLARIFY and specify exactly what is missing in clarification_question.
-- For RESCHEDULE_TASK: extract task_id from the message if present (format: "task_id: <uuid>").
+- For NEW_TASK: always route as NEW_TASK even if no specific time is given — the task handler will ask for a time if needed. Only use CLARIFY if the message is too ambiguous to determine what the task even is.
+- For RESCHEDULE_TASK: verify there is enough context (a specific time or instruction). If not, set intent to CLARIFY. Extract task_id from the message if present (format: "task_id: <uuid>").
 - For MODIFY_GOAL: extract goal_id from the message context if available.
 - For NEXT_MILESTONE: extract goal_id if present. Set milestone_order to the pipeline_order integer of the next milestone the user wants to plan (e.g. if they say "move on to milestone 2", set milestone_order=2). If the order cannot be determined from the message, set milestone_order to null — the backend will resolve it from the DB.
 - Only use CLARIFY when a message is clearly goal/task-related but is missing specific required information. Never use CLARIFY for vague or generic messages.

@@ -2,6 +2,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Bell, CheckCircle2, Clock, LogOut, MessageCircle, Moon, Phone, Sun, Sunrise } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "~/lib/apiClient";
+import { getPermissionState, registerAndSubscribe, unsubscribe as unsubscribePush } from "~/lib/pushNotifications";
 import type { AccountMe, AccountPatchRequest } from "~/types";
 import { cn } from "~/utils/cn";
 import { EditField } from "./EditField";
@@ -234,6 +235,24 @@ export function ProfilePreferences({
   const [callOptedIn, setCallOptedIn] = useState(!!notifPrefs?.call_opted_in);
   const [togglingWhatsapp, setTogglingWhatsapp] = useState(false);
   const [togglingCall, setTogglingCall] = useState(false);
+  const [pushEnabled, setPushEnabled] = useState(() => getPermissionState() === 'granted');
+  const [togglingPush, setTogglingPush] = useState(false);
+
+  async function handleTogglePush() {
+    if (togglingPush) return;
+    setTogglingPush(true);
+    try {
+      if (!pushEnabled) {
+        const success = await registerAndSubscribe();
+        if (success) setPushEnabled(true);
+      } else {
+        await unsubscribePush();
+        setPushEnabled(false);
+      }
+    } finally {
+      setTogglingPush(false);
+    }
+  }
 
   async function handleToggleWhatsapp() {
     if (!phoneVerified || togglingWhatsapp) return;
@@ -319,8 +338,9 @@ export function ProfilePreferences({
             label="Timezone"
             value={account.timezone ?? "UTC"}
             placeholder="e.g. America/New_York"
-            hint="Used to schedule reminders correctly"
-            onSave={async (timezone) => onPatch({ timezone })}
+            hint="Auto-detected from your browser"
+            onSave={async () => {}}
+            disabled
           />
           {profile?.sleep_window && (
             <div className="flex gap-3">
@@ -457,6 +477,37 @@ export function ProfilePreferences({
               </div>
             </div>
           )}
+
+          {/* Push notifications */}
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl glass-bubble flex items-center justify-center shrink-0">
+              <Bell className="w-5 h-5 text-river/60" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-semibold text-charcoal">Push notifications</p>
+              <p className="text-xs text-river/60 mt-0.5">
+                {pushEnabled ? "Browser notifications enabled" : "Get notified right in your browser"}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={handleTogglePush}
+              disabled={togglingPush}
+              className={cn(
+                "relative w-11 h-6 rounded-full transition-colors duration-200 shrink-0",
+                "focus:outline-none disabled:cursor-not-allowed",
+                pushEnabled ? "bg-sage" : "bg-river/20",
+              )}
+              aria-label={pushEnabled ? "Disable push notifications" : "Enable push notifications"}
+            >
+              <span
+                className={cn(
+                  "absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform duration-200",
+                  pushEnabled && "translate-x-5",
+                )}
+              />
+            </button>
+          </div>
 
           {/* WhatsApp opt-in */}
           <div className={cn("flex items-center gap-3", !phoneVerified && "opacity-50")}>

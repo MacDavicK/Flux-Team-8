@@ -10,8 +10,9 @@ import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { useAuth } from "~/contexts/AuthContext";
+import { setInMemoryToken } from "~/lib/apiClient";
 import { tasksService } from "~/services/TasksService";
-import { isClient } from "~/utils/env";
+import { debugSsrLog, isClient } from "~/utils/env";
 import { EventType, type TaskRailItem, type TimelineEvent } from "~/types";
 
 function FlowPagePending() {
@@ -32,7 +33,12 @@ export const Route = createFileRoute("/")({
     if (!user.onboarded) throw redirect({ to: "/chat" });
 
     const rawTasks: { [key: string]: unknown }[] = await (async () => {
-      if (isClient()) return tasksService.getTodayTasks().catch((e) => { Sentry.captureException(e); return []; });
+      if (isClient()) {
+        // Hydrate the in-memory token before calling apiFetch-based services.
+        // The loader runs before AuthContext.useEffect has a chance to set it.
+        setInMemoryToken(token);
+        return tasksService.getTodayTasks().catch((e) => { Sentry.captureException(e); return []; });
+      }
       const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
       return fetch(`${backendUrl}/api/v1/tasks/today`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -45,10 +51,16 @@ export const Route = createFileRoute("/")({
     const tasks: TaskRailItem[] = [];
     for (const t of rawTasks) {
       const { railItem, event } = mapTaskToDisplayTypes(t);
-      events.push(event);
-      tasks.push(railItem);
+      const hasTime = Boolean(t.scheduled_at ?? t.scheduled_time ?? t.time ?? "");
+      if (hasTime) {
+        events.push(event);
+      } else {
+        tasks.push(railItem);
+      }
     }
-    return { user, events, tasks };
+    const data = { user, events, tasks };
+    debugSsrLog("/ (FlowPage)", data);
+    return data;
   },
   component: FlowPage,
 });
@@ -67,8 +79,11 @@ function mapTaskToDisplayTypes(task: { [key: string]: unknown }): {
   const isDone = status === "done" || status === "completed";
   const isPast = isDone || status === "missed";
 
-  // Best-effort time parsing
-  const rawTime = String(task.scheduled_time ?? task.time ?? "");
+  // Best-effort time parsing from scheduled_at (ISO 8601) or legacy time fields
+  const scheduledAt = task.scheduled_at as string | null | undefined;
+  const rawTime = scheduledAt
+    ? new Date(scheduledAt).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false })
+    : String(task.scheduled_time ?? task.time ?? "");
   let time = rawTime;
   let period: "AM" | "PM" = "AM";
   if (rawTime.includes(":")) {
@@ -104,6 +119,29 @@ function FlowPage() {
   });
 
   const displayName = user?.name ?? loaderUser.name;
+
+  const handleAddTodo = (title: string) => {
+    const tempId = `temp-${Date.now()}`;
+    setData((prev) => ({
+      ...prev,
+      tasks: [...prev.tasks, { id: tempId, title, completed: false }],
+    }));
+
+    tasksService.addTodo(title).then((result) => {
+      setData((prev) => ({
+        ...prev,
+        tasks: prev.tasks.map((t) =>
+          t.id === tempId ? { ...t, id: result.task_id } : t,
+        ),
+      }));
+    }).catch((error) => {
+      Sentry.captureException(error, { extra: { title } });
+      setData((prev) => ({
+        ...prev,
+        tasks: prev.tasks.filter((t) => t.id !== tempId),
+      }));
+    });
+  };
 
   const handleComplete = (taskId: string) => {
     // Optimistic update — mark done immediately in local state.
@@ -153,7 +191,7 @@ function FlowPage() {
 
       <DateHeader greeting={getGreeting(displayName)} />
 
-      <TaskRail tasks={data.tasks} onComplete={handleComplete} />
+      <TaskRail tasks={data.tasks} onComplete={handleComplete} onAddTodo={handleAddTodo} />
 
       <FlowTimeline events={data.events} />
 

@@ -9,6 +9,7 @@ import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { StatPill } from "~/components/ui/StatPill";
 import { serverGetMe } from "~/lib/authServerFns";
+import { debugSsrLog } from "~/utils/env";
 
 function ReflectionPagePending() {
   return (
@@ -60,7 +61,7 @@ export const Route = createFileRoute("/reflection")({
     const health = byCategory.find((c) => c.category === "health")?.count ?? 0;
     const total = work + personal + health || 1;
 
-    return {
+    const data = {
       profile: user ? { id: user.id, name: user.name ?? "User", email: user.email } : null,
       stats: {
         title: o.week_label ?? "This Week",
@@ -81,6 +82,8 @@ export const Route = createFileRoute("/reflection")({
         health: Math.round((health / total) * 100),
       },
     };
+    debugSsrLog("/reflection (ReflectionPage)", data);
+    return data;
   },
   component: ReflectionPage,
 });

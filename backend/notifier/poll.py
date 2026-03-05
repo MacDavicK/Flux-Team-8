@@ -3,17 +3,24 @@
 
 Four-step escalation cycle:
   1. Push reminders for tasks due soon
-  2. WhatsApp escalation
-  3. Voice call escalation
-  4. Auto-miss marking
+  2. WhatsApp escalation  (standard + aggressive only)
+  3. Voice call escalation (aggressive only)
+  4. Auto-miss marking    (with recurring task auto-advance)
+
+escalation_policy values:
+  silent     — push only; auto-miss after push window × 3
+  standard   — push + WhatsApp; auto-miss after WhatsApp window × 2
+  aggressive — push + WhatsApp + call; auto-miss after call window (original behaviour)
 """
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 
 from app.config import settings
 from app.services.push_service import dispatch_push
+from app.services.recurrence import advance_recurring_task
 from app.services.supabase import db
 from app.services.twilio_service import dispatch_call, dispatch_whatsapp
 
@@ -48,6 +55,7 @@ async def _step_push() -> None:
           AND t.reminder_sent_at IS NULL
           AND t.scheduled_at <= now() + ('{lead} minutes')::interval
           AND t.scheduled_at > now() - INTERVAL '1 hour'
+          AND u.push_subscription IS NOT NULL
         """,
     )
 
@@ -62,9 +70,8 @@ async def _step_push() -> None:
             continue  # Another worker claimed it first
 
         push_sub = row["push_subscription"]
-        if not push_sub:
-            continue
-
+        if isinstance(push_sub, str):
+            push_sub = json.loads(push_sub)
         await log_dispatch(task_id, "push")
         try:
             await dispatch_push(dict(row), push_sub)
@@ -75,7 +82,7 @@ async def _step_push() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────
-# Step 2 — WhatsApp escalation
+# Step 2 — WhatsApp escalation (standard + aggressive only)
 # ─────────────────────────────────────────────────────────────────
 
 async def _step_whatsapp() -> None:
@@ -85,6 +92,7 @@ async def _step_whatsapp() -> None:
         f"""
         SELECT id, user_id, title, scheduled_at FROM tasks
         WHERE status = 'pending'
+          AND escalation_policy IN ('standard', 'aggressive')
           AND reminder_sent_at IS NOT NULL
           AND whatsapp_sent_at IS NULL
           AND reminder_sent_at <= now() - ('{esc} minutes')::interval
@@ -111,7 +119,7 @@ async def _step_whatsapp() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────
-# Step 3 — Voice call escalation
+# Step 3 — Voice call escalation (aggressive only)
 # ─────────────────────────────────────────────────────────────────
 
 async def _step_call() -> None:
@@ -121,6 +129,7 @@ async def _step_call() -> None:
         f"""
         SELECT id, user_id, title, scheduled_at FROM tasks
         WHERE status = 'pending'
+          AND escalation_policy = 'aggressive'
           AND whatsapp_sent_at IS NOT NULL
           AND call_sent_at IS NULL
           AND whatsapp_sent_at <= now() - ('{esc} minutes')::interval
@@ -147,33 +156,75 @@ async def _step_call() -> None:
 
 
 # ─────────────────────────────────────────────────────────────────
-# Step 4 — Auto-miss
+# Step 4 — Auto-miss (policy-aware) + recurring auto-advance
 # ─────────────────────────────────────────────────────────────────
 
 async def _step_auto_miss() -> None:
-    """15.2.7 — Mark tasks as missed when call sent > escalation_window ago."""
+    """
+    15.2.7 — Mark tasks as missed once all their escalation channels have had
+    time to fire. Trigger window varies by policy:
+
+      aggressive — after call_sent_at + escalation_window  (original behaviour)
+      standard   — after whatsapp_sent_at + escalation_window × 2
+      silent     — after reminder_sent_at + escalation_window × 3
+
+    For recurring tasks, a new occurrence is inserted instead of stopping.
+    """
     esc = settings.escalation_window_minutes
-    rows = await db.fetch(
+
+    # Sub-query A: aggressive tasks that completed the call step
+    aggressive_rows = await db.fetch(
         f"""
         SELECT id, user_id FROM tasks
         WHERE status = 'pending'
+          AND escalation_policy = 'aggressive'
           AND call_sent_at IS NOT NULL
           AND call_sent_at <= now() - ('{esc} minutes')::interval
         """,
     )
 
-    for row in rows:
-        task_id = str(row["id"])
-        user_id = str(row["user_id"])
-        claimed = await db.fetchval(
-            "UPDATE tasks SET status = 'missed' WHERE id = $1 AND status = 'pending' RETURNING id",
-            task_id,
-        )
-        if claimed is None:
-            continue
+    # Sub-query B: standard tasks whose WhatsApp window has fully elapsed
+    standard_rows = await db.fetch(
+        f"""
+        SELECT id, user_id FROM tasks
+        WHERE status = 'pending'
+          AND escalation_policy = 'standard'
+          AND whatsapp_sent_at IS NOT NULL
+          AND call_sent_at IS NULL
+          AND whatsapp_sent_at <= now() - ('{esc * 2} minutes')::interval
+        """,
+    )
 
-        await log_dispatch(task_id, "auto_miss")
-        await mark_dispatch_done(task_id, "auto_miss")
+    # Sub-query C: silent tasks whose push window has fully elapsed
+    silent_rows = await db.fetch(
+        f"""
+        SELECT id, user_id FROM tasks
+        WHERE status = 'pending'
+          AND escalation_policy = 'silent'
+          AND reminder_sent_at IS NOT NULL
+          AND whatsapp_sent_at IS NULL
+          AND reminder_sent_at <= now() - ('{esc * 3} minutes')::interval
+        """,
+    )
+
+    for row in list(aggressive_rows) + list(standard_rows) + list(silent_rows):
+        await _process_auto_miss(str(row["id"]), str(row["user_id"]))
+
+
+async def _process_auto_miss(task_id: str, user_id: str) -> None:
+    """Atomically mark a task missed; auto-advance if it's a recurring task."""
+    claimed = await db.fetchval(
+        "UPDATE tasks SET status = 'missed' WHERE id = $1 AND status = 'pending' RETURNING id",
+        task_id,
+    )
+    if claimed is None:
+        return  # Another worker got it first
+
+    await log_dispatch(task_id, "auto_miss")
+    await mark_dispatch_done(task_id, "auto_miss")
+
+    advanced = await advance_recurring_task(task_id)
+    if not advanced:
         asyncio.create_task(check_and_flag_miss_pattern(user_id, task_id))
 
 
@@ -225,7 +276,6 @@ async def _mark_dispatch_failed(task_id: str, channel: str, error: str) -> None:
 async def check_and_flag_miss_pattern(user_id: str, task_id: str) -> None:
     """15.2.10 — Check for ≥3 consecutive misses in same slot; log if threshold met."""
     try:
-        # Check if the missed task has ≥3 consecutive misses in the same day-of-week/hour
         result = await db.fetchval(
             """
             WITH missed AS (

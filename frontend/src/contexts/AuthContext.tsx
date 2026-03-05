@@ -7,7 +7,7 @@ import {
   useState,
 } from "react";
 import { serverGetMe } from "~/lib/authServerFns";
-import { setInMemoryToken } from "~/lib/apiClient";
+import { apiFetch, setInMemoryToken } from "~/lib/apiClient";
 import { authService } from "~/services/AuthService";
 import type { User } from "~/types";
 
@@ -55,6 +55,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setInMemoryToken(token);
       setIsAuthenticated(true);
       setUser(serverUser);
+
+      // Silently re-register push subscription for users who already granted permission.
+      // Dynamic import keeps this out of the SSR path.
+      if (typeof window !== 'undefined') {
+        import('~/lib/pushNotifications').then(({ registerAndSubscribe }) => {
+          registerAndSubscribe().catch(() => {/* non-critical */});
+        });
+      }
+
       return serverUser;
     } catch {
       setInMemoryToken(null);
@@ -71,6 +80,20 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     refreshAuthStatus();
   }, [refreshAuthStatus]);
+
+  // Silently sync browser timezone to backend if it differs from stored value.
+  useEffect(() => {
+    if (!user) return;
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (browserTz && browserTz !== user.timezone) {
+      apiFetch("/api/v1/account/me", {
+        method: "PATCH",
+        body: JSON.stringify({ timezone: browserTz }),
+      }).then(() => {
+        setUser((prev) => prev ? { ...prev, timezone: browserTz } : prev);
+      }).catch(() => {/* silent — non-critical */});
+    }
+  }, [user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Periodically refresh to keep the in-memory token fresh before it expires.
   // Supabase JWTs expire after 1 hour; refresh every 45 minutes.

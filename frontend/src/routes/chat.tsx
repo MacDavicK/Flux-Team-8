@@ -163,6 +163,7 @@ function ChatPage() {
     conversationIdRef.current = id;
   };
   const [onboardingPhone, setOnboardingPhone] = useState("");
+  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [convCursor, setConvCursor] = useState<string | null>(null);
@@ -195,18 +196,8 @@ function ChatPage() {
     }
   }, [authLoading, isAuthenticated, navigate]);
 
-  // Navigate to home once onboarding completes (user.onboarded flips to true).
-  // Only redirect if the user arrived at /chat because they were non-onboarded;
-  // once onboarding finishes send them to the flow page.
-  const wasOnboardingRef = useRef(false);
-  useEffect(() => {
-    if (isOnboarding) wasOnboardingRef.current = true;
-  }, [isOnboarding]);
-  useEffect(() => {
-    if (!authLoading && isAuthenticated && user?.onboarded && wasOnboardingRef.current) {
-      navigate({ to: "/" });
-    }
-  }, [authLoading, isAuthenticated, user?.onboarded, navigate]);
+  // Do NOT auto-navigate when onboarding completes. Instead, show a CTA button
+  // so the user can proceed to /chat intentionally.
 
   // Initialise chat once auth is ready.
   // Onboarding: resume the most recent conversation so the user picks up where
@@ -437,11 +428,11 @@ function ChatPage() {
         setMessages((prev) => [...prev, aiMessage]);
         scrollToBottom();
 
-        // Patch user.onboarded locally once the backend signals onboarding is
-        // done (agent_node transitions away from "ONBOARDING"). This triggers
-        // the redirect to "/" without an SSR round-trip or loading flash.
+        // When the backend signals onboarding is done (agent_node transitions
+        // away from "ONBOARDING"), mark locally and show the CTA button.
         if (isOnboarding && result.agent_node !== "ONBOARDING") {
           patchUser({ onboarded: true });
+          setOnboardingComplete(true);
         }
       }, 800);
     } catch {
@@ -547,11 +538,26 @@ function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      <ChatInput
-        onSend={handleSendMessage}
-        disabled={isThinking || isLoadingHistory || isInitializing}
-        placeholder={messages.length === 0 ? "What would you like to achieve?" : "What's on your mind?"}
-      />
+      {onboardingComplete ? (
+        <div className="px-4 pb-8 pt-2 relative z-10">
+          <motion.button
+            type="button"
+            onClick={() => { window.location.href = "/chat"; }}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.4 }}
+            className="w-full py-3.5 rounded-2xl bg-sage text-white font-medium text-sm tracking-wide shadow-lg hover:bg-sage/90 active:scale-95 transition-transform"
+          >
+            Set my first goal →
+          </motion.button>
+        </div>
+      ) : !isOnboarding ? (
+        <ChatInput
+          onSend={handleSendMessage}
+          disabled={isThinking || isLoadingHistory || isInitializing}
+          placeholder={messages.length === 0 ? "What would you like to achieve?" : "What's on your mind?"}
+        />
+      ) : null}
 
       <BottomNav />
 

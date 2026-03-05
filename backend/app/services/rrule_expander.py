@@ -60,3 +60,32 @@ def expand_rrule_to_tasks(
         tasks.append(task)
 
     return tasks
+
+
+def next_occurrence_after(
+    rrule_string: str,
+    after_dt: pendulum.DateTime,
+    user_timezone: str,
+) -> str | None:
+    """
+    Return the next occurrence of an RRULE strictly after after_dt, as a UTC ISO8601 string.
+
+    Returns None if the RRULE has no more occurrences after after_dt.
+
+    Args:
+        rrule_string:  iCal RRULE, e.g. "FREQ=DAILY"
+        after_dt:      Reference datetime (UTC or timezone-aware). The next occurrence
+                       will be strictly after this point.
+        user_timezone: IANA timezone string for wall-clock expansion.
+    """
+    tz = pendulum.timezone(user_timezone)
+    local_after = after_dt.in_timezone(user_timezone)
+    naive_after = local_after.naive()
+
+    rule = rrulestr(rrule_string, dtstart=naive_after)
+    occ = rule.after(naive_after, inc=False)  # strictly after
+    if occ is None:
+        return None
+
+    local_dt = pendulum.instance(occ, tz=tz)
+    return local_dt.in_timezone("UTC").isoformat()

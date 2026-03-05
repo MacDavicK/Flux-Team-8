@@ -17,7 +17,8 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.agents.graph import compiled_graph
 from app.middleware.auth import get_current_user
-from app.models.api_schemas import ChatMessageResponse, RescheduleRequest
+from app.models.api_schemas import ChatMessageResponse, EscalationPolicyUpdate, RescheduleRequest, TodoCreateRequest
+from app.services.recurrence import advance_recurring_task
 from app.services.supabase import db
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -53,11 +54,11 @@ async def get_today_tasks(
     start_utc = start_of_today.astimezone(timezone.utc)
     end_utc = end_of_today.astimezone(timezone.utc)
 
-    rows = await db.fetch(
+    scheduled_rows = await db.fetch(
         """
         SELECT id, user_id, goal_id, title, description, status,
                scheduled_at, duration_minutes, trigger_type, location_trigger,
-               recurrence_rule, shared_with_goal_ids, completed_at, created_at
+               recurrence_rule, shared_with_goal_ids, escalation_policy, completed_at, created_at
         FROM tasks
         WHERE user_id = $1
           AND status = 'pending'
@@ -70,7 +71,44 @@ async def get_today_tasks(
         end_utc,
     )
 
-    return [_serialize_task(row) for row in rows]
+    todo_rows = await db.fetch(
+        """
+        SELECT id, user_id, goal_id, title, description, status,
+               scheduled_at, duration_minutes, trigger_type, location_trigger,
+               recurrence_rule, shared_with_goal_ids, escalation_policy, completed_at, created_at
+        FROM tasks
+        WHERE user_id = $1
+          AND status = 'pending'
+          AND scheduled_at IS NULL
+        ORDER BY created_at ASC
+        """,
+        user_uuid,
+    )
+
+    return [_serialize_task(row) for row in scheduled_rows] + [_serialize_task(row) for row in todo_rows]
+
+
+@router.post("/todo")
+async def create_todo(
+    body: TodoCreateRequest,
+    current_user=Depends(get_current_user),
+) -> dict:
+    """Create an unscheduled to-do task (no scheduled_at, no LangGraph)."""
+    user_id = str(current_user["sub"])
+    user_uuid = uuid.UUID(user_id)
+
+    task_id = await db.fetchval(
+        """
+        INSERT INTO tasks (user_id, title, description, status, trigger_type)
+        VALUES ($1, $2, $3, 'pending', 'time')
+        RETURNING id
+        """,
+        user_uuid,
+        body.title,
+        body.description or "",
+    )
+
+    return {"task_id": str(task_id), "title": body.title, "status": "pending"}
 
 
 @router.get("/{task_id}")
@@ -103,6 +141,8 @@ async def complete_task(
         task_uuid,
         user_uuid,
     )
+
+    asyncio.create_task(advance_recurring_task(task_id))
 
     if goal_uuid is not None:
         remaining = await db.fetchval(
@@ -163,9 +203,45 @@ async def missed_task(
         user_uuid,
     )
 
+    asyncio.create_task(advance_recurring_task(task_id))
     asyncio.create_task(_run_pattern_observer(user_id, task_id))
 
     return {"task_id": task_id, "status": "missed"}
+
+
+@router.patch("/{task_id}/escalation-policy")
+async def update_escalation_policy(
+    task_id: str,
+    body: EscalationPolicyUpdate,
+    current_user=Depends(get_current_user),
+) -> dict:
+    """17.3.6 — Update the escalation policy for a task (silent | standard | aggressive)."""
+    valid = {"silent", "standard", "aggressive"}
+    if body.escalation_policy not in valid:
+        raise HTTPException(status_code=422, detail=f"escalation_policy must be one of {sorted(valid)}")
+
+    user_id = str(current_user["sub"])
+    user_uuid = uuid.UUID(user_id)
+    try:
+        task_uuid = uuid.UUID(task_id)
+    except ValueError:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    updated = await db.fetchval(
+        """
+        UPDATE tasks SET escalation_policy = $1
+        WHERE id = $2 AND user_id = $3
+        RETURNING id
+        """,
+        body.escalation_policy,
+        task_uuid,
+        user_uuid,
+    )
+    if updated is None:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    task = await _fetch_task_or_404(task_id, user_id)
+    return _serialize_task(task)
 
 
 @router.post("/{task_id}/reschedule", response_model=ChatMessageResponse)
@@ -230,7 +306,7 @@ async def _fetch_task_or_404(task_id: str, user_id: str):
         """
         SELECT id, user_id, goal_id, title, description, status,
                scheduled_at, duration_minutes, trigger_type, location_trigger,
-               recurrence_rule, shared_with_goal_ids, completed_at, created_at
+               recurrence_rule, shared_with_goal_ids, escalation_policy, completed_at, created_at
         FROM tasks WHERE id = $1
         """,
         task_uuid,

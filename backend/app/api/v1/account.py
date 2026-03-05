@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import limiter
-from app.models.api_schemas import AccountMeResponse, AccountPatchRequest, PhoneVerifyConfirmRequest, PhoneVerifySendRequest
+from app.models.api_schemas import AccountMeResponse, AccountPatchRequest, PhoneVerifyConfirmRequest, PhoneVerifySendRequest, PushSubscriptionRequest
+from app.config import settings
 from app.services.supabase import db
 from app.services.twilio_service import confirm_otp, send_otp
 
@@ -123,6 +124,23 @@ async def delete_account(request: Request, user=Depends(get_current_user)) -> Re
             pass
     await db.execute("DELETE FROM users WHERE id = $1", user_id)
     return Response(status_code=204)
+
+
+@router.get("/push-subscription/vapid-key")
+async def get_vapid_public_key() -> dict:
+    """19.13.1 — Return VAPID public key for frontend push subscription."""
+    return {"public_key": settings.vapid_public_key}
+
+
+@router.post("/push-subscription")
+@limiter.limit("30/minute")
+async def save_push_subscription(body: PushSubscriptionRequest, request: Request, user=Depends(get_current_user)) -> dict:
+    """19.13.2 — Save browser Web Push subscription to users table."""
+    await db.execute(
+        "UPDATE users SET push_subscription = $2::jsonb WHERE id = $1",
+        str(user["sub"]), json.dumps(body.subscription),
+    )
+    return {"status": "saved"}
 
 
 @router.get("/export")

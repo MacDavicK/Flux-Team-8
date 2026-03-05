@@ -42,7 +42,7 @@ async def dispatch_push(task: dict, user_push_subscription: dict) -> bool:
     }
 
     try:
-        webpush(
+        response = webpush(
             subscription_info=user_push_subscription,
             data=json.dumps(payload),
             vapid_private_key=settings.vapid_private_key,
@@ -50,13 +50,20 @@ async def dispatch_push(task: dict, user_push_subscription: dict) -> bool:
                 "sub": f"mailto:{settings.vapid_claims_email}",
             },
         )
+        logger.info(
+            "Web push sent for task %s: HTTP %s %s",
+            task_id,
+            response.status_code,
+            response.text[:200] if response.text else "",
+        )
         return True
     except WebPushException as exc:
         # 14.1.4 — Expired / invalid subscriptions are non-fatal
         logger.warning(
-            "Web push failed for task %s: %s",
+            "Web push failed for task %s: %s — response: %s",
             task_id,
             exc,
+            exc.response.text[:200] if getattr(exc, "response", None) and exc.response.text else "",
             exc_info=False,
         )
         return False

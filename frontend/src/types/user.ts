@@ -92,6 +92,7 @@ export interface User {
   preferences?: Preference;
   profile?: Profile;
   onboarded: boolean;
+  timezone?: string | null;
   onboardingProfile?: OnboardingProfile;
   createdAt?: string;
   lastActive?: string;

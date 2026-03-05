@@ -10,7 +10,7 @@ from __future__ import annotations
 import itertools
 import json
 import uuid
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 
@@ -98,15 +98,17 @@ async def send_message(
         "SELECT profile, timezone FROM users WHERE id = $1",
         uuid.UUID(user_id),
     )
-    user_profile: dict = {}
-    if user_row and user_row["profile"]:
-        raw = user_row["profile"]
-        if isinstance(raw, str):
-            user_profile = json.loads(raw)
-        elif isinstance(raw, dict):
-            user_profile = raw
-        else:
-            user_profile = dict(raw)
+    _raw_profile = user_row["profile"] if user_row and user_row["profile"] else None
+    if _raw_profile is None:
+        user_profile: dict[str, Any] = {}
+    elif isinstance(_raw_profile, str):
+        user_profile = cast(dict[str, Any], json.loads(_raw_profile))
+    else:
+        user_profile = cast(dict[str, Any], dict(_raw_profile))
+
+    # Ensure timezone from dedicated column takes precedence over profile JSON
+    if user_row and user_row["timezone"]:
+        user_profile["timezone"] = user_row["timezone"]
 
     # ── Build initial AgentState ─────────────────────────────────────────────
     # user_profile is loaded from DB on every turn. The onboarding node writes
@@ -152,7 +154,10 @@ async def send_message(
         body.message,
     )
     goal_draft = result.get("goal_draft")
-    metadata = {"proposed_plan": goal_draft} if goal_draft else None
+    approval_pending = result.get("approval_status") == "pending"
+    # Only persist the plan in metadata when the user still needs to act on it.
+    # After save_tasks runs, approval_status is None — don't echo the plan back.
+    metadata = {"proposed_plan": goal_draft} if goal_draft and approval_pending else None
     await db.execute(
         """
         INSERT INTO messages (conversation_id, role, content, agent_node, metadata)
@@ -199,8 +204,8 @@ async def send_message(
         conversation_id=str(conv_id),
         message=reply,
         agent_node=result.get("intent"),
-        proposed_plan=result.get("goal_draft"),
-        requires_user_action=result.get("approval_status") == "pending",
+        proposed_plan=goal_draft if approval_pending else None,
+        requires_user_action=approval_pending,
         onboarding_options=result.get("onboarding_options"),
     )
 
@@ -266,7 +271,7 @@ async def start_onboarding(
     conv = await db.fetchrow(
         """
         INSERT INTO conversations (user_id, langgraph_thread_id, context_type)
-        VALUES ($1, $2, 'general')
+        VALUES ($1, $2, 'onboarding')
         RETURNING id, langgraph_thread_id
         """,
         uuid.UUID(user_id),
@@ -441,6 +446,7 @@ async def list_conversations(
                 ) AS preview
             FROM conversations c
             WHERE c.user_id = $1
+              AND (c.context_type IS NULL OR c.context_type != 'onboarding')
               AND (c.last_message_at < $2::timestamptz
                    OR (c.last_message_at IS NULL AND $2 IS NOT NULL))
             ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
@@ -466,6 +472,7 @@ async def list_conversations(
                 ) AS preview
             FROM conversations c
             WHERE c.user_id = $1
+              AND (c.context_type IS NULL OR c.context_type != 'onboarding')
             ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
             LIMIT $2
             """,

@@ -10,7 +10,7 @@ import { useAuth } from "~/contexts/AuthContext";
 import { serverGetMe } from "~/lib/authServerFns";
 import { accountService } from "~/services/AccountService";
 import type { AccountMe, AccountPatchRequest } from "~/types";
-import { isClient } from "~/utils/env";
+import { debugSsrLog, isClient } from "~/utils/env";
 
 function ProfilePagePending() {
   return (
@@ -27,7 +27,9 @@ export const Route = createFileRoute("/profile")({
   loader: async () => {
     if (isClient()) {
       const account = await accountService.getMe();
-      return { account };
+      const data = { account };
+      debugSsrLog("/profile (ProfilePage)", data);
+      return data;
     }
     // Server-side: use serverGetMe for token, then fetch with absolute URL
     const { token } = await serverGetMe();

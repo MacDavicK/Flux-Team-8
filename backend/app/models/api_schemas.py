@@ -101,6 +101,7 @@ class TaskResponse(BaseModel):
     duration_minutes: Optional[int] = None
     trigger_type: Optional[str] = None
     goal_id: Optional[str] = None
+    escalation_policy: str = "standard"
     created_at: datetime
 
 
@@ -190,8 +191,33 @@ class RescheduleRequest(BaseModel):
 
 
 # ─────────────────────────────────────────────────────────────────
+# 19.12 — To-do (unscheduled task)
+# ─────────────────────────────────────────────────────────────────
+
+class TodoCreateRequest(BaseModel):
+    title: str
+    description: Optional[str] = None
+
+
+# ─────────────────────────────────────────────────────────────────
 # 19.11 — Goal modify
 # ─────────────────────────────────────────────────────────────────
 
 class GoalModifyRequest(BaseModel):
     message: str
+
+
+# ─────────────────────────────────────────────────────────────────
+# 19.13 — Push subscription
+# ─────────────────────────────────────────────────────────────────
+
+class PushSubscriptionRequest(BaseModel):
+    subscription: dict  # Full PushSubscriptionJSON object from the browser
+
+
+# ─────────────────────────────────────────────────────────────────
+# 19.14 — Escalation policy
+# ─────────────────────────────────────────────────────────────────
+
+class EscalationPolicyUpdate(BaseModel):
+    escalation_policy: str  # "silent" | "standard" | "aggressive"

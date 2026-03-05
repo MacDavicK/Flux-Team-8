@@ -68,26 +68,17 @@ async def _ensure_goal(user_id: str, goal_draft: dict) -> Optional[str]:
     return str(new_id) if new_id else None
 
 
-async def _insert_task(row: dict) -> None:
-    """INSERT a single task row; asyncpg handles Python types natively."""
+def _row_to_tuple(row: dict) -> tuple:
+    """Convert a task dict to the positional tuple used by the INSERT statement."""
     scheduled_at = row.get("scheduled_at")
-    # Parse ISO8601 strings into datetime objects that asyncpg accepts as TIMESTAMPTZ
     if isinstance(scheduled_at, str):
         try:
             scheduled_at = pendulum.parse(scheduled_at)
         except Exception:
             scheduled_at = None
-
-    await db.execute(
-        """
-        INSERT INTO tasks (
-            user_id, goal_id, title, description, status,
-            scheduled_at, duration_minutes, trigger_type, location_trigger,
-            recurrence_rule, shared_with_goal_ids
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-        """,
+    return (
         row.get("user_id"),
-        row.get("goal_id"),          # None for standalone tasks
+        row.get("goal_id"),
         row.get("title", ""),
         row.get("description", ""),
         row.get("status", "pending"),
@@ -97,7 +88,29 @@ async def _insert_task(row: dict) -> None:
         row.get("location_trigger"),
         row.get("recurrence_rule"),
         row.get("shared_with_goal_ids") or [],
+        row.get("escalation_policy", "standard"),
     )
+
+
+_INSERT_SQL = """
+INSERT INTO tasks (
+    user_id, goal_id, title, description, status,
+    scheduled_at, duration_minutes, trigger_type, location_trigger,
+    recurrence_rule, shared_with_goal_ids, escalation_policy
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+"""
+
+
+async def _insert_task(row: dict) -> None:
+    """INSERT a single task row."""
+    await db.execute(_INSERT_SQL, *_row_to_tuple(row))
+
+
+async def _insert_tasks_bulk(rows: list[dict]) -> None:
+    """Batch-insert many task rows in a single round-trip using executemany."""
+    if not rows:
+        return
+    await db.executemany(_INSERT_SQL, [_row_to_tuple(r) for r in rows])
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -191,6 +204,13 @@ async def save_tasks_node(state: AgentState) -> dict:
             "shared_with_goal_ids": shared_with_goal_ids,
         }
 
+        escalation_policy: str = task.get("escalation_policy", "standard")
+
+        # If a recurring task has no scheduled_at, default to now so the rrule
+        # expander has a valid dtstart and the task shows up in today's events.
+        if recurrence_rule and not scheduled_at_utc:
+            scheduled_at_utc = pendulum.now("UTC").isoformat()
+
         if recurrence_rule and scheduled_at_utc:
             # Convert UTC start → local wall-clock for rrule dtstart
             try:
@@ -199,26 +219,38 @@ async def save_tasks_node(state: AgentState) -> dict:
                 start_utc = pendulum.now("UTC")
             start_local = start_utc.in_timezone(user_tz)
 
-            # Expansion horizon: sprint end for goal tasks, 1 year for standalone
-            if task_goal_id and week_range:
-                expansion_weeks = week_range[-1]
-            elif task_goal_id:
-                expansion_weeks = 6   # default sprint length
-            else:
-                expansion_weeks = 52  # standalone recurring task — expand 1 year
-
-            end_local = start_local.add(weeks=expansion_weeks)
-
-            expanded = expand_rrule_to_tasks(
-                base_task=base_row,
-                rrule_string=recurrence_rule,
-                start_dt=start_local,
-                end_dt=end_local,
-                user_timezone=user_tz,
-            )
-            for row in expanded:
-                await _insert_task(row)
+            if escalation_policy == "silent":
+                # Silent recurring tasks: save only the first occurrence.
+                # The notifier auto-advances to the next occurrence on each miss,
+                # so pre-expanding the full series would create a huge number of
+                # rows (e.g. "every 15 mins" → ~34k rows/year) with no benefit.
+                await _insert_task({
+                    **base_row,
+                    "scheduled_at": scheduled_at_utc,
+                    "recurrence_rule": recurrence_rule,
+                    "escalation_policy": escalation_policy,
+                })
                 rows_inserted += 1
+            else:
+                # Expansion horizon: sprint end for goal tasks, 1 year for standalone
+                if task_goal_id and week_range:
+                    expansion_weeks = week_range[-1]
+                elif task_goal_id:
+                    expansion_weeks = 6   # default sprint length
+                else:
+                    expansion_weeks = 52  # standalone recurring task — expand 1 year
+
+                end_local = start_local.add(weeks=expansion_weeks)
+
+                expanded = expand_rrule_to_tasks(
+                    base_task={**base_row, "escalation_policy": escalation_policy},
+                    rrule_string=recurrence_rule,
+                    start_dt=start_local,
+                    end_dt=end_local,
+                    user_timezone=user_tz,
+                )
+                await _insert_tasks_bulk(expanded)
+                rows_inserted += len(expanded)
 
         else:
             # One-off task (or no recurrence) — single insert
@@ -226,6 +258,7 @@ async def save_tasks_node(state: AgentState) -> dict:
                 **base_row,
                 "scheduled_at": scheduled_at_utc,
                 "recurrence_rule": recurrence_rule,
+                "escalation_policy": escalation_policy,
             })
             rows_inserted += 1
 
@@ -257,18 +290,32 @@ async def save_tasks_node(state: AgentState) -> dict:
             pass  # Never let pattern flagging break the save flow
 
     # ── Step 5: Build summary reply ───────────────────────────────────────
-    if rows_inserted > 0:
-        noun = "task" if rows_inserted == 1 else "tasks"
-        summary = f"Done! {rows_inserted} {noun} added to your schedule."
+    # For NEW_TASK flow, task_handler already appended a rich contextual reply
+    # (e.g. "I've scheduled a reminder for you to get stationary items at 1 PM").
+    # Avoid appending a second generic message; just return history as-is.
+    # For GOAL / MODIFY_GOAL / NEXT_MILESTONE flows there is no prior assistant
+    # reply in this turn, so we still need to append the summary.
+    intent: str = state.get("intent") or ""
+    last_assistant = next(
+        (m["content"] for m in reversed(history) if m.get("role") == "assistant"),
+        None,
+    )
+    # task_handler sets approval_status="approved" and adds its reply before
+    # calling save_tasks, so history already ends with an assistant message.
+    if intent == "NEW_TASK" and last_assistant:
+        final_history = history
     else:
-        summary = "No tasks were saved — nothing to schedule."
+        if rows_inserted > 0:
+            noun = "task" if rows_inserted == 1 else "tasks"
+            summary = f"Done! {rows_inserted} {noun} added to your schedule."
+        else:
+            summary = "No tasks were saved — nothing to schedule."
+        final_history = history + [{"role": "assistant", "content": summary}]
 
     updated_goal_draft = {**goal_draft, "goal_id": goal_id} if goal_id else goal_draft
 
     return {
-        "conversation_history": history + [
-            {"role": "assistant", "content": summary}
-        ],
+        "conversation_history": final_history,
         "goal_draft": updated_goal_draft,
         "approval_status": None,
         "proposed_tasks": None,
