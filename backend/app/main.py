@@ -33,7 +33,6 @@ from app.services.supabase import close_pool, init_pool  # noqa: E402
 from app.api.v1.account import router as account_router  # noqa: E402
 from app.api.v1.analytics import router as analytics_router  # noqa: E402
 from app.api.v1.chat import router as chat_router  # noqa: E402
-from app.api.v1.demo import router as demo_router  # noqa: E402
 from app.api.v1.echoconfig import router as echoconfig_router  # noqa: E402
 from app.api.v1.goals import router as goals_router  # noqa: E402
 from app.api.v1.patterns import router as patterns_router  # noqa: E402
@@ -98,7 +97,6 @@ app.include_router(analytics_router, prefix=_PREFIX)
 app.include_router(patterns_router,  prefix=_PREFIX)
 app.include_router(account_router,   prefix=_PREFIX)
 app.include_router(webhooks_router,  prefix=_PREFIX)
-app.include_router(demo_router,      prefix=_PREFIX)
 app.include_router(echoconfig_router)
 
 

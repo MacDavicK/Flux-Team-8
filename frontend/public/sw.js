@@ -2,13 +2,23 @@
 
 self.addEventListener('push', (event) => {
   const data = event.data?.json() ?? {};
+
   event.waitUntil(
-    self.registration.showNotification(data.title ?? 'Flux Reminder', {
-      body: data.body ?? '',
-      icon: '/favicon-32x32.png',
-      badge: '/favicon-16x16.png',
-      data: { task_id: data.task_id },
-      actions: data.actions ?? [],
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((windowClients) => {
+      // If the app is open and focused, post a message so it can show an in-app banner.
+      const focusedClient = windowClients.find((c) => c.focused);
+      if (focusedClient) {
+        focusedClient.postMessage({ type: 'PUSH_RECEIVED', data });
+      }
+
+      // Always show the OS notification (browser ignores it when tab is focused).
+      return self.registration.showNotification(data.title ?? 'Flux Reminder', {
+        body: data.body ?? '',
+        icon: '/favicon-32x32.png',
+        badge: '/favicon-16x16.png',
+        data: { task_id: data.task_id },
+        actions: data.actions ?? [],
+      });
     })
   );
 });

@@ -14,7 +14,6 @@ import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { useAuth } from "~/contexts/AuthContext";
-import { useSimulation } from "~/contexts/SimulationContext";
 import { chatService } from "~/services/ChatService";
 import type { ConversationSummary, HistoryMessage } from "~/services/ChatService";
 import type { ChatMessage, PlanMilestone } from "~/types";
@@ -175,7 +174,6 @@ function ChatPage() {
   const drawerScrollRef = useRef<HTMLDivElement | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const { stopEscalation } = useSimulation();
   const initDoneRef = useRef(false);
 
   const isOnboarding = user && !user.onboarded;
@@ -384,8 +382,6 @@ function ChatPage() {
     ]);
     setIsThinking(true);
     scrollToBottom();
-    stopEscalation();
-
     try {
       const result = await chatService.sendMessage(text, conversationIdRef.current);
 

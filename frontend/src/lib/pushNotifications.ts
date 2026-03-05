@@ -73,3 +73,28 @@ export function getPermissionState(): NotificationPermission | 'unsupported' {
   if (!('Notification' in window)) return 'unsupported';
   return Notification.permission;
 }
+
+export interface InAppPushPayload {
+  title: string;
+  body: string;
+  task_id?: string;
+}
+
+/**
+ * Listens for push notifications forwarded by the service worker while the app
+ * is in the foreground. Returns a cleanup function to remove the listener.
+ */
+export function listenForInAppPushes(
+  onPush: (payload: InAppPushPayload) => void,
+): () => void {
+  if (!('serviceWorker' in navigator)) return () => {};
+
+  const handler = (event: MessageEvent) => {
+    if (event.data?.type === 'PUSH_RECEIVED') {
+      onPush(event.data.data as InAppPushPayload);
+    }
+  };
+
+  navigator.serviceWorker.addEventListener('message', handler);
+  return () => navigator.serviceWorker.removeEventListener('message', handler);
+}

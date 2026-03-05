@@ -35,16 +35,6 @@ export {
   ColorTheme,
   SortDirection,
 } from "./common";
-// Demo domain
-export type {
-  DemoModeType,
-  DemoPanelState,
-  DemoToggleState,
-  RescheduleOption,
-  SimulationEvent,
-  TimeWarpSettings,
-  TravelModeSettings,
-} from "./demo";
 // Event domain
 export type {
   Event,
