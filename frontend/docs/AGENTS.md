@@ -61,6 +61,33 @@ Onboarding uses the `/chat` route. When a user is not onboarded (`user.onboarded
 - Page-level data: Fetched via TanStack Router `loader` functions (blocking, before page renders).
 - Component-level data: Fetched via `useEffect` with local state (non-blocking, shows loading states).
 
+### SSR-Safe Loader Pattern (isClient split)
+Loaders run on **both server and client**. A relative URL like `/api/v1/...` will throw `"Failed to parse URL"` on the server because there is no base URL. Always split loader fetches using `isClient()`:
+
+```typescript
+import { isClient } from "~/utils/env";
+import { serverGetMe } from "~/lib/authServerFns";
+import { someService } from "~/services/SomeService";
+
+loader: async () => {
+  if (isClient()) {
+    // Client: service uses apiFetch with relative URL + in-memory token
+    const data = await someService.getData();
+    return { data };
+  }
+  // Server: must use absolute URL with token from serverGetMe
+  const { token } = await serverGetMe();
+  const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+  const res = await fetch(`${backendUrl}/api/v1/some-endpoint`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  const data = res.ok ? await res.json() : {};
+  return { data };
+},
+```
+
+See `src/routes/index.tsx` and `src/routes/profile.tsx` for reference implementations. **Never** call a service method (which uses `apiFetch` with a relative URL) from a loader without an `isClient()` guard.
+
 ### Loading States
 Each component section has its own glassmorphic loading state component (e.g., `StatsLoadingState`, `EnergyAuraLoadingState`).
 

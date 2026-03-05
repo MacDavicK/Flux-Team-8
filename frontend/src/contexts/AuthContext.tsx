@@ -6,7 +6,7 @@ import {
   useEffect,
   useState,
 } from "react";
-import { serverGetAccessToken } from "~/lib/authServerFns";
+import { serverGetMe } from "~/lib/authServerFns";
 import { setInMemoryToken } from "~/lib/apiClient";
 import { authService } from "~/services/AuthService";
 import type { User } from "~/types";
@@ -21,6 +21,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshAuthStatus: () => Promise<User | undefined>;
   loginWithGoogle: () => Promise<void>;
+  patchUser: (patch: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -34,58 +35,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [hasTasks, setHasTasks] = useState(false);
 
   /**
-   * Reads the session from the httpOnly cookie (via server function), hydrates
-   * the in-memory token, then fetches the onboarded flag from the backend.
+   * Reads the session from the httpOnly cookie and fetches the authoritative
+   * profile from the FastAPI backend — all in a single server-side round-trip
+   * via serverGetMe. Hydrates the in-memory token on the client.
    */
   const refreshAuthStatus = useCallback(async (): Promise<User | undefined> => {
     setIsLoading(true);
     try {
-      const { token, user: serverUser } = await serverGetAccessToken();
-      setInMemoryToken(token);
+      const { token, user: serverUser, sessionInvalid } = await serverGetMe();
 
-      if (!token || !serverUser) {
+      if (sessionInvalid || !token || !serverUser) {
+        setInMemoryToken(null);
         setIsAuthenticated(false);
         setUser(undefined);
         setHasTasks(false);
         return undefined;
       }
 
-      // Fetch authoritative onboarded flag from the backend.
-      // A 401 here means the session is invalid/expired — treat as logged out.
-      // Token is now available in memory so apiFetch would work, but using raw
-      // fetch here avoids a circular import with apiClient.
-      let onboarded = false;
-      let profileName: string | null = null;
-      try {
-        const res = await fetch("/api/v1/account/me", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.status === 401 || res.status === 403) {
-          // Session rejected by the backend — clear everything.
-          setInMemoryToken(null);
-          setIsAuthenticated(false);
-          setUser(undefined);
-          setHasTasks(false);
-          return undefined;
-        }
-        if (res.ok) {
-          const meData = (await res.json()) as { onboarded: boolean; name?: string | null };
-          onboarded = meData.onboarded ?? false;
-          profileName = meData.name ?? null;
-        }
-      } catch {
-        // Backend unavailable — keep onboarded: false as safe default.
-        // Do not log out; the backend may just be temporarily down.
-      }
-
-      const resolvedUser: User = {
-        ...serverUser,
-        onboarded,
-        ...(profileName ? { name: profileName } : {}),
-      };
+      setInMemoryToken(token);
       setIsAuthenticated(true);
-      setUser(resolvedUser);
-      return resolvedUser;
+      setUser(serverUser);
+      return serverUser;
     } catch {
       setInMemoryToken(null);
       setIsAuthenticated(false);
@@ -141,6 +111,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     // State is restored when /auth/callback completes and refreshAuthStatus() runs.
   }, []);
 
+  const patchUser = useCallback((patch: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
+  }, []);
+
   return (
     <AuthContext.Provider
       value={{
@@ -153,6 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         logout,
         refreshAuthStatus,
         loginWithGoogle,
+        patchUser,
       }}
     >
       {children}

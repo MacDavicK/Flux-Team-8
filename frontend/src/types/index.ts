@@ -79,6 +79,7 @@ export type {
   ChatSession,
   MessageContent,
   NotificationMessage,
+  OnboardingOption,
   PlanMessage,
   TaskSuggestionMessage,
   TextMessage,

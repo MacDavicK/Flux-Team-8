@@ -163,6 +163,17 @@ export interface ChatMessageRequest {
 }
 
 /**
+ * A quick-select option shown during onboarding.
+ * value=null means "Specify" — the frontend opens a validated text input.
+ */
+export interface OnboardingOption {
+  label: string;
+  value: string | null;
+  zod_validator: string | null;
+  input_type?: string | null;  // "otp" renders the OTP verification widget
+}
+
+/**
  * Real backend: POST /api/v1/chat/message response
  */
 export interface ChatMessageResponse {
@@ -171,6 +182,7 @@ export interface ChatMessageResponse {
   agent_node?: string | null;
   proposed_plan?: { [key: string]: unknown } | null;
   requires_user_action: boolean;
+  onboarding_options?: OnboardingOption[] | null;
 }
 
 /**
@@ -184,4 +196,6 @@ export interface ChatMessage {
   type: MessageVariant;
   /** Content as React node for UI rendering */
   content: React.ReactNode;
+  /** Quick-select options shown below this message during onboarding */
+  onboardingOptions?: OnboardingOption[] | null;
 }

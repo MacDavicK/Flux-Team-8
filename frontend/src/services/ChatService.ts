@@ -7,13 +7,21 @@ export interface HistoryMessage {
   content: string;
   agent_node: string | null;
   created_at: string;
+  metadata?: { proposed_plan?: Record<string, unknown> } | null;
 }
 
 export interface ConversationSummary {
   id: string;
   last_message_at: string | null;
   created_at: string;
+  title: string | null;
   preview: string | null;
+}
+
+export interface ConversationListPage {
+  conversations: ConversationSummary[];
+  has_more: boolean;
+  next_cursor: string | null;
 }
 
 class ChatService {
@@ -29,13 +37,36 @@ class ChatService {
     return response.json();
   }
 
-  async getConversations(limit = 20): Promise<ConversationSummary[]> {
-    const response = await apiFetch(`/api/v1/chat/conversations?limit=${limit}`);
+  async getConversations(cursor?: string): Promise<ConversationListPage> {
+    const params = new URLSearchParams();
+    if (cursor) params.set("cursor", cursor);
+    const response = await apiFetch(`/api/v1/chat/conversations?${params}`);
     if (!response.ok) {
       throw new Error("Failed to fetch conversations");
     }
-    const data = await response.json() as { conversations: ConversationSummary[] };
-    return data.conversations;
+    return response.json() as Promise<ConversationListPage>;
+  }
+
+  async startOnboarding(): Promise<ChatMessageResponse> {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const response = await apiFetch("/api/v1/chat/onboarding/start", {
+      method: "POST",
+      body: JSON.stringify({ timezone }),
+    });
+    if (!response.ok && response.status !== 409) {
+      throw new Error("Failed to start onboarding");
+    }
+    return response.json();
+  }
+
+  async resendOtp(phoneNumber: string): Promise<void> {
+    const response = await apiFetch("/api/v1/account/phone/verify/send", {
+      method: "POST",
+      body: JSON.stringify({ phone_number: phoneNumber }),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to resend verification code");
+    }
   }
 
   async sendMessage(

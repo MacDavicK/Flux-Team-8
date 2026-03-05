@@ -1,5 +1,7 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import * as Sentry from "@sentry/react";
+import { createFileRoute, redirect } from "@tanstack/react-router";
+import { serverGetMe } from "~/lib/authServerFns";
+import { useState } from "react";
 import { DateHeader } from "~/components/flow/v2/DateHeader";
 import { FlowTimeline } from "~/components/flow/v2/FlowTimeline";
 import { TaskRail } from "~/components/flow/v2/TaskRail";
@@ -9,9 +11,45 @@ import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { useAuth } from "~/contexts/AuthContext";
 import { tasksService } from "~/services/TasksService";
+import { isClient } from "~/utils/env";
 import { EventType, type TaskRailItem, type TimelineEvent } from "~/types";
 
+function FlowPagePending() {
+  return (
+    <div className="relative w-full max-w-md mx-auto h-screen flex flex-col overflow-hidden items-center justify-center">
+      <AmbientBackground />
+      <LoadingState />
+    </div>
+  );
+}
+
 export const Route = createFileRoute("/")({
+  pendingComponent: FlowPagePending,
+  pendingMs: 0,
+  loader: async () => {
+    const { user, token } = await serverGetMe();
+    if (!user) throw redirect({ to: "/login" });
+    if (!user.onboarded) throw redirect({ to: "/chat" });
+
+    const rawTasks: { [key: string]: unknown }[] = await (async () => {
+      if (isClient()) return tasksService.getTodayTasks().catch((e) => { Sentry.captureException(e); return []; });
+      const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+      return fetch(`${backendUrl}/api/v1/tasks/today`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+        .then((r) => (r.ok ? r.json() : []))
+        .catch((e) => { Sentry.captureException(e); return []; });
+    })();
+
+    const events: TimelineEvent[] = [];
+    const tasks: TaskRailItem[] = [];
+    for (const t of rawTasks) {
+      const { railItem, event } = mapTaskToDisplayTypes(t);
+      events.push(event);
+      tasks.push(railItem);
+    }
+    return { user, events, tasks };
+  },
   component: FlowPage,
 });
 
@@ -58,36 +96,14 @@ function getGreeting(name?: string): string {
 }
 
 function FlowPage() {
-  const { isAuthenticated, isLoading: authLoading, user } = useAuth();
-  const [data, setData] = useState<{
-    events: TimelineEvent[];
-    tasks: TaskRailItem[];
-  }>({ events: [], tasks: [] });
-  const [isLoading, setIsLoading] = useState(true);
+  const { events: initialEvents, tasks: initialTasks, user: loaderUser } = Route.useLoaderData();
+  const { user } = useAuth();
+  const [data, setData] = useState<{ events: TimelineEvent[]; tasks: TaskRailItem[] }>({
+    events: initialEvents,
+    tasks: initialTasks,
+  });
 
-  useEffect(() => {
-    // Wait for auth to resolve before fetching — the root redirect handles
-    // unauthenticated users, so we only fetch once we know we're allowed here.
-    if (authLoading || !isAuthenticated) return;
-
-    tasksService
-      .getTodayTasks()
-      .then((rawTasks) => {
-        const events: TimelineEvent[] = [];
-        const tasks: TaskRailItem[] = [];
-        for (const t of rawTasks) {
-          const { railItem, event } = mapTaskToDisplayTypes(t);
-          events.push(event);
-          tasks.push(railItem);
-        }
-        setData({ events, tasks });
-        setIsLoading(false);
-      })
-      .catch((error) => {
-        console.error("Failed to fetch tasks:", error);
-        setIsLoading(false);
-      });
-  }, [authLoading, isAuthenticated]);
+  const displayName = user?.name ?? loaderUser.name;
 
   const handleComplete = (taskId: string) => {
     // Optimistic update — mark done immediately in local state.
@@ -101,7 +117,7 @@ function FlowPage() {
     }));
 
     tasksService.completeTask(taskId).catch((error) => {
-      console.error("Failed to complete task:", error);
+      Sentry.captureException(error, { extra: { taskId } });
       // Revert optimistic update on error.
       setData((prev) => ({
         events: prev.events.map((e) =>
@@ -125,27 +141,17 @@ function FlowPage() {
       tasksService
         .rescheduleTask(rescheduleModal.taskId, { message: option })
         .catch((error) => {
-          console.error("Failed to reschedule task:", error);
+          Sentry.captureException(error, { extra: { taskId: rescheduleModal.taskId, option } });
         });
     }
     setRescheduleModal({ isOpen: false, taskTitle: "", taskId: "" });
   };
 
-  if (authLoading || isLoading) {
-    return (
-      <div className="relative w-full max-w-md mx-auto h-screen flex flex-col overflow-hidden">
-        <AmbientBackground />
-        <LoadingState />
-        <BottomNav />
-      </div>
-    );
-  }
-
   return (
     <div className="relative w-full max-w-md mx-auto h-screen flex flex-col overflow-hidden">
       <AmbientBackground />
 
-      <DateHeader greeting={getGreeting(user?.name)} />
+      <DateHeader greeting={getGreeting(displayName)} />
 
       <TaskRail tasks={data.tasks} onComplete={handleComplete} />
 

@@ -153,14 +153,15 @@ export interface AccountMe {
   timezone?: string | null;
   onboarded?: boolean | null;
   phone_verified?: boolean | null;
-  notification_preferences?: { [key: string]: unknown } | null;
-  monthly_token_usage?: { [key: string]: unknown } | null;
+  notification_preferences?: { [key: string]: {} } | null;
+  monthly_token_usage?: { [key: string]: {} } | null;
 }
 
 /**
  * Real backend: PATCH /api/v1/account/me request body
  */
 export interface AccountPatchRequest {
+  name?: string | null;
   timezone?: string | null;
   notification_preferences?: { [key: string]: unknown } | null;
 }

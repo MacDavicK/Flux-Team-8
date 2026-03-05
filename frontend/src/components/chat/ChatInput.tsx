@@ -38,7 +38,7 @@ export function ChatInput({
   return (
     <motion.form
       onSubmit={handleSubmit}
-      className="px-5 pb-24 pt-4"
+      className="px-5 pb-32 pt-4"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}

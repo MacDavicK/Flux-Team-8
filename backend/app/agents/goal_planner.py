@@ -1,657 +1,276 @@
-"""
-Flux Backend — Goal Planner Agent
-
-A state-machine powered agent that uses an LLM (via OpenRouter) to decompose
-high-level goals into weekly milestones and recurring tasks via empathetic
-conversation.
-
-States:
-  IDLE → GATHERING_TIMELINE → GATHERING_CURRENT_STATE → GATHERING_TARGET
-  → GATHERING_PREFERENCES → PLAN_READY → AWAITING_CONFIRMATION → CONFIRMED
-"""
-
-from __future__ import annotations
-
-import asyncio
 import json
-import logging
-from typing import Any, Optional
+from pathlib import Path
 
-from openai import AsyncOpenAI
+from app.agents.state import AgentState
+from app.models.agent_outputs import GoalPlannerOutput, UserPreferenceExtractOutput
+from app.services.llm import check_token_budget, validated_llm_call
+from app.services.supabase import db
+from app.services.user_notes import get_user_notes, upsert_user_note
 
-from app.config import settings
-from app.models.schemas import (
-    ConversationState,
-    PlanMilestone,
-)
-from app.services import rag_service
+# conversation_id is threaded through goal_draft so we can update the title
+_CONV_ID_KEY = "_conversation_id"
 
-logger = logging.getLogger(__name__)
+# 9.2.1 — Load system prompt once at import time
+_PROMPT = (Path(__file__).parent / "prompts" / "goal_planner.txt").read_text()
 
-# ── Fallback message when RAG has no expert content ──
-FALLBACK_NO_EXPERT_CONTENT = (
-    "I don't have expert guidance for this specific goal yet. "
-    "Want me to create a general plan instead?"
-)
+_MODEL_PRIMARY = "openrouter/anthropic/claude-sonnet-4"
+_MODEL_BUDGET = "openrouter/openai/gpt-4o-mini"
 
-# ── System Prompt ───────────────────────────────────────────
+# Lightweight prompt to extract explicit user habit/constraint statements from conversation.
+_PREFERENCE_EXTRACT_PROMPT = """\
+You are a context extractor. Given a conversation, identify any explicit user statements
+about EXISTING habits, routines, or constraints that should be remembered for future planning.
 
-SYSTEM_PROMPT = """\
-You are Flux, an empathetic AI life assistant that helps people turn goals into
-actionable daily plans. You are warm, encouraging, and never judgmental.
+IMPORTANT DISTINCTION:
+- EXTRACT: things the user currently does or is constrained by (present tense, ongoing reality)
+- DO NOT EXTRACT: goals, aspirations, or things the user *wants* to start doing
 
-Your current task is to guide the user through a goal-planning conversation for
-a Health & Fitness goal. You must extract the following information one piece at
-a time through natural dialogue:
+Examples of things to EXTRACT:
+- "I go to the gym on Tuesday evenings" → already doing this, extract it
+- "I already run in the mornings" → already doing this, extract it
+- "I can't do anything before 9 AM because of the school run" → existing constraint, extract it
+- "I work nights so mornings are bad for me" → existing constraint, extract it
 
-1. **Timeline** — When is their target date / event?
-2. **Current State** — e.g. current weight
-3. **Target** — e.g. target weight (or suggest a healthy one if asked)
-4. **Preferences** — e.g. gym, home workouts, diet, running, etc.
+Examples of things to NOT EXTRACT (these are goals, not existing habits):
+- "I want to learn Japanese" → goal/aspiration, NOT an existing habit
+- "I want to start running" → goal, NOT an existing habit
+- "I'd like to learn German" → goal, NOT an existing habit
+- "I want to lose weight" → goal, NOT an existing habit
 
 Rules:
-- Ask only ONE question at a time.
-- Be concise (1–3 sentences max per response).
-- Use encouraging emojis sparingly (💪, 🎯, ✨).
-- When suggesting a target, be health-conscious and realistic.
-- Never be pushy or judgmental about body weight.
-- Always be supportive even if the user seems unsure.
+- Only extract things the user explicitly stated as CURRENT/EXISTING in THIS conversation turn.
+- Do NOT extract goals, aspirations, or things the user wants to start.
+- Do NOT infer or guess — only extract clear, direct statements about existing reality.
+- If nothing qualifying was stated, return an empty notes list.
+- Generate a stable slug key: lowercase, underscores, e.g. "gym_tuesday_evening".
 
-Respond with ONLY the next conversational message — no JSON, no markdown headers.
-"""
-
-PLAN_GENERATION_PROMPT = """\
-You are Flux, an AI life assistant and behavioral scientist. Based on the conversation context below, generate a structured 6-week health & fitness plan.
-
-Context:
-- Goal: {goal}
-- Timeline: {timeline}
-- Current state: {current_state}
-- Target: {target}
-- Preferences: {preferences}
-
-{expert_context_section}
-
-{rag_section}
-Generate a JSON object with this exact structure:
-{{
-  "plan": [
-    {{
-      "week": 1,
-      "title": "Week 1 milestone title",
-      "tasks": ["task 1", "task 2", "task 3"]
-    }}
-  ],
-  "sources": [
-    {{
-      "title": "Article title",
-      "source": "URL"
-    }}
+Output ONLY valid JSON matching this schema:
+{
+  "notes": [
+    {
+      "key": "gym_tuesday_evening",
+      "description": "Goes to gym on Tuesday evenings around 19:00",
+      "activity": "gym",
+      "days": ["Tuesday"],
+      "time": "19:00",
+      "duration_minutes": 60
+    }
   ]
-  "sources_used": ["Article title 1", "Article title 2"]
-}}
-
-Rules:
-- Generate exactly 6 milestones (weeks 1-6).
-- Each milestone should have 3-5 concrete, recurring tasks.
-- Tasks should be specific and actionable (e.g. "30-min gym session: chest & triceps").
-- Progress from lighter to more intense across the weeks.
-- Include a mix of the user's preferences (gym, diet, etc.).
-- Make it realistic and achievable.
-{rag_rules}
-- Ground your recommendations in the expert content above when available.
-- In "sources_used", list the exact article titles you referenced. If no expert
-  content was provided, return an empty array.
-
-Respond with ONLY the JSON object, nothing else.
+}
 """
 
-RAG_RULES = """\
-- Ground recommendations in the expert content provided above. Do NOT fabricate advice.
-- If the expert content doesn't cover a specific topic, note that in the task description.
-- Include a "sources" array listing every article you referenced. Each entry must have "title" and "source" fields.
-- Cite sources naturally in task descriptions where applicable (e.g. "Based on CDC guidelines, aim for...").\
-"""
 
-NO_RAG_RULES = """\
-- If no expert content was provided, generate the best plan from your general knowledge.
-- Set "sources" to an empty array [].\
-"""
-
-FALLBACK_NO_EXPERT_CONTENT = (
-    "I don't have expert guidance for this specific goal yet. "
-    "I'll create a plan based on general best practices instead."
-)
-
-
-class GoalPlannerAgent:
+async def goal_planner_node(state: AgentState) -> dict:
     """
-    Manages a single goal-planning conversation through a state machine.
+    Converts the user's goal into a concrete 6-week plan via multi-turn negotiation.
 
-    Each conversation gets its own agent instance. The conversation history
-    is stored both in-memory (for the LLM context window) and persisted
-    to the database via the service layer.
+    Handles two entry paths:
+    - GOAL intent (new goal): builds the full roadmap; proposed_tasks always covers
+      the first milestone (pipeline_order=1) so the UI can show tasks immediately.
+    - NEXT_MILESTONE intent: loads the target pipeline goal from DB, marks the
+      previously active goal as completed, activates the pipeline goal, and plans
+      proposed_tasks specifically for it.
+
+    Called twice per goal turn (fan-out pattern):
+    1. Before sub-agents: sub-agent outputs are None → return empty dict so
+       route_from_goal_planner can dispatch the Send() fan-out.
+    2. After sub-agents converge: all outputs present → run the full LLM call.
     """
+    user_id: str = state["user_id"]
 
-    def __init__(self, conversation_id: str, user_id: str):
-        self.conversation_id = conversation_id
-        self.user_id = user_id
-        self.state = ConversationState.IDLE
-        self.context: dict[str, Any] = {}
-        self.messages: list[dict[str, str]] = []
-        self.plan: Optional[list[PlanMilestone]] = None
-        self._sources: list[dict] = []
+    # 9.2.2 — Only generate the plan once all sub-agent outputs are available.
+    # On the first call they are None (fan-out not yet triggered); return early
+    # so route_from_goal_planner can dispatch the Send() fan-out.
+    classifier_done = state.get("classifier_output") is not None
+    scheduler_done = state.get("scheduler_output") is not None
+    pattern_done = state.get("pattern_output") is not None
 
-        self._client = AsyncOpenAI(
-            api_key=settings.open_router_api_key,
-            base_url=settings.openrouter_base_url,
-        )
-        self._model = settings.openai_model
-        self._sources: list[dict] = []
-        self._rag_available = False
-        self._model = settings.goal_planner_model
+    if not (classifier_done and scheduler_done and pattern_done):
+        # Sub-agents haven't run yet — nothing to do here; routing will fan out.
+        return {}
 
-    # ── Public API ──────────────────────────────────────────
+    # 9.2.8 — Downgrade model on hard budget limit
+    budget = await check_token_budget(user_id)
+    model = _MODEL_BUDGET if budget == "hard_limit" else _MODEL_PRIMARY
 
-    async def process_message(self, user_message: str) -> dict:
-        """
-        Process a user message and advance the state machine.
+    profile = state.get("user_profile") or {}
+    classifier_output = state.get("classifier_output") or {}
+    scheduler_output = state.get("scheduler_output") or {}
+    pattern_output = state.get("pattern_output") or {}
+    goal_draft = state.get("goal_draft") or {}
+    intent = state.get("intent") or "GOAL"
 
-        Returns a dict with:
-          - message: str (AI response)
-          - state: ConversationState
-          - suggested_action: Optional[str]
-          - plan: Optional[list[PlanMilestone]]
-        """
-        self.messages.append({"role": "user", "content": user_message})
+    # Load stored user preference notes (habits / constraints from past conversations)
+    user_notes = await get_user_notes(user_id)
 
-        result = await self._advance_state(user_message)
+    # ── NEXT_MILESTONE: resolve target pipeline goal, transition statuses ─────
+    milestone_context_block = ""
+    next_goal_id: str | None = None
 
-        self.messages.append({"role": "assistant", "content": result["message"]})
+    if intent == "NEXT_MILESTONE":
+        # milestone_order may come from orchestrator state or goal_draft
+        _draft: dict = goal_draft  # plain dict — avoid TypedDict narrowing issues
+        milestone_order: int | None = state.get("milestone_order") or _draft.get("milestone_order")
+        parent_goal_id: str | None = _draft.get("goal_id")
 
-        return result
-
-    async def start_conversation(self, initial_message: str) -> dict:
-        """
-        Kick off the conversation. The initial_message is the user's first
-        goal statement (e.g. "I want to lose weight for a wedding").
-        """
-        # Detect if it's a health/fitness goal
-        lower = initial_message.lower()
-        _FITNESS_KEYWORDS = [
-            "lose weight", "weight", "fitness", "gym", "wedding", "health",
-            "lose", "loose", "pounds", "shape", "exercise", "workout", "run",
-            "running", "diet", "muscle", "strength", "cardio", "fat",
-            "tone", "slim", "lean", "fit", "kg", "kilo", "lb", "lbs",
-        ]
-        if any(kw in lower for kw in _FITNESS_KEYWORDS):
-            self.context["goal"] = initial_message
-            self.state = ConversationState.GATHERING_TIMELINE
-            ai_response = await self._ask_llm(
-                f"The user said: \"{initial_message}\". "
-                "This is a health & fitness goal. Ask them about their timeline/target date. "
-                "Be warm and encouraging."
+        # If no explicit order, resolve: find the lowest pipeline_order still pending
+        if milestone_order is None:
+            row = await db.fetchrow(
+                """
+                SELECT pipeline_order FROM goals
+                WHERE user_id = $1
+                  AND status = 'pipeline'
+                ORDER BY pipeline_order ASC
+                LIMIT 1
+                """,
+                user_id,
             )
-        else:
-            # For MVP, we only support health & fitness
-            ai_response = (
-                "That's a wonderful goal! 🎯 Right now I'm best at helping with "
-                "health & fitness goals. Could you tell me more about a health or "
-                "fitness goal you'd like to achieve?"
+            if row:
+                milestone_order = row["pipeline_order"]
+
+        # Fetch the target pipeline goal
+        if milestone_order is not None:
+            pipeline_row = await db.fetchrow(
+                """
+                SELECT id, title, description, pipeline_order, target_weeks
+                FROM goals
+                WHERE user_id = $1 AND pipeline_order = $2 AND status = 'pipeline'
+                LIMIT 1
+                """,
+                user_id,
+                milestone_order,
             )
-            self.state = ConversationState.IDLE
-
-        self.messages.append({"role": "user", "content": initial_message})
-        self.messages.append({"role": "assistant", "content": ai_response})
-
-        return {
-            "message": ai_response,
-            "state": self.state,
-            "suggested_action": None,
-            "plan": None,
-        }
-
-    # ── State Machine ───────────────────────────────────────
-
-    async def _advance_state(self, user_message: str) -> dict:
-        """Route to the correct handler based on current state."""
-
-        if self.state == ConversationState.IDLE:
-            return await self._handle_idle(user_message)
-        elif self.state == ConversationState.GATHERING_TIMELINE:
-            return await self._handle_timeline(user_message)
-        elif self.state == ConversationState.GATHERING_CURRENT_STATE:
-            return await self._handle_current_state(user_message)
-        elif self.state == ConversationState.GATHERING_TARGET:
-            return await self._handle_target(user_message)
-        elif self.state == ConversationState.GATHERING_PREFERENCES:
-            return await self._handle_preferences(user_message)
-        elif self.state == ConversationState.AWAITING_CONFIRMATION:
-            return await self._handle_confirmation(user_message)
-        else:
-            return {
-                "message": "This conversation has already been completed. Start a new one to set another goal!",
-                "state": self.state,
-                "suggested_action": None,
-                "plan": None,
-            }
-
-    async def _handle_idle(self, message: str) -> dict:
-        """User re-engages after an initial non-fitness goal."""
-        lower = message.lower()
-        _FITNESS_KEYWORDS = [
-            "lose weight", "weight", "fitness", "gym", "wedding", "health",
-            "lose", "loose", "pounds", "shape", "exercise", "workout", "run",
-            "running", "diet", "muscle", "strength", "cardio", "fat",
-            "tone", "slim", "lean", "fit", "kg", "kilo", "lb", "lbs",
-        ]
-        if any(kw in lower for kw in _FITNESS_KEYWORDS):
-            self.context["goal"] = message
-            self.state = ConversationState.GATHERING_TIMELINE
-            ai_response = await self._ask_llm(
-                f"The user said: \"{message}\". Ask about their timeline/event date."
-            )
-        else:
-            ai_response = (
-                "I'd love to help! For now I specialize in health & fitness goals. "
-                "Tell me about a health-related goal and let's build a plan! 💪"
-            )
-        return {
-            "message": ai_response,
-            "state": self.state,
-            "suggested_action": None,
-            "plan": None,
-        }
-
-    async def _handle_timeline(self, message: str) -> dict:
-        self.context["timeline"] = message
-        self.state = ConversationState.GATHERING_CURRENT_STATE
-
-        ai_response = await self._ask_llm(
-            f"The user's goal is: \"{self.context['goal']}\". "
-            f"Their timeline/event is: \"{message}\". "
-            "Now ask about their current state (e.g. current weight). Be gentle and non-judgmental."
-        )
-        return {
-            "message": ai_response,
-            "state": self.state,
-            "suggested_action": None,
-            "plan": None,
-        }
-
-    async def _handle_current_state(self, message: str) -> dict:
-        self.context["current_state"] = message
-        self.state = ConversationState.GATHERING_TARGET
-
-        ai_response = await self._ask_llm(
-            f"User's current state: \"{message}\". "
-            "Ask what their target is (e.g. target weight), and offer to suggest a healthy goal."
-        )
-        return {
-            "message": ai_response,
-            "state": self.state,
-            "suggested_action": "Suggest a goal",
-            "plan": None,
-        }
-
-    async def _handle_target(self, message: str) -> dict:
-        lower = message.lower()
-
-        # If the user wants a suggestion, let the LLM suggest one
-        if "suggest" in lower:
-            ai_response = await self._ask_llm(
-                f"The user wants you to suggest a healthy target. "
-                f"Their current state: \"{self.context['current_state']}\". "
-                f"Timeline: \"{self.context['timeline']}\". "
-                "Suggest a realistic, healthy target and then ask about their exercise/diet preferences."
-            )
-            # Extract a reasonable default
-            self.context["target"] = "Healthy target suggested by AI"
-        else:
-            self.context["target"] = message
-            ai_response = await self._ask_llm(
-                f"User's target: \"{message}\". "
-                "Now ask about their exercise and diet preferences "
-                "(gym, home workouts, running, diet changes, etc.)."
-            )
-
-        self.state = ConversationState.GATHERING_PREFERENCES
-        return {
-            "message": ai_response,
-            "state": self.state,
-            "suggested_action": None,
-            "plan": None,
-        }
-
-    async def _handle_preferences(self, message: str) -> dict:
-        self.context["preferences"] = message
-        self.state = ConversationState.AWAITING_CONFIRMATION
-
-        # Generate the plan (with RAG if available)
-        plan = await self._generate_plan()
-        # Generate the plan using a dedicated prompt (now RAG-enhanced)
-        plan, sources = await self._generate_plan()
-        self.plan = plan
-        self._sources = sources
-
-        # Build response message based on whether RAG content was found
-        if self._rag_available:
-            ai_response = (
-                "I've put together a personalized 6-week plan based on our conversation "
-                "and expert health & fitness research! 🎯\n\n"
-                "Here's what I've designed for you. Take a look and let me know if you'd like "
-                "to adjust anything, or say **'Looks good!'** to lock it in."
-            )
-        else:
-            ai_response = (
-                f"{FALLBACK_NO_EXPERT_CONTENT}\n\n"
-                "I've put together a 6-week plan based on our conversation! 🎯\n\n"
-                "Take a look and let me know if you'd like to adjust anything, "
-                "or say **'Looks good!'** to lock it in."
-            )
-
-        return {
-            "message": ai_response,
-            "state": self.state,
-            "suggested_action": "Looks good!",
-            "plan": plan,
-            "sources": getattr(self, "_sources", []),
-            "sources": sources,
-        }
-
-    async def _handle_confirmation(self, message: str) -> dict:
-        lower = message.lower()
-        if any(kw in lower for kw in ["yes", "good", "great", "perfect", "confirm", "lock", "love", "looks good"]):
-            self.state = ConversationState.CONFIRMED
-            ai_response = (
-                "Awesome! Your plan is locked in! 🎉\n\n"
-                "I've created your goal, milestones, and recurring tasks. "
-                "You'll see them on your calendar. Let's crush this together! 💪"
-            )
-            return {
-                "message": ai_response,
-                "state": self.state,
-                "suggested_action": None,
-                "plan": self.plan,
-                "sources": getattr(self, "_sources", []),
-                "sources": self._sources,
-            }
-        else:
-            # User wants changes — regenerate or adjust
-            ai_response = await self._ask_llm(
-                f"The user wants to modify the plan. They said: \"{message}\". "
-                "Acknowledge their feedback and ask what they'd like to change."
-            )
-            return {
-                "message": ai_response,
-                "state": self.state,
-                "suggested_action": None,
-                "plan": self.plan,
-                "sources": getattr(self, "_sources", []),
-                "sources": self._sources,
-            }
-
-    # ── LLM Helpers ─────────────────────────────────────────
-
-    async def _ask_llm(self, instruction: str) -> str:
-        """Send the conversation + a specific instruction to GPT-4o-mini."""
-        try:
-            llm_messages = [
-                {"role": "system", "content": SYSTEM_PROMPT},
-                *self.messages,
-                {"role": "user", "content": f"[AGENT INSTRUCTION — not from user]: {instruction}"},
-            ]
-
-            response = await self._client.chat.completions.create(
-                model=self._model,
-                messages=llm_messages,
-                temperature=0.7,
-                max_tokens=300,
-            )
-            return response.choices[0].message.content.strip()
-
-        except Exception as e:
-            logger.error(f"LLM call failed: {e}")
-            # Fallback responses so the conversation doesn't break
-            return self._fallback_response()
-
-    async def _generate_plan(self) -> list[PlanMilestone]:
-        """Ask GPT-4o-mini to generate a structured 6-week plan.
-
-        If RAG content is available, injects expert article context into the
-        prompt and includes source citations. Falls back gracefully if RAG
-        retrieval fails or returns no relevant content.
-        """
-        # --- RAG retrieval (non-blocking) ---
-        rag_context = ""
-        self._sources = []
-        self._rag_available = False
-
-        try:
-            # Build a composite query from the gathered context
-            query_parts = [
-                self.context.get("goal", ""),
-                self.context.get("preferences", ""),
-                self.context.get("target", ""),
-            ]
-            query = " ".join(part for part in query_parts if part)
-
-            if query.strip():
-                chunks = await asyncio.to_thread(rag_service.retrieve, query)
-                rag_context = await asyncio.to_thread(
-                    rag_service.format_rag_context, chunks
+            if pipeline_row:
+                next_goal_id = str(pipeline_row["id"])
+                milestone_context_block = (
+                    f"\ntarget_milestone: {json.dumps({'title': pipeline_row['title'], 'description': pipeline_row['description'], 'pipeline_order': pipeline_row['pipeline_order'], 'target_weeks': pipeline_row['target_weeks']})}\n"
+                    f"planning_mode: next_milestone\n"
+                    f"instruction: Generate proposed_tasks ONLY for this specific milestone. "
+                    f"Set goal_feasible_in_6_weeks=true and milestone_roadmap=null — the overall roadmap already exists.\n"
                 )
 
-                if rag_context:
-                    self._rag_available = True
-                    # Extract unique sources for the response
-                    seen = set()
-                    for chunk in chunks:
-                        key = (chunk["title"], chunk["source"])
-                        if key not in seen and chunk["score"] > settings.rag_relevance_threshold:
-                            seen.add(key)
-                            self._sources.append({
-                                "title": chunk["title"],
-                                "source": chunk["source"],
-                            })
-                    logger.info(
-                        "RAG context injected: %d chars, %d sources",
-                        len(rag_context), len(self._sources),
-                    )
-                else:
-                    logger.info("RAG retrieval returned no relevant chunks for: %s", query[:80])
-
-        except Exception as e:
-            logger.warning("RAG retrieval failed (proceeding without): %s", e)
-
-        # --- Build prompt ---
-    async def _generate_plan(self) -> tuple[list[PlanMilestone], list[dict]]:
-        """Ask the LLM to generate a structured 6-week plan, grounded in RAG content.
-
-        Returns ``(milestones, sources)`` where *sources* is a list of
-        ``{"title": str, "source": str}`` dicts for every unique article
-        that was injected into the prompt.
-        """
-        sources: list[dict] = []
-        rag_section = "\n"
-
-        # --- RAG retrieval (blocking I/O → run in thread) ---------------
-        try:
-            query = " ".join(filter(None, [
-                self.context.get("goal", ""),
-                self.context.get("target", ""),
-                self.context.get("preferences", ""),
-            ]))
-            chunks = await asyncio.to_thread(rag_service.retrieve, query)
-            formatted = rag_service.format_rag_context(chunks)
-
-            if formatted:
-                rag_section = (
-                    "\n## Expert Content (use these to ground your plan)\n"
-                    f"{formatted}\n\n"
-                )
-                # Deduplicate sources by title
-                seen_titles: set[str] = set()
-                for c in chunks:
-                    if c["score"] > settings.rag_relevance_threshold and c["title"] not in seen_titles:
-                        seen_titles.add(c["title"])
-                        sources.append({"title": c["title"], "source": c["source"]})
-                logger.info("RAG: injected %d chars, %d unique sources", len(formatted), len(sources))
-            else:
-                logger.info("RAG: no chunks above threshold — generating without expert content")
-        except Exception as e:
-            logger.warning("RAG retrieval failed (will generate without): %s", e)
-
-        # --- Plan generation --------------------------------------------
-        try:
-            if rag_context:
-                expert_context_section = (
-                    "## Expert Content\n\n"
-                    "The following excerpts come from curated, expert-reviewed articles. "
-                    "Use them as the primary basis for your plan.\n\n"
-                    f"{rag_context}"
-                )
-                rag_rules = RAG_RULES
-            else:
-                expert_context_section = ""
-                rag_rules = NO_RAG_RULES
-
-            prompt = PLAN_GENERATION_PROMPT.format(
-                goal=self.context.get("goal", ""),
-                timeline=self.context.get("timeline", ""),
-                current_state=self.context.get("current_state", ""),
-                target=self.context.get("target", ""),
-                preferences=self.context.get("preferences", ""),
-                expert_context_section=expert_context_section,
-                rag_rules=rag_rules,
-                rag_section=rag_section,
+        # Mark the currently active goal as completed
+        if parent_goal_id:
+            await db.execute(
+                """
+                UPDATE goals SET status = 'completed', completed_at = now()
+                WHERE id = $1 AND user_id = $2 AND status = 'active'
+                """,
+                parent_goal_id,
+                user_id,
+            )
+        else:
+            # No explicit goal_id — complete whatever is currently active
+            await db.execute(
+                """
+                UPDATE goals SET status = 'completed', completed_at = now()
+                WHERE user_id = $1 AND status = 'active'
+                """,
+                user_id,
             )
 
-            response = await self._client.chat.completions.create(
-                model=self._model,
-                messages=[{"role": "user", "content": prompt}],
-                temperature=0.7,
-                max_tokens=2000,
-                response_format={"type": "json_object"},
+        # Activate the pipeline goal so save_tasks can attach tasks to it
+        if next_goal_id:
+            await db.execute(
+                """
+                UPDATE goals SET status = 'active', activated_at = now()
+                WHERE id = $1 AND user_id = $2
+                """,
+                next_goal_id,
+                user_id,
+            )
+            goal_draft = {**goal_draft, "goal_id": next_goal_id}
+
+    # ── Build LLM context block ───────────────────────────────────────────────
+    context_block = (
+        f"\n\nContext:\n"
+        f"user_profile: {json.dumps(profile)}\n"
+        f"classifier_output: {json.dumps(classifier_output)}\n"
+        f"scheduler_output: {json.dumps(scheduler_output)}\n"
+        f"pattern_output: {json.dumps(pattern_output)}\n"
+        f"goal_draft: {json.dumps(goal_draft)}\n"
+        f"user_preference_notes: {json.dumps(user_notes)}\n"
+        + milestone_context_block
+    )
+
+    # 9.2.3 — Call validated LLM with GoalPlannerOutput, max_tokens=4096
+    result: GoalPlannerOutput = await validated_llm_call(
+        model=model,
+        system_prompt=_PROMPT + context_block,
+        messages=list(state.get("conversation_history") or []),
+        output_model=GoalPlannerOutput,
+        max_tokens=4096,
+        user_id=user_id,
+    )
+
+    # 9.2.9 — Extract new user preference notes (fire-and-forget)
+    conv_history = list(state.get("conversation_history") or [])
+    if conv_history:
+        try:
+            extract_result: UserPreferenceExtractOutput = await validated_llm_call(
+                model=_MODEL_BUDGET,
+                system_prompt=_PREFERENCE_EXTRACT_PROMPT,
+                messages=conv_history,
+                output_model=UserPreferenceExtractOutput,
+                max_tokens=512,
+                user_id=user_id,
+            )
+            for note in extract_result.notes:
+                await upsert_user_note(
+                    user_id=user_id,
+                    key=note.key,
+                    description=note.description,
+                    details={
+                        "activity": note.activity,
+                        "days": note.days,
+                        "time": note.time,
+                        "duration_minutes": note.duration_minutes,
+                    },
+                )
+        except Exception:
+            # Never let note extraction break the main plan flow
+            pass
+
+    # 9.2.4 — Handle multi-sprint goals (new GOAL flow only)
+    # For NEXT_MILESTONE the roadmap already exists in DB — skip re-insertion.
+    if intent != "NEXT_MILESTONE" and not result.goal_feasible_in_6_weeks and result.milestone_roadmap:
+        pipeline_goals = [mg for mg in result.milestone_roadmap if mg.pipeline_order > 1]
+        for mg in pipeline_goals:
+            await db.execute(
+                """
+                INSERT INTO goals (user_id, title, description, status, pipeline_order, target_weeks)
+                VALUES ($1, $2, $3, 'pipeline', $4, $5)
+                ON CONFLICT DO NOTHING
+                """,
+                user_id,
+                mg.title,
+                mg.description,
+                mg.pipeline_order,
+                mg.target_weeks,
             )
 
-            raw = response.choices[0].message.content.strip()
-            data = json.loads(raw)
+    # 9.2.5 — Compose assistant message from plan summary
+    assistant_message = result.plan_summary
 
-            milestones = []
-            for item in data.get("plan", []):
-                milestones.append(
-                    PlanMilestone(
-                        week=item["week"],
-                        title=item["title"],
-                        tasks=item["tasks"],
-                    )
-                )
-
-            # Capture LLM-reported sources (may differ from retrieval sources)
-            llm_sources = data.get("sources", [])
-            if llm_sources:
-                self._sources = llm_sources
-
-            return milestones
-
-        except Exception as e:
-            logger.error("Plan generation failed: %s", e)
-            # Fallback plan is generic; do not claim it was based on RAG/sources
-            self._rag_available = False
-            self._sources = []
-            return self._fallback_plan()
-            return milestones, sources
-
-        except Exception as e:
-            logger.error(f"Plan generation failed: {e}")
-            return self._fallback_plan(), []
-
-    # ── Fallbacks ───────────────────────────────────────────
-
-    def _fallback_response(self) -> str:
-        """Hardcoded fallback if the LLM is unavailable."""
-        fallbacks = {
-            ConversationState.GATHERING_TIMELINE: "That's a great goal! 💪 When is the event or target date?",
-            ConversationState.GATHERING_CURRENT_STATE: "Got it! What do you currently weigh, if you don't mind sharing?",
-            ConversationState.GATHERING_TARGET: "And what's your target weight? Or should I suggest a healthy goal?",
-            ConversationState.GATHERING_PREFERENCES: "Do you prefer gym, home workouts, or mostly diet changes?",
-        }
-        return fallbacks.get(self.state, "Tell me more about your goal!")
-
-    def _fallback_plan(self) -> list[PlanMilestone]:
-        """Hardcoded fallback plan for the wedding weight loss scenario."""
-        return [
-            PlanMilestone(week=1, title="Foundation Week", tasks=[
-                "30-min walk daily",
-                "Track all meals in a food journal",
-                "Drink 8 glasses of water daily",
-                "Replace sugary drinks with water or herbal tea",
-            ]),
-            PlanMilestone(week=2, title="Building Momentum", tasks=[
-                "3× gym sessions (full body)",
-                "Meal prep Sunday for the week",
-                "30-min cardio 2× per week",
-                "Cut processed snacks",
-            ]),
-            PlanMilestone(week=3, title="Increasing Intensity", tasks=[
-                "4× gym sessions (upper/lower split)",
-                "Add 10-min HIIT after strength training",
-                "Increase protein intake to 1.6g/kg",
-                "Reduce portion sizes by 10%",
-            ]),
-            PlanMilestone(week=4, title="Consistency Check", tasks=[
-                "4× gym sessions",
-                "2× cardio sessions (30 min each)",
-                "Weekly weigh-in and progress photo",
-                "Try one new healthy recipe",
-            ]),
-            PlanMilestone(week=5, title="Push Phase", tasks=[
-                "5× gym sessions",
-                "Increase cardio intensity",
-                "Fine-tune macros based on progress",
-                "Start light core routine daily",
-            ]),
-            PlanMilestone(week=6, title="Final Sprint & Maintain", tasks=[
-                "5× gym sessions with peak intensity",
-                "Maintain calorie target",
-                "Final weigh-in and measurements",
-                "Plan maintenance routine for post-goal",
-            ]),
-        ]
-
-    # ── Serialization ───────────────────────────────────────
-
-    def to_dict(self) -> dict:
-        """Serialize agent state for database persistence."""
-        return {
-            "conversation_id": self.conversation_id,
-            "user_id": self.user_id,
-            "state": self.state.value,
-            "context": self.context,
-            "messages": self.messages,
-            "plan": [m.model_dump() for m in self.plan] if self.plan else None,
-            "sources": getattr(self, "_sources", []),
-            "sources": self._sources,
-        }
-
-    @classmethod
-    def from_dict(cls, data: dict) -> "GoalPlannerAgent":
-        """Restore agent state from database."""
-        agent = cls(
-            conversation_id=data["conversation_id"],
-            user_id=data["user_id"],
+    # 9.2.6 — Append quick-action hint when plan is pending approval
+    if result.approval_status == "pending":
+        assistant_message += (
+            "\n\n_You can accept this plan, ask me to change specific tasks or timings, "
+            "or describe anything that doesn't work for you._"
         )
-        agent.state = ConversationState(data["state"])
-        agent.context = data.get("context", {})
-        agent.messages = data.get("messages", [])
-        agent._sources = data.get("sources", [])
-        agent._rag_available = bool(agent._sources)
 
-        raw_plan = data.get("plan")
-        if raw_plan:
-            agent.plan = [PlanMilestone(**m) for m in raw_plan]
+    # Assign stable IDs so the scheduler can echo them back for reliable matching
+    # in save_tasks (avoids fragile title-string comparison).
+    for i, task in enumerate(result.proposed_tasks):
+        task.task_id = f"task-{i}"
 
-        agent._sources = data.get("sources", [])
+    updated_draft: dict = dict(goal_draft or {})
+    updated_draft["plan"] = result.model_dump()
 
-        return agent
+    return {
+        "goal_draft": updated_draft,
+        "proposed_tasks": [t.model_dump() for t in result.proposed_tasks],
+        "approval_status": result.approval_status,
+        "conversation_history": conv_history
+        + [{"role": "assistant", "content": assistant_message}],
+    }

@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/react";
 import { createRouter } from "@tanstack/react-router";
 import { DefaultCatchBoundary } from "./components/DefaultCatchBoundary";
 import { NotFound } from "./components/NotFound";
@@ -11,5 +12,8 @@ export function getRouter() {
     defaultNotFoundComponent: () => <NotFound />,
     scrollRestoration: true,
   });
+
+  Sentry.addIntegration(Sentry.tanstackRouterBrowserTracingIntegration(router));
+
   return router;
 }

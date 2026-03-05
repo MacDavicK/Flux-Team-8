@@ -1,6 +1,7 @@
 import tailwindcss from "@tailwindcss/vite";
 import { tanstackStart } from "@tanstack/react-start/plugin/vite";
 import viteReact from "@vitejs/plugin-react";
+import { sentryVitePlugin } from "@sentry/vite-plugin";
 import { defineConfig } from "vite";
 import tsConfigPaths from "vite-tsconfig-paths";
 
@@ -69,8 +70,14 @@ export default defineConfig({
         ? { babel: { plugins: [babelPluginDataComponent] } }
         : {},
     ),
+    sentryVitePlugin({
+      org: process.env.SENTRY_ORG,
+      project: process.env.SENTRY_PROJECT,
+      authToken: process.env.SENTRY_AUTH_TOKEN,
+    }),
   ],
   build: {
+    sourcemap: true,
     rollupOptions: {
       onwarn(warning, warn) {
         // TODO - remove this when tanstack start fixes this

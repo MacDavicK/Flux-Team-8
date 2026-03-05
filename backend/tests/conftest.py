@@ -1,53 +1,45 @@
 """
-Shared fixtures for legacy app/ tests.
-
-Uses real OpenRouter LLM calls (key loaded from backend/.env).
-Mocks Supabase only since DB may not be running.
+21.3 — Shared pytest fixtures for Flux backend tests.
 """
+from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-from dotenv import load_dotenv
-from fastapi.testclient import TestClient
-
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
 
-@pytest.fixture()
-def mock_supabase():
-    """
-    Patch get_supabase_client in goal_service so no real DB calls happen.
-    Returns the mock client so tests can configure return values.
-    """
-    with patch("app.services.goal_service.get_supabase_client") as mock_get_sb:
-        mock_sb = MagicMock()
-        mock_get_sb.return_value = mock_sb
+# ─────────────────────────────────────────────────────────────────
+# 21.3.3 — AsyncMock helpers for LLM call and Twilio client
+# ─────────────────────────────────────────────────────────────────
 
-        mock_result = MagicMock()
-        mock_result.data = [{"id": "00000000-0000-0000-0000-000000000001"}]
-
-        mock_table = MagicMock()
-        mock_table.insert.return_value.execute.return_value = mock_result
-        mock_table.update.return_value.eq.return_value.execute.return_value = mock_result
-        mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = MagicMock(data=None)
-
-        mock_sb.table.return_value = mock_table
-        yield mock_sb
+@pytest.fixture
+def mock_llm_call(monkeypatch):
+    """Patch llm_call and validated_llm_call to return controllable values."""
+    mock = AsyncMock(return_value='{"intent": "CLARIFY", "payload": {}, "clarification_question": "What goal?"}')
+    monkeypatch.setattr("app.services.llm.llm_call", mock)
+    monkeypatch.setattr("app.services.llm.validated_llm_call", AsyncMock())
+    return mock
 
 
-@pytest.fixture()
-def agent():
-    """Fresh GoalPlannerAgent instance using real OpenRouter from .env."""
-    from app.agents.goal_planner import GoalPlannerAgent
-    return GoalPlannerAgent(conversation_id="test-conv-1", user_id="test-user-1")
+@pytest.fixture
+def mock_twilio(monkeypatch):
+    """Patch Twilio client methods."""
+    mock_client = MagicMock()
+    mock_client.messages.create.return_value = MagicMock(sid="SM_test_123")
+    mock_client.calls.create.return_value = MagicMock(sid="CA_test_456")
+    mock_client.verify.v2.services.return_value.verifications.create.return_value = MagicMock(status="pending")
+    mock_client.verify.v2.services.return_value.verification_checks.create.return_value = MagicMock(status="approved")
+    monkeypatch.setattr("app.services.twilio_service._client", mock_client)
+    return mock_client
 
 
-@pytest.fixture()
-def app_client(mock_supabase):
-    """Sync FastAPI TestClient for legacy app/ tests (DB mocked, real OpenRouter)."""
-    from app.main import app as legacy_app
-    from app.routers.goals import _active_agents
-    _active_agents.clear()
-    return TestClient(legacy_app)
+@pytest.fixture
+def mock_db(monkeypatch):
+    """Patch the db helper with AsyncMock methods."""
+    mock = MagicMock()
+    mock.fetch = AsyncMock(return_value=[])
+    mock.fetchrow = AsyncMock(return_value=None)
+    mock.execute = AsyncMock(return_value="OK")
+    mock.fetchval = AsyncMock(return_value=None)
+    monkeypatch.setattr("app.services.supabase.db", mock)
+    return mock

@@ -25,7 +25,7 @@ const navItems: NavItem[] = [
     position: "center",
   },
   {
-    to: "/reflection",
+    to: "/profile",
     icon: <User className="w-5 h-5" />,
     label: "Profile",
     position: "right",

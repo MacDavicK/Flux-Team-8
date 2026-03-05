@@ -54,7 +54,7 @@ All task and goal creation, modification, and rescheduling is done through conve
 ## 2. Repository Structure
 
 ```
-flux-backend/
+backend/
 ├── app/
 │   ├── main.py                    # FastAPI app entry point, router registration
 │   ├── config.py                  # Settings via pydantic-settings

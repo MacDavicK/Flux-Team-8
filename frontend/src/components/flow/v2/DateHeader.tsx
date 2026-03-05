@@ -1,3 +1,5 @@
+import { Link } from "@tanstack/react-router";
+import { User } from "lucide-react";
 import { format } from "~/utils/date";
 
 export function DateHeader({ date, greeting }: { date?: string; greeting?: string }) {
@@ -13,6 +15,14 @@ export function DateHeader({ date, greeting }: { date?: string; greeting?: strin
           {displayDate}
         </h1>
       </div>
+
+      <Link
+        to="/profile"
+        className="w-10 h-10 glass-bubble flex items-center justify-center text-river hover:text-sage transition-colors duration-200 active:scale-95 shrink-0 mb-1"
+        aria-label="Profile settings"
+      >
+        <User className="w-[18px] h-[18px]" />
+      </Link>
     </header>
   );
 }
