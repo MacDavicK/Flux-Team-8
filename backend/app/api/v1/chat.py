@@ -74,7 +74,7 @@ async def send_message(
     # ── Load conversation history from DB ────────────────────────────────────
     rows = await db.fetch(
         """
-        SELECT id, role, content, agent_node, created_at
+        SELECT id, role, content, agent_node, created_at, metadata
         FROM messages
         WHERE conversation_id = $1
         ORDER BY created_at ASC
@@ -110,6 +110,26 @@ async def send_message(
     if user_row and user_row["timezone"]:
         user_profile["timezone"] = user_row["timezone"]
 
+    # ── Restore pending approval state from last assistant message metadata ─────
+    # approval_status and goal_draft/proposed_tasks are not persisted in the DB
+    # as columns — they live only in LangGraph state. Since we rebuild state from
+    # scratch on every turn, we recover them from the metadata written when the
+    # plan was last presented to the user (approval_status="pending").
+    pending_goal_draft: dict | None = None
+    pending_proposed_tasks: list | None = None
+    pending_approval_status: str | None = None
+    pending_classifier_output: dict | None = None
+    for row in reversed(rows):
+        if row["role"] == "assistant" and row["metadata"]:
+            meta = json.loads(row["metadata"]) if isinstance(row["metadata"], str) else dict(row["metadata"])
+            plan = meta.get("proposed_plan")
+            if plan and plan.get("plan", {}).get("approval_status") == "pending":
+                pending_goal_draft = plan
+                pending_proposed_tasks = plan.get("plan", {}).get("proposed_tasks")
+                pending_approval_status = "pending"
+                pending_classifier_output = meta.get("classifier_output")
+            break
+
     # ── Build initial AgentState ─────────────────────────────────────────────
     # user_profile is loaded from DB on every turn. The onboarding node writes
     # partial answers back to users.profile after each step, so the DB is always
@@ -118,12 +138,12 @@ async def send_message(
         "user_id": user_id,
         "conversation_history": history,
         "intent": None,
-        "goal_draft": None,
-        "proposed_tasks": None,
-        "classifier_output": None,
+        "goal_draft": pending_goal_draft,
+        "proposed_tasks": pending_proposed_tasks,
+        "classifier_output": pending_classifier_output,
         "scheduler_output": None,
         "pattern_output": None,
-        "approval_status": None,
+        "approval_status": pending_approval_status,
         "error": None,
         "token_usage": {},
         "correlation_id": str(uuid.uuid4()),
@@ -157,7 +177,15 @@ async def send_message(
     approval_pending = result.get("approval_status") == "pending"
     # Only persist the plan in metadata when the user still needs to act on it.
     # After save_tasks runs, approval_status is None — don't echo the plan back.
-    metadata = {"proposed_plan": goal_draft} if goal_draft and approval_pending else None
+    # Also persist classifier_output so class_tags can be written when the goal
+    # row is created on the approval turn (classifier doesn't re-run then).
+    if goal_draft and approval_pending:
+        metadata: dict | None = {
+            "proposed_plan": goal_draft,
+            "classifier_output": result.get("classifier_output"),
+        }
+    else:
+        metadata = None
     await db.execute(
         """
         INSERT INTO messages (conversation_id, role, content, agent_node, metadata)

@@ -19,7 +19,6 @@ import pendulum
 
 from app.agents.pattern_observer import flag_goal_milestone_completion
 from app.agents.state import AgentState
-from app.services.rrule_expander import expand_rrule_to_tasks
 from app.services.supabase import db
 
 
@@ -29,12 +28,17 @@ from app.services.supabase import db
 
 
 def _goal_title_from_plan(plan: dict) -> str:
-    """Derive a short goal title from the plan summary (max 100 chars)."""
-    summary = plan.get("plan_summary", "") or ""
-    # Use first sentence or first 100 chars, whichever is shorter
-    first_sentence = summary.split(".")[0].strip()
-    title = first_sentence if first_sentence else summary
-    return title[:100] or "New Goal"
+    title = (plan.get("goal_title") or "").strip()
+    if title:
+        return title[:100]
+    # Fallback for plans generated before goal_title was added
+    roadmap = plan.get("milestone_roadmap") or []
+    if roadmap:
+        first_milestone_title = (roadmap[0].get("title") or "").strip()
+        if first_milestone_title:
+            return first_milestone_title[:100]
+    summary = (plan.get("plan_summary") or "").strip()
+    return summary[:100] or "New Goal"
 
 
 async def _ensure_goal(user_id: str, goal_draft: dict) -> Optional[str]:
@@ -212,45 +216,16 @@ async def save_tasks_node(state: AgentState) -> dict:
             scheduled_at_utc = pendulum.now("UTC").isoformat()
 
         if recurrence_rule and scheduled_at_utc:
-            # Convert UTC start → local wall-clock for rrule dtstart
-            try:
-                start_utc = pendulum.parse(scheduled_at_utc)
-            except Exception:
-                start_utc = pendulum.now("UTC")
-            start_local = start_utc.in_timezone(user_tz)
-
-            if escalation_policy == "silent":
-                # Silent recurring tasks: save only the first occurrence.
-                # The notifier auto-advances to the next occurrence on each miss,
-                # so pre-expanding the full series would create a huge number of
-                # rows (e.g. "every 15 mins" → ~34k rows/year) with no benefit.
-                await _insert_task({
-                    **base_row,
-                    "scheduled_at": scheduled_at_utc,
-                    "recurrence_rule": recurrence_rule,
-                    "escalation_policy": escalation_policy,
-                })
-                rows_inserted += 1
-            else:
-                # Expansion horizon: sprint end for goal tasks, 1 year for standalone
-                if task_goal_id and week_range:
-                    expansion_weeks = week_range[-1]
-                elif task_goal_id:
-                    expansion_weeks = 6   # default sprint length
-                else:
-                    expansion_weeks = 52  # standalone recurring task — expand 1 year
-
-                end_local = start_local.add(weeks=expansion_weeks)
-
-                expanded = expand_rrule_to_tasks(
-                    base_task={**base_row, "escalation_policy": escalation_policy},
-                    rrule_string=recurrence_rule,
-                    start_dt=start_local,
-                    end_dt=end_local,
-                    user_timezone=user_tz,
-                )
-                await _insert_tasks_bulk(expanded)
-                rows_inserted += len(expanded)
+            # All recurring tasks: insert only the first occurrence.
+            # The notifier/task-completion handler advances to the next occurrence
+            # (via the recurrence_rule) when the current one is done/missed/rescheduled.
+            await _insert_task({
+                **base_row,
+                "scheduled_at": scheduled_at_utc,
+                "recurrence_rule": recurrence_rule,
+                "escalation_policy": escalation_policy,
+            })
+            rows_inserted += 1
 
         else:
             # One-off task (or no recurrence) — single insert

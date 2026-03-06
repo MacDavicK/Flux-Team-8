@@ -8,7 +8,7 @@ from pydantic import BaseModel
 # ─────────────────────────────────────────────────────────────────
 
 class OrchestratorOutput(BaseModel):
-    intent: Literal["GOAL", "NEW_TASK", "RESCHEDULE_TASK", "MODIFY_GOAL", "NEXT_MILESTONE", "CHITCHAT", "CLARIFY", "ONBOARDING"]
+    intent: Literal["GOAL", "NEW_TASK", "RESCHEDULE_TASK", "MODIFY_GOAL", "NEXT_MILESTONE", "CHITCHAT", "CLARIFY", "ONBOARDING", "APPROVE"]
     payload: dict
     clarification_question: Optional[str] = None
     task_id: Optional[str] = None       # Present when intent == RESCHEDULE_TASK
@@ -57,6 +57,7 @@ class ConflictDetected(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 
 class GoalPlannerOutput(BaseModel):
+    goal_title: str                     # Short title for the goal (e.g. "Learn Japanese")
     goal_feasible_in_6_weeks: bool
     milestone_roadmap: Optional[list[Milestone]] = None
     proposed_tasks: list[ProposedTask]

@@ -28,6 +28,7 @@ Principles:
 When generating tasks, output ONLY valid JSON matching the GoalPlannerOutput schema:
 
 {
+  "goal_title": "Short title for this goal (e.g. 'Learn Japanese', 'Run a 5K')",
   "goal_feasible_in_6_weeks": true | false,
   "milestone_roadmap": null | [{ "title": "", "description": "", "pipeline_order": 1, "target_weeks": 6 }],
   "proposed_tasks": [

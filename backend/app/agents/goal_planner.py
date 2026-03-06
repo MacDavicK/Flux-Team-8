@@ -240,7 +240,7 @@ async def goal_planner_node(state: AgentState) -> dict:
                 """
                 INSERT INTO goals (user_id, title, description, status, pipeline_order, target_weeks)
                 VALUES ($1, $2, $3, 'pipeline', $4, $5)
-                ON CONFLICT DO NOTHING
+                ON CONFLICT (user_id, pipeline_order) WHERE status IN ('pipeline', 'active') DO NOTHING
                 """,
                 user_id,
                 mg.title,

@@ -51,6 +51,10 @@ class _Database:
         async with get_pool().acquire() as conn:
             return await conn.fetchval(query, *args)
 
+    async def executemany(self, query: str, args_list: list) -> None:
+        async with get_pool().acquire() as conn:
+            await conn.executemany(query, args_list)
+
 
 db = _Database()
 

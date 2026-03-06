@@ -37,10 +37,12 @@ async def orchestrator_node(state: AgentState) -> dict:
 
     # 9.1.2 — Build messages: conversation history + user profile context
     profile = state.get("user_profile") or {}
+    approval_status = state.get("approval_status") or ""
     system = _PROMPT + (
         f"\n\nUser profile context:\n"
         f"- Timezone: {profile.get('timezone', 'UTC')}\n"
         f"- Onboarded: true\n"
+        f"- approval_status: {approval_status or 'none'}\n"
     )
     messages = list(state.get("conversation_history") or [])
 
@@ -53,6 +55,11 @@ async def orchestrator_node(state: AgentState) -> dict:
         max_tokens=512,
         user_id=user_id,
     )
+
+    # APPROVE intent: user confirmed a pending plan — set approval_status and
+    # skip goal_planner entirely. route_from_orchestrator will route to save_tasks.
+    if result.intent == "APPROVE":
+        return {"approval_status": "approved"}
 
     out: dict = {
         "intent": result.intent,

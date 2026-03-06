@@ -555,7 +555,7 @@ function ChatPage() {
         />
       ) : null}
 
-      <BottomNav />
+      {!isOnboarding && <BottomNav />}
 
       {/* History Drawer */}
       <AnimatePresence>

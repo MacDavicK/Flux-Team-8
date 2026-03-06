@@ -51,6 +51,7 @@ so write it immediately without asking again.
 
 Output ONLY valid JSON matching this schema (no markdown fences):
 {
+  "goal_title": "Short title for this goal (e.g. 'Learn Japanese', 'Run a 5K')",
   "goal_feasible_in_6_weeks": true,
   "milestone_roadmap": null,
   "proposed_tasks": [
