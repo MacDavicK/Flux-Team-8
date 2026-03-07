@@ -1,5 +1,5 @@
 import { apiFetch } from "~/lib/apiClient";
-import type { ChatMessageResponse } from "~/types";
+import type { ChatMessageResponse, GoalClarifierAnswer } from "~/types";
 
 export interface HistoryMessage {
   id: string;
@@ -72,7 +72,7 @@ class ChatService {
   async sendMessage(
     message: string,
     conversationId?: string,
-    options?: { intent?: string; task_id?: string },
+    options?: { intent?: string; task_id?: string; answers?: GoalClarifierAnswer[] },
   ): Promise<ChatMessageResponse> {
     const response = await apiFetch("/api/v1/chat/message", {
       method: "POST",
@@ -81,6 +81,7 @@ class ChatService {
         conversation_id: conversationId ?? null,
         ...(options?.intent ? { intent: options.intent } : {}),
         ...(options?.task_id ? { task_id: options.task_id } : {}),
+        ...(options?.answers ? { answers: options.answers } : {}),
       }),
     });
 

@@ -121,6 +121,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const logout = useCallback(async () => {
+    // Unsubscribe from push notifications before signing out so the backend
+    // stops sending notifications to this device.
+    try {
+      const { unsubscribe } = await import('~/lib/pushNotifications');
+      await unsubscribe();
+    } catch {
+      // Non-fatal — proceed with logout even if unsubscribe fails.
+    }
     await authService.logout();
     setInMemoryToken(null);
     setIsAuthenticated(false);

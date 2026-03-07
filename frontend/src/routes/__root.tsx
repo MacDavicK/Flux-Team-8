@@ -107,7 +107,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
         {showSplash && (
           <SplashScreen onComplete={() => setShowSplash(false)} minDuration={3000} />
         )}
-        <main className="relative min-h-screen overflow-x-hidden">
+        <main className="relative min-h-screen overflow-x-hidden w-full max-w-md mx-auto">
           {children}
         </main>
         <Scripts />

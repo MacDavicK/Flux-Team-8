@@ -155,11 +155,35 @@ type TaskSuggestion = {
 };
 
 /**
+ * A single answer to a clarifying question, submitted as part of GOAL_CLARIFY intent.
+ */
+export interface GoalClarifierAnswer {
+  question_id: string;  // matches GoalClarifierQuestion.id
+  question: string;     // original question text (for conversation history context)
+  answer: string;       // selected option or custom input
+}
+
+/**
+ * A structured clarifying question returned by the backend when agent_node == "GOAL_CLARIFY".
+ * The frontend presents these one-by-one locally, then submits all answers in one batch.
+ */
+export interface GoalClarifierQuestion {
+  id: string;
+  question: string;
+  options: string[];          // pre-defined choices (empty = open-ended)
+  allows_custom: boolean;     // true if user can type a custom answer
+  zod_validator: string | null;  // Zod schema string for validating custom input
+  required: boolean;
+}
+
+/**
  * Real backend: POST /api/v1/chat/message request body
  */
 export interface ChatMessageRequest {
   message: string;
   conversation_id?: string | null;
+  intent?: string | null;                  // "GOAL_CLARIFY" when submitting answers batch
+  answers?: GoalClarifierAnswer[] | null;  // structured answers for GOAL_CLARIFY
 }
 
 /**
@@ -175,6 +199,9 @@ export interface OnboardingOption {
 
 /**
  * Real backend: POST /api/v1/chat/message response
+ *
+ * options — OnboardingOption[] for onboarding/reschedule flows
+ * questions — GoalClarifierQuestion[] when agent_node == "GOAL_CLARIFY"
  */
 export interface ChatMessageResponse {
   conversation_id: string;
@@ -183,6 +210,7 @@ export interface ChatMessageResponse {
   proposed_plan?: { [key: string]: unknown } | null;
   requires_user_action: boolean;
   options?: OnboardingOption[] | null;
+  questions?: GoalClarifierQuestion[] | null;
 }
 
 /**
@@ -198,4 +226,6 @@ export interface ChatMessage {
   content: React.ReactNode;
   /** Quick-select options shown below this message */
   options?: OnboardingOption[] | null;
+  /** Structured clarifying questions for GOAL_CLARIFY flow */
+  questions?: GoalClarifierQuestion[] | null;
 }

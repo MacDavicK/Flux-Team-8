@@ -25,6 +25,7 @@ export function FlowTimeline({ events, onTaskClick }: FlowTimelineProps) {
               type={event.type}
               avatars={event.avatars}
               status={event.status}
+              goalName={event.goalName}
               onClick={onTaskClick ? () => onTaskClick(event) : undefined}
             />
           </div>

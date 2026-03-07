@@ -1,11 +1,12 @@
 import { apiFetch } from "~/lib/apiClient";
 
 class TasksService {
-  async getTodayTasks(): Promise<{ [key: string]: unknown }[]> {
-    const response = await apiFetch("/api/v1/tasks/today");
+  async getTasks(date?: string): Promise<{ [key: string]: unknown }[]> {
+    const url = date ? `/api/v1/tasks?date=${encodeURIComponent(date)}` : "/api/v1/tasks";
+    const response = await apiFetch(url);
 
     if (!response.ok) {
-      throw new Error("Failed to fetch today's tasks");
+      throw new Error("Failed to fetch tasks");
     }
 
     return response.json();

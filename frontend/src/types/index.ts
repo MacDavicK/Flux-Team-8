@@ -67,6 +67,8 @@ export type {
   ChatMessageRequest,
   ChatMessageResponse,
   ChatSession,
+  GoalClarifierAnswer,
+  GoalClarifierQuestion,
   MessageContent,
   NotificationMessage,
   OnboardingOption,

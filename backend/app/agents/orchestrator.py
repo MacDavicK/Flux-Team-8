@@ -54,10 +54,14 @@ def _parse_start_date(payload: dict, messages: list, user_tz: str) -> str:
 async def orchestrator_node(state: AgentState) -> dict:
     """
     Classifies the user's latest message into one of:
-    GOAL | NEW_TASK | RESCHEDULE_TASK | MODIFY_GOAL | NEXT_MILESTONE | CHITCHAT | CLARIFY | ONBOARDING
+    GOAL | GOAL_CLARIFY | NEW_TASK | RESCHEDULE_TASK | MODIFY_GOAL | NEXT_MILESTONE | CHITCHAT | CLARIFY | ONBOARDING
 
     9.1.4 — If the user has not completed onboarding, intent is overridden to ONBOARDING.
     9.1.5 — If the user is over the hard token budget, model is downgraded to gpt-4o-mini.
+
+    GOAL_CLARIFY: the frontend has collected all clarification answers and is submitting
+    them in one batch. The orchestrator short-circuits — no LLM call needed, since the
+    intent is pre-set by the frontend. goal_clarifier handles the answers.
     """
     user_id: str = state["user_id"]
 
@@ -67,6 +71,11 @@ async def orchestrator_node(state: AgentState) -> dict:
     )
     if user_row and not user_row["onboarded"]:
         return {"intent": "ONBOARDING"}
+
+    # GOAL_CLARIFY: intent pre-set by frontend — pass through without LLM call.
+    # goal_clarifier will read the answers from goal_draft and route to goal_planner.
+    if state.get("intent") == "GOAL_CLARIFY":
+        return {"intent": "GOAL_CLARIFY"}
 
     # 9.1.5 — Downgrade model on hard budget limit
     budget = await check_token_budget(user_id)

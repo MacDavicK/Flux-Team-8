@@ -8,7 +8,7 @@ from pydantic import BaseModel
 # ─────────────────────────────────────────────────────────────────
 
 class OrchestratorOutput(BaseModel):
-    intent: Literal["GOAL", "NEW_TASK", "RESCHEDULE_TASK", "MODIFY_GOAL", "NEXT_MILESTONE", "CHITCHAT", "CLARIFY", "ONBOARDING", "APPROVE", "START_DATE"]
+    intent: Literal["GOAL", "GOAL_CLARIFY", "NEW_TASK", "RESCHEDULE_TASK", "MODIFY_GOAL", "NEXT_MILESTONE", "CHITCHAT", "CLARIFY", "ONBOARDING", "APPROVE", "START_DATE"]
     payload: dict
     clarification_question: Optional[str] = None
     task_id: Optional[str] = None       # Present when intent == RESCHEDULE_TASK
@@ -142,3 +142,20 @@ class UserPreferenceNote(BaseModel):
 
 class UserPreferenceExtractOutput(BaseModel):
     notes: list[UserPreferenceNote]     # May be empty if nothing new was detected
+
+
+# ─────────────────────────────────────────────────────────────────
+# 6.13 — GoalClarifierOutput
+# ─────────────────────────────────────────────────────────────────
+
+class ClarifierQuestion(BaseModel):
+    id: str                             # stable slug e.g. "current_fitness_level"
+    question: str
+    options: list[str] = []            # pre-defined choices (empty = open-ended)
+    allows_custom: bool = True
+    zod_validator: Optional[str] = None  # e.g. "z.string().min(1).max(500)"
+    required: bool = True
+
+
+class GoalClarifierOutput(BaseModel):
+    questions: list[ClarifierQuestion]  # empty = enough context, skip to planning

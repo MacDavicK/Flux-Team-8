@@ -11,6 +11,7 @@ interface TimelineEventProps {
   avatars?: string[];
   isLast?: boolean;
   status?: string;
+  goalName?: string;
   onClick?: () => void;
 }
 
@@ -21,6 +22,7 @@ export function TimelineEvent({
   period,
   type,
   status,
+  goalName,
   onClick,
 }: TimelineEventProps) {
   const typeClasses = {
@@ -60,6 +62,9 @@ export function TimelineEvent({
           {title}
         </h3>
         <p className="text-sm text-river leading-snug">{description}</p>
+        {goalName && (
+          <p className="text-xs text-river/50 mt-2 font-medium">{goalName}</p>
+        )}
       </motion.div>
     </div>
   );

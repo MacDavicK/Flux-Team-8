@@ -6,6 +6,7 @@ import { z } from "zod";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { MarkdownMessage } from "~/components/chat/MarkdownMessage";
 import { ChatInput } from "~/components/chat/ChatInput";
+import { GoalClarifierView } from "~/components/chat/GoalClarifierView";
 import { MilestoneRoadmapView, type RoadmapMilestone } from "~/components/chat/MilestoneRoadmapView";
 import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { PlanView } from "~/components/chat/PlanView";
@@ -184,6 +185,7 @@ function ChatPage() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingMoreConversations, setIsLoadingMoreConversations] = useState(false);
+  const [activeClarifier, setActiveClarifier] = useState<{ questions: import("~/types").GoalClarifierQuestion[]; messageId: string } | null>(null);
   const drawerScrollRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const initDoneRef = useRef(false);
@@ -409,23 +411,6 @@ function ChatPage() {
       return;
     }
 
-    // Handle "Mark as Missed" sentinel from reschedule options
-    if (text.startsWith("missed:")) {
-      const taskId = text.slice("missed:".length);
-      const missedMsg: ChatMessage = {
-        id: Date.now().toString(),
-        type: MessageVariant.AI,
-        content: <MarkdownMessage>Got it — marked as missed. You're all set.</MarkdownMessage>,
-      };
-      setMessages((prev) => [
-        ...prev.map((m) => ({ ...m, options: null })),
-        missedMsg,
-      ]);
-      tasksService.missedTask(taskId).catch(() => {});
-      scrollToBottom();
-      return;
-    }
-
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: MessageVariant.USER,
@@ -457,8 +442,9 @@ function ChatPage() {
 
         const isStartDatePrompt = result.agent_node === "ask_start_date";
 
+        const msgId = (Date.now() + 1).toString();
         const aiMessage: ChatMessage = {
-          id: (Date.now() + 1).toString(),
+          id: msgId,
           type: MessageVariant.AI,
           content: (
             <div className="space-y-3">
@@ -482,6 +468,11 @@ function ChatPage() {
         };
 
         setMessages((prev) => [...prev, aiMessage]);
+
+        if (result.questions?.length) {
+          setActiveClarifier({ questions: result.questions, messageId: msgId });
+        }
+
         scrollToBottom();
       }, 800);
     } catch {
@@ -667,6 +658,72 @@ function ChatPage() {
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Goal Clarifier Sheet */}
+      <AnimatePresence>
+        {activeClarifier && (
+          <GoalClarifierView
+            questions={activeClarifier.questions}
+            disabled={isThinking}
+            onDismiss={() => setActiveClarifier(null)}
+            onSubmit={(answers) => {
+              setActiveClarifier(null);
+              const summary = answers.map((a) => `${a.question}: ${a.answer}`).join(", ");
+              setMessages((prev) => [
+                ...prev,
+                { id: Date.now().toString(), type: MessageVariant.USER, content: summary },
+              ]);
+              setIsThinking(true);
+              scrollToBottom();
+              chatService
+                .sendMessage(summary, conversationIdRef.current, { intent: "GOAL_CLARIFY", answers })
+                .then((result) => {
+                  if (!conversationIdRef.current && result.conversation_id) {
+                    conversationIdRef.current = result.conversation_id;
+                    window.history.replaceState(null, "", `/chat?conversation=${result.conversation_id}`);
+                  }
+                  setTimeout(() => {
+                    setIsThinking(false);
+                    const parsed = result.proposed_plan
+                      ? parseProposedPlan(result.proposed_plan as Record<string, unknown>)
+                      : null;
+                    const isStartDatePrompt = result.agent_node === "ask_start_date";
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: (Date.now() + 1).toString(),
+                        type: MessageVariant.AI,
+                        content: (
+                          <div className="space-y-3">
+                            <MarkdownMessage>{result.message}</MarkdownMessage>
+                            {isStartDatePrompt ? (
+                              <StartDatePicker onSelect={(date) => handleSendMessage(date)} />
+                            ) : parsed ? (
+                              renderPlanUI(parsed, () => handleSendMessage("Yes, this looks great!"))
+                            ) : null}
+                          </div>
+                        ),
+                        options: result.options,
+                      },
+                    ]);
+                    scrollToBottom();
+                  }, 800);
+                })
+                .catch(() => {
+                  setIsThinking(false);
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: Date.now().toString(),
+                      type: MessageVariant.AI,
+                      content: "Sorry, I had trouble understanding that. Could you try again?",
+                    },
+                  ]);
+                });
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

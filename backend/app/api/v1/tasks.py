@@ -1,7 +1,7 @@
 """
 Tasks API endpoints — §17.3
 
-GET   /api/v1/tasks/today                      — Today's pending tasks in user timezone.
+GET   /api/v1/tasks                            — Tasks for a given date (defaults to today) in user timezone.
 GET   /api/v1/tasks/{task_id}                  — Fetch single task.
 PATCH /api/v1/tasks/{task_id}/complete         — Mark task done; check goal completion + pipeline.
 PATCH /api/v1/tasks/{task_id}/missed           — Mark task missed; fire pattern observer async.
@@ -25,11 +25,13 @@ from app.services.supabase import db
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
-@router.get("/today")
-async def get_today_tasks(
+@router.get("")
+async def get_tasks(
     current_user=Depends(get_current_user),
+    date: str | None = None,
 ) -> list[dict]:
-    """17.3.1 — Return pending tasks scheduled for today in the user's local timezone."""
+    """17.3.1 — Return tasks scheduled for a given date (YYYY-MM-DD) in the user's local timezone.
+    Defaults to today when no date is provided."""
     user_id = str(current_user["sub"])
     user_uuid = uuid.UUID(user_id)
 
@@ -48,8 +50,15 @@ async def get_today_tasks(
         import zoneinfo
         user_tz = zoneinfo.ZoneInfo("UTC")
 
-    now_user = datetime.now(user_tz)
-    start_of_today = now_user.replace(hour=0, minute=0, second=0, microsecond=0)
+    if date:
+        try:
+            parsed = datetime.strptime(date, "%Y-%m-%d")
+            start_of_today = datetime(parsed.year, parsed.month, parsed.day, tzinfo=user_tz)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid date format; expected YYYY-MM-DD")
+    else:
+        now_user = datetime.now(user_tz)
+        start_of_today = now_user.replace(hour=0, minute=0, second=0, microsecond=0)
     end_of_today = start_of_today + timedelta(days=1)
 
     start_utc = start_of_today.astimezone(timezone.utc)
@@ -57,34 +66,41 @@ async def get_today_tasks(
 
     scheduled_rows = await db.fetch(
         """
-        SELECT id, user_id, goal_id, title, description, status,
-               scheduled_at, duration_minutes, trigger_type, location_trigger,
-               recurrence_rule, shared_with_goal_ids, escalation_policy, completed_at, created_at
-        FROM tasks
-        WHERE user_id = $1
-          AND status IN ('pending', 'missed', 'done')
-          AND scheduled_at >= $2
-          AND scheduled_at < $3
-        ORDER BY scheduled_at ASC
+        SELECT t.id, t.user_id, t.goal_id, t.title, t.description, t.status,
+               t.scheduled_at, t.duration_minutes, t.trigger_type, t.location_trigger,
+               t.recurrence_rule, t.shared_with_goal_ids, t.escalation_policy, t.completed_at, t.created_at,
+               g.title AS goal_name
+        FROM tasks t
+        LEFT JOIN goals g ON g.id = t.goal_id
+        WHERE t.user_id = $1
+          AND t.status IN ('pending', 'rescheduled', 'missed', 'done')
+          AND t.scheduled_at >= $2
+          AND t.scheduled_at < $3
+        ORDER BY t.scheduled_at ASC
         """,
         user_uuid,
         start_utc,
         end_utc,
     )
 
-    todo_rows = await db.fetch(
-        """
-        SELECT id, user_id, goal_id, title, description, status,
-               scheduled_at, duration_minutes, trigger_type, location_trigger,
-               recurrence_rule, shared_with_goal_ids, escalation_policy, completed_at, created_at
-        FROM tasks
-        WHERE user_id = $1
-          AND status = 'pending'
-          AND scheduled_at IS NULL
-        ORDER BY created_at ASC
-        """,
-        user_uuid,
-    )
+    # Unscheduled todos only appear when viewing today (not historical dates)
+    todo_rows = []
+    if not date:
+        todo_rows = await db.fetch(
+            """
+            SELECT t.id, t.user_id, t.goal_id, t.title, t.description, t.status,
+                   t.scheduled_at, t.duration_minutes, t.trigger_type, t.location_trigger,
+                   t.recurrence_rule, t.shared_with_goal_ids, t.escalation_policy, t.completed_at, t.created_at,
+                   g.title AS goal_name
+            FROM tasks t
+            LEFT JOIN goals g ON g.id = t.goal_id
+            WHERE t.user_id = $1
+              AND t.status = 'pending'
+              AND t.scheduled_at IS NULL
+            ORDER BY t.created_at ASC
+            """,
+            user_uuid,
+        )
 
     return [_serialize_task(row) for row in scheduled_rows] + [_serialize_task(row) for row in todo_rows]
 
@@ -266,14 +282,29 @@ async def reschedule_confirm(
     except ValueError:
         raise HTTPException(status_code=422, detail="Invalid scheduled_at format; expected ISO 8601")
 
-    # Ensure the original task is marked missed so history is preserved
+    if task["goal_id"] is None:
+        # Silent task (no goal) — mutate in place; no new row needed
+        await db.execute(
+            "UPDATE tasks SET scheduled_at = $1, status = 'rescheduled' WHERE id = $2 AND user_id = $3",
+            scheduled_at_dt,
+            task_uuid,
+            user_uuid,
+        )
+        return {
+            "original_task_id": task_id,
+            "new_task_id": task_id,
+            "status": "rescheduled",
+            "scheduled_at": scheduled_at_dt.isoformat(),
+        }
+
+    # Goal-linked task — mark original missed (preserves pattern-observer data)
+    # and create a new pending task for the rescheduled slot.
     await db.execute(
         "UPDATE tasks SET status = 'missed' WHERE id = $1 AND user_id = $2",
         task_uuid,
         user_uuid,
     )
 
-    # Create a new pending task for the rescheduled slot, copying relevant fields
     new_task_id = await db.fetchval(
         """
         INSERT INTO tasks (
@@ -397,7 +428,7 @@ def _build_slot_options(
     user_tz: str,
     task_id: str,
 ) -> list[OnboardingOptionSchema]:
-    """Convert up to 6 scheduler slots into button options, plus a Mark as Missed option (7 total)."""
+    """Convert up to 6 scheduler slots into button options, plus a date-time picker option."""
     options: list[OnboardingOptionSchema] = []
     tz = pendulum.timezone(user_tz)
 
@@ -418,8 +449,9 @@ def _build_slot_options(
         ))
 
     options.append(OnboardingOptionSchema(
-        label="Mark as Missed",
-        value=f"missed:{task_id}",
+        label="Pick a date & time",
+        value=None,
+        input_type="datetime",
     ))
 
     return options
@@ -461,6 +493,9 @@ def _serialize_task(row) -> dict:
     for k in ("scheduled_at", "completed_at", "created_at"):
         if d.get(k) is not None:
             d[k] = d[k].isoformat()
+    # goal_name is already a string (or None) from the LEFT JOIN
+    if "goal_name" not in d:
+        d["goal_name"] = None
     return d
 
 

@@ -117,4 +117,6 @@ export interface TimelineEvent {
   status?: string;
   /** Duration in minutes */
   durationMinutes?: number;
+  /** Goal name if this task is linked to a goal */
+  goalName?: string;
 }

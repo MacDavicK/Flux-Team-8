@@ -20,6 +20,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from app.agents.ask_start_date import ask_start_date_node
 from app.agents.classifier import classifier_node
+from app.agents.goal_clarifier import goal_clarifier_node
 from app.agents.goal_planner import goal_planner_node
 from app.agents.onboarding import onboarding_node
 from app.agents.orchestrator import orchestrator_node
@@ -89,20 +90,41 @@ def route_from_orchestrator(state: AgentState) -> str:
         return "reschedule"
 
     intent = state.get("intent") or ""
+
+    # MODIFY_GOAL while still in negotiation (goal not yet saved to DB — no
+    # goal_id in goal_draft) means the user wants to change the *draft* plan.
+    # Re-route to goal_planner so it re-plans with the new information.
+    if intent == "MODIFY_GOAL":
+        goal_draft = state.get("goal_draft") or {}
+        if not goal_draft.get("goal_id"):
+            return "goal_planner"
+
     return {
-        "ONBOARDING":      "onboarding",
-        "GOAL":            "goal_planner",
-        "NEW_TASK":        "task_handler",
-        "MODIFY_GOAL":     "goal_modifier",
-        "NEXT_MILESTONE":  "goal_planner",
-        "CHITCHAT":        "chitchat",
-        "CLARIFY":         "clarify",
+        "ONBOARDING":     "onboarding",
+        "GOAL":           "goal_clarifier",  # always goes through clarifier first
+        "GOAL_CLARIFY":   "goal_clarifier",  # frontend submitted answers batch
+        "NEW_TASK":       "task_handler",
+        "MODIFY_GOAL":    "goal_modifier",
+        "NEXT_MILESTONE": "goal_planner",    # milestone skips clarifier
+        "CHITCHAT":       "chitchat",
+        "CLARIFY":        "clarify",
     }.get(intent, "chitchat")
 
 
 # ─────────────────────────────────────────────────────────────────
 # 10.6 + 10.8 — Goal planner routing (fan-out + approval)
 # ─────────────────────────────────────────────────────────────────
+
+
+def route_from_goal_clarifier(state: AgentState) -> str:
+    """
+    Routes from goal_clarifier:
+    - GOAL_PLAN  → goal_planner (enough context gathered)
+    - otherwise  → END (questions sent to frontend; user answers on next turn)
+    """
+    if state.get("intent") == "GOAL_PLAN":
+        return "goal_planner"
+    return END
 
 
 def route_from_goal_planner(state: AgentState) -> str | list[Send]:
@@ -179,6 +201,7 @@ def _build_graph() -> StateGraph:
     graph.add_node("chitchat",         chitchat_node)
     graph.add_node("clarify",          clarify_node)
     graph.add_node("onboarding",       onboarding_node)
+    graph.add_node("goal_clarifier",   goal_clarifier_node)
     graph.add_node("goal_planner",     goal_planner_node)
     graph.add_node("classifier",       classifier_node)
     graph.add_node("scheduler",        scheduler_node)
@@ -208,6 +231,10 @@ def _build_graph() -> StateGraph:
     # onboarding_node; the user's next message naturally re-enters via the
     # orchestrator entry point ("re-route after completion" per §10.5).
     graph.add_edge("onboarding", END)
+
+    # goal_clarifier: either sends questions to frontend (→ END) or proceeds to
+    # goal_planner when intent is GOAL_PLAN (enough context gathered / answers received)
+    graph.add_conditional_edges("goal_clarifier", route_from_goal_clarifier)
 
     # 10.6 — goal_planner fans out via Send() on first call
     # 10.7 — classifier/scheduler/pattern_observer reconverge to goal_planner

@@ -188,6 +188,8 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
   const [specifyStep, setSpecifyStep] = useState<OnboardingOption | null>(null);
   const [specifyValue, setSpecifyValue] = useState("");
   const [specifyError, setSpecifyError] = useState<string | null>(null);
+  const [datetimeStep, setDatetimeStep] = useState(false);
+  const [datetimeValue, setDatetimeValue] = useState("");
 
   // OTP step: render the dedicated OTP widget
   const otpOption = options.find((o) => o.input_type === "otp");
@@ -195,7 +197,8 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
     return <OtpInput phoneNumber={phoneNumber} onSubmit={onSelect} disabled={disabled} />;
   }
 
-  const specifyOption = options.find((o) => o.value === null);
+  const datetimeOption = options.find((o) => o.input_type === "datetime");
+  const specifyOption = options.find((o) => o.value === null && o.input_type !== "datetime");
   const regularOptions = options.filter((o) => o.value !== null);
 
   function handleOptionClick(option: OnboardingOption) {
@@ -242,6 +245,25 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
     }
   }
 
+  function handleDatetimeSubmit() {
+    if (!datetimeValue || disabled) return;
+    // Convert local datetime string (YYYY-MM-DDTHH:mm) to UTC ISO for the slot-confirm path
+    const isoUtc = new Date(datetimeValue).toISOString();
+    setDatetimeStep(false);
+    setDatetimeValue("");
+    onSelect(isoUtc);
+  }
+
+  function handleDatetimeKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") handleDatetimeSubmit();
+    if (e.key === "Escape") { setDatetimeStep(false); setDatetimeValue(""); }
+  }
+
+  // Compute min for datetime-local input: now rounded up to the next minute
+  const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString()
+    .slice(0, 16);
+
   return (
     <div className="mt-3 space-y-2">
       <div className="flex flex-wrap gap-2">
@@ -278,6 +300,24 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
             )}
           >
             {specifyOption.label}
+          </motion.button>
+        )}
+
+        {datetimeOption && !datetimeStep && (
+          <motion.button
+            key="datetime"
+            type="button"
+            onClick={() => { setDatetimeStep(true); setDatetimeValue(""); }}
+            disabled={disabled}
+            whileTap={{ scale: 0.96 }}
+            className={cn(
+              "px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
+              "bg-terracotta/10 border-terracotta/30 text-terracotta",
+              "hover:bg-terracotta/20 hover:border-terracotta/50",
+              "disabled:opacity-40 disabled:cursor-not-allowed",
+            )}
+          >
+            {datetimeOption.label}
           </motion.button>
         )}
       </div>
@@ -327,6 +367,47 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
             {specifyError && (
               <p className="text-red-500 text-xs mt-1 pl-1">{specifyError}</p>
             )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {datetimeStep && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="overflow-hidden"
+          >
+            <div className="flex gap-2 items-center pt-1">
+              <input
+                type="datetime-local"
+                value={datetimeValue}
+                min={nowLocal}
+                onChange={(e) => setDatetimeValue(e.target.value)}
+                onKeyDown={handleDatetimeKeyDown}
+                disabled={disabled}
+                autoFocus
+                className={cn(
+                  "flex-1 px-3 py-2 text-sm rounded-xl border bg-white/90 text-charcoal",
+                  "outline-none transition-colors border-charcoal/20 focus:border-sage",
+                  "disabled:opacity-40 disabled:cursor-not-allowed",
+                )}
+              />
+              <button
+                type="button"
+                onClick={handleDatetimeSubmit}
+                disabled={disabled || !datetimeValue}
+                className={cn(
+                  "px-3 py-2 rounded-xl text-sm font-medium transition-colors",
+                  "bg-terracotta text-white",
+                  "hover:bg-terracotta/90 disabled:opacity-40 disabled:cursor-not-allowed",
+                )}
+              >
+                OK
+              </button>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

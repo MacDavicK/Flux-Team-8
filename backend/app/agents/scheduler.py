@@ -59,9 +59,12 @@ async def scheduler_node(state: AgentState) -> dict:
         for row in existing_tasks
     ]
 
-    # 9.4.3 — Load sleep_window and work_hours from user_profile
+    # 9.4.3 — Load sleep_window and work_hours from user_profile.
+    # work_hours may be stored as a natural-language string from onboarding
+    # (e.g. "9 AM to 5 PM, Monday to Friday") — pass it through as-is so the
+    # LLM can parse it. sleep_window is always a {"start", "end"} dict.
     sleep_window = profile.get("sleep_window", {"start": "22:00", "end": "07:00"})
-    work_hours = profile.get("work_hours", {"start": "09:00", "end": "17:00"})
+    work_hours = profile.get("work_hours", "9 AM to 5 PM, Monday to Friday")
 
     # 9.4.4 — Build slot-finding context
     today_utc = pendulum.now("UTC").format("YYYY-MM-DD")

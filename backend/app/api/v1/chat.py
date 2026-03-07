@@ -86,7 +86,7 @@ async def send_message(
         reply = (
             f"Here {'is' if slot_count == 1 else 'are'} the next available "
             f"{'slot' if slot_count == 1 else 'slots'} for **{task_title}**. "
-            f"Pick one or mark it as missed."
+            f"Pick one or choose a custom date & time."
         )
 
         # Persist both turns so conversation history is complete
@@ -211,11 +211,21 @@ async def send_message(
     # user_profile is loaded from DB on every turn. The onboarding node writes
     # partial answers back to users.profile after each step, so the DB is always
     # the authoritative source of onboarding progress.
+
+    # For GOAL_CLARIFY: inject structured answers into goal_draft so goal_clarifier
+    # can detect them and route to goal_planner without an extra LLM call.
+    initial_goal_draft = pending_goal_draft
+    if body.intent == "GOAL_CLARIFY" and body.answers:
+        initial_goal_draft = dict(pending_goal_draft or {})
+        initial_goal_draft["clarification_answers"] = [
+            a.model_dump() for a in body.answers
+        ]
+
     state: dict = {
         "user_id": user_id,
         "conversation_history": history,
         "intent": body.intent or None,
-        "goal_draft": pending_goal_draft,
+        "goal_draft": initial_goal_draft,
         "proposed_tasks": pending_proposed_tasks,
         "classifier_output": pending_classifier_output,
         "scheduler_output": None,
@@ -313,13 +323,16 @@ async def send_message(
             conv_id,
         )
 
+    raw_options = result.get("options")
+    is_clarifier = agent_node_value == "GOAL_CLARIFY"
     return ChatMessageResponse(
         conversation_id=str(conv_id),
         message=reply,
         agent_node=agent_node_value,
         proposed_plan=goal_draft if approval_pending else None,
         requires_user_action=approval_pending,
-        options=result.get("options"),
+        options=None if is_clarifier else raw_options,
+        questions=raw_options if is_clarifier else None,
     )
 
 

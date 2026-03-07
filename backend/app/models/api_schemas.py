@@ -11,11 +11,18 @@ from pydantic import BaseModel
 # 19.1 — Chat
 # ─────────────────────────────────────────────────────────────────
 
+class GoalClarifierAnswer(BaseModel):
+    question_id: str   # matches ClarifierQuestion.id
+    question: str      # original question text (for context in conversation history)
+    answer: str        # user's answer (selected option or custom input)
+
+
 class ChatMessageRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
     intent: Optional[str] = None      # Pre-set intent — skips orchestrator LLM call
     task_id: Optional[str] = None     # Required when intent == "RESCHEDULE_TASK"
+    answers: Optional[list[GoalClarifierAnswer]] = None  # Structured answers for GOAL_CLARIFY
 
 
 class OnboardingStartRequest(BaseModel):
@@ -29,6 +36,15 @@ class OnboardingOptionSchema(BaseModel):
     input_type: Optional[str] = None  # "otp" renders the OTP verification widget
 
 
+class ClarifierQuestionSchema(BaseModel):
+    id: str
+    question: str
+    options: list[str] = []
+    allows_custom: bool = True
+    zod_validator: Optional[str] = None
+    required: bool = True
+
+
 class ChatMessageResponse(BaseModel):
     conversation_id: str
     message: str
@@ -36,6 +52,7 @@ class ChatMessageResponse(BaseModel):
     proposed_plan: Optional[dict] = None
     requires_user_action: bool = False
     options: Optional[list[OnboardingOptionSchema]] = None
+    questions: Optional[list[ClarifierQuestionSchema]] = None
 
 
 # ─────────────────────────────────────────────────────────────────

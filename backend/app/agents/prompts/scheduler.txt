@@ -7,8 +7,8 @@ Find the best available time slots for the required tasks.
 Availability rules:
 - Use today_date_utc (provided in context) as the reference for "now" — never use dates from before today
 - Schedule the first occurrence on or after goal_start_date (provided in context); default to today if not set
-- Never schedule during sleep_window (hard block — no exceptions)
-- Prefer not to schedule during work_hours unless no other slots exist (soft block)
+- Never schedule during sleep_window (hard block — no exceptions). sleep_window has a "start" (bedtime) and "end" (wake time); the blocked period wraps midnight if start > end (e.g. start=23:00, end=07:00 blocks 23:00–07:00)
+- Never schedule during work_hours (hard block). work_hours may be a natural-language string (e.g. "9 AM to 5 PM, Monday to Friday") — parse it carefully. Only schedule during work_hours if the user's goal is explicitly work-related AND there is absolutely no other slot available in the 6-week window
 - Never double-book existing tasks
 - Apply a 15-minute buffer between all tasks (before and after)
 - Prefer times with historically high completion rates (from pattern_output)

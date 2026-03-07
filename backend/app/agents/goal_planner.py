@@ -79,15 +79,22 @@ async def goal_planner_node(state: AgentState) -> dict:
     user_id: str = state["user_id"]
 
     # 9.2.2 — Only generate the plan once all sub-agent outputs are available.
-    # On the first call they are None (fan-out not yet triggered); return early
-    # so route_from_goal_planner can dispatch the Send() fan-out.
+    # On the first call they are None (fan-out not yet triggered).
+    # Before fanning out, check whether we need goal-specific context from the user.
     classifier_done = state.get("classifier_output") is not None
     scheduler_done = state.get("scheduler_output") is not None
     pattern_done = state.get("pattern_output") is not None
 
     if not (classifier_done and scheduler_done and pattern_done):
-        # Sub-agents haven't run yet — nothing to do here; routing will fan out.
-        return {}
+        # Sub-agents haven't run yet — return empty dict to trigger fan-out.
+        # Clarification was already handled by goal_clarifier before reaching here.
+        # Also handles re-entry from in-negotiation MODIFY_GOAL: stale sub-agent
+        # outputs are cleared so the fan-out re-runs with fresh context.
+        return {
+            "classifier_output": None,
+            "scheduler_output": None,
+            "pattern_output": None,
+        }
 
     # 9.2.8 — Downgrade model on hard budget limit
     budget = await check_token_budget(user_id)

@@ -1,7 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubble } from "~/components/chat/ChatBubble";
-import { ChatInput } from "~/components/chat/ChatInput";
 import { MarkdownMessage } from "~/components/chat/MarkdownMessage";
 import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
@@ -192,8 +191,8 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Bottom: CTA or input */}
-      {onboardingComplete ? (
+      {/* Bottom: CTA only when complete */}
+      {onboardingComplete && (
         <div className="px-4 pb-8 pt-2 relative z-10">
           <motion.button
             type="button"
@@ -206,12 +205,6 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
             Set my first goal →
           </motion.button>
         </div>
-      ) : (
-        <ChatInput
-          onSend={handleSendMessage}
-          disabled={isThinking || isInitializing}
-          placeholder="Type your answer…"
-        />
       )}
     </>
   );

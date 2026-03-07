@@ -18,7 +18,7 @@ import { EventType, type TaskRailItem, type TimelineEvent } from "~/types";
 
 function FlowPagePending() {
   return (
-    <div className="relative w-full max-w-md mx-auto h-screen flex flex-col overflow-hidden items-center justify-center">
+    <div className="relative w-full h-screen flex flex-col overflow-hidden items-center justify-center">
       <AmbientBackground />
       <LoadingState />
     </div>
@@ -31,21 +31,25 @@ export const Route = createFileRoute("/")({
   validateSearch: z.object({
     complete_task_id: z.string().optional(),
     missed_task_id: z.string().optional(),
+    date: z.string().optional(),
   }),
-  loader: async () => {
+  loader: async ({ location }) => {
     const { user, token } = await serverGetMe();
     if (!user) throw redirect({ to: "/login" });
     if (!user.onboarded) throw redirect({ to: "/chat" });
+
+    const searchDate = (location.search as Record<string, string | undefined>)["date"];
+    const dateParam = searchDate ? `?date=${encodeURIComponent(searchDate)}` : "";
 
     const rawTasks: { [key: string]: unknown }[] = await (async () => {
       if (isClient()) {
         // Hydrate the in-memory token before calling apiFetch-based services.
         // The loader runs before AuthContext.useEffect has a chance to set it.
         setInMemoryToken(token);
-        return tasksService.getTodayTasks().catch((e) => { Sentry.captureException(e); return []; });
+        return tasksService.getTasks(searchDate).catch((e) => { Sentry.captureException(e); return []; });
       }
       const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
-      return fetch(`${backendUrl}/api/v1/tasks/today`, {
+      return fetch(`${backendUrl}/api/v1/tasks${dateParam}`, {
         headers: { Authorization: `Bearer ${token}` },
       })
         .then((r) => (r.ok ? r.json() : []))
@@ -63,7 +67,7 @@ export const Route = createFileRoute("/")({
         tasks.push(railItem);
       }
     }
-    const data = { user, events, tasks };
+    const data = { user, events, tasks, selectedDate: searchDate ?? null };
     debugSsrLog("/ (FlowPage)", data);
     return data;
   },
@@ -104,10 +108,11 @@ function mapTaskToDisplayTypes(task: { [key: string]: unknown }): {
   else if (category === "personal") eventType = EventType.TERRA;
 
   const durationMinutes = typeof task.duration_minutes === "number" ? task.duration_minutes : undefined;
+  const goalName = typeof task.goal_name === "string" && task.goal_name ? task.goal_name : undefined;
 
   return {
     railItem: { id, title, completed: isDone },
-    event: { id, title, description, time, period, type: eventType, isPast, status, durationMinutes },
+    event: { id, title, description, time, period, type: eventType, isPast, status, durationMinutes, goalName },
   };
 }
 
@@ -118,15 +123,40 @@ function getGreeting(name?: string): string {
 }
 
 function FlowPage() {
-  const { events: initialEvents, tasks: initialTasks, user: loaderUser } = Route.useLoaderData();
+  const { events: initialEvents, tasks: initialTasks, user: loaderUser, selectedDate: loaderDate } = Route.useLoaderData();
   const { complete_task_id, missed_task_id } = Route.useSearch();
   const { user } = useAuth();
   const [data, setData] = useState<{ events: TimelineEvent[]; tasks: TaskRailItem[] }>({
     events: initialEvents,
     tasks: initialTasks,
   });
+  const [isLoadingDate, setIsLoadingDate] = useState(false);
 
   const displayName = user?.name ?? loaderUser.name;
+
+  const handleDateChange = async (date: string | null) => {
+    const url = date ? `/?date=${encodeURIComponent(date)}` : "/";
+    window.history.pushState(null, "", url);
+
+    setIsLoadingDate(true);
+    try {
+      const rawTasks = await tasksService.getTasks(date ?? undefined);
+
+      const events: TimelineEvent[] = [];
+      const tasks: TaskRailItem[] = [];
+      for (const t of rawTasks) {
+        const { railItem, event } = mapTaskToDisplayTypes(t);
+        const hasTime = Boolean(t.scheduled_at ?? t.scheduled_time ?? t.time ?? "");
+        if (hasTime) events.push(event);
+        else tasks.push(railItem);
+      }
+      setData({ events, tasks });
+    } catch (e) {
+      Sentry.captureException(e);
+    } finally {
+      setIsLoadingDate(false);
+    }
+  };
 
   const handleAddTodo = (title: string) => {
     const tempId = `temp-${Date.now()}`;
@@ -203,18 +233,35 @@ function FlowPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Derive the currently-displayed date from the loader (set on initial load / SSR)
+  const [viewDate, setViewDate] = useState<string | null>(loaderDate ?? null);
+
   return (
-    <div className="relative w-full max-w-md mx-auto h-screen flex flex-col overflow-hidden">
+    <div className="relative w-full h-screen flex flex-col overflow-hidden">
       <AmbientBackground />
 
-      <DateHeader greeting={getGreeting(displayName)} />
-
-      <TaskRail tasks={data.tasks} onComplete={handleComplete} onAddTodo={handleAddTodo} />
-
-      <FlowTimeline
-        events={data.events}
-        onTaskClick={(event) => setSelectedTask(event)}
+      <DateHeader
+        greeting={getGreeting(displayName)}
+        selectedDate={viewDate}
+        onDateChange={(d) => {
+          setViewDate(d);
+          handleDateChange(d);
+        }}
       />
+
+      {isLoadingDate ? (
+        <div className="flex-1 flex items-center justify-center">
+          <LoadingState />
+        </div>
+      ) : (
+        <>
+          <TaskRail tasks={data.tasks} onComplete={handleComplete} onAddTodo={handleAddTodo} />
+          <FlowTimeline
+            events={data.events}
+            onTaskClick={(event) => setSelectedTask(event)}
+          />
+        </>
+      )}
 
       <BottomNav />
 

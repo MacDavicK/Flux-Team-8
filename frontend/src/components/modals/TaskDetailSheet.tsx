@@ -55,7 +55,7 @@ export function TaskDetailSheet({
             animate={{ y: 0 }}
             exit={{ y: "100%" }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed bottom-0 left-0 right-0 z-50"
+            className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
           >
             <div className="glass-card rounded-b-none p-6 pb-safe space-y-5">
               {/* Header */}
