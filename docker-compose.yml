@@ -36,12 +36,15 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8010:8000"
     env_file:
       - ./backend/.env
-    depends_on:
-      db:
-        condition: service_healthy
+    environment:
+      SUPABASE_URL: http://host.docker.internal:54321
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      DAO_SERVICE_URL: http://host.docker.internal:8001
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Mount source for live reload during development
       - ./backend:/app
@@ -59,8 +62,16 @@ services:
       - "5173:5173"
     env_file:
       - ./frontend/.env
+    environment:
+      VITE_API_URL: http://localhost:8010
+      SUPABASE_URL: http://host.docker.internal:54321
+      SUPABASE_ANON_KEY: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+      APP_URL: http://localhost:5173
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     depends_on:
       - backend
+    command: npm run dev -- --host 0.0.0.0 --port 5173
 
 volumes:
   # Named volume for PostgreSQL data persistence across restarts

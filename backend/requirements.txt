@@ -19,6 +19,7 @@ alembic==1.13.3
 # AI / LLM
 openai==1.59.3
 langchain-text-splitters==0.2.4
+langgraph>=0.2.0,<0.3.0
 
 # Vector store (Pinecone)
 pinecone==5.4.2

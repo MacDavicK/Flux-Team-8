@@ -39,6 +39,9 @@ class Settings(BaseSettings):
     scheduler_cutoff_hour: int = 21  # Don't suggest same-day slots after 9 PM
     scheduler_buffer_minutes: int = 15  # Buffer between tasks
 
+    # Orchestrator
+    use_langgraph_orchestrator: bool = False
+
     # Deepgram Voice Agent
     deepgram_api_key: str = ""
     deepgram_voice_model: str = "aura-2-thalia-en"

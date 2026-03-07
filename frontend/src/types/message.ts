@@ -169,7 +169,7 @@ export interface ChatMessageResponse {
   conversation_id: string;
   message: string;
   agent_node?: string | null;
-  proposed_plan?: { [key: string]: unknown } | null;
+  proposed_plan?: { [key: string]: unknown }[] | null;
   requires_user_action: boolean;
 }
 
