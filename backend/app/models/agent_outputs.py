@@ -8,7 +8,7 @@ from pydantic import BaseModel
 # ─────────────────────────────────────────────────────────────────
 
 class OrchestratorOutput(BaseModel):
-    intent: Literal["GOAL", "NEW_TASK", "RESCHEDULE_TASK", "MODIFY_GOAL", "NEXT_MILESTONE", "CHITCHAT", "CLARIFY", "ONBOARDING", "APPROVE"]
+    intent: Literal["GOAL", "NEW_TASK", "RESCHEDULE_TASK", "MODIFY_GOAL", "NEXT_MILESTONE", "CHITCHAT", "CLARIFY", "ONBOARDING", "APPROVE", "START_DATE"]
     payload: dict
     clarification_question: Optional[str] = None
     task_id: Optional[str] = None       # Present when intent == RESCHEDULE_TASK

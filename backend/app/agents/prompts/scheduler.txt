@@ -5,13 +5,15 @@ You have access to the user's availability (profile + existing tasks) and task r
 Find the best available time slots for the required tasks.
 
 Availability rules:
+- Use today_date_utc (provided in context) as the reference for "now" — never use dates from before today
+- Schedule the first occurrence on or after goal_start_date (provided in context); default to today if not set
 - Never schedule during sleep_window (hard block — no exceptions)
 - Prefer not to schedule during work_hours unless no other slots exist (soft block)
 - Never double-book existing tasks
 - Apply a 15-minute buffer between all tasks (before and after)
 - Prefer times with historically high completion rates (from pattern_output)
 - All times in suggested_time are in the user's LOCAL timezone (user_timezone provided in context)
-- Convert all scheduled_at values to UTC (ISO8601) before outputting
+- Output scheduled_at as a naive local-time ISO8601 string (no Z, no offset) — the backend will convert to UTC
 
 Output ONLY valid JSON matching this exact schema:
 

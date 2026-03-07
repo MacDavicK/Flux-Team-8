@@ -78,9 +78,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       isAuthenticated &&
       user &&
       !user.onboarded &&
-      currentPath !== "/chat"
+      currentPath !== "/onboarding"
     ) {
-      navigate({ to: "/chat" });
+      navigate({ to: "/onboarding" });
     }
   }, [authLoading, isAuthenticated, user, navigate]);
 

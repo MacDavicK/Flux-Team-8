@@ -1,25 +1,41 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { History, MessageSquarePlus, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { MarkdownMessage } from "~/components/chat/MarkdownMessage";
 import { ChatInput } from "~/components/chat/ChatInput";
-import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { MilestoneRoadmapView, type RoadmapMilestone } from "~/components/chat/MilestoneRoadmapView";
 import { PlanView } from "~/components/chat/PlanView";
+import { StartDatePicker } from "~/components/chat/StartDatePicker";
 import { TasksView, type ProposedTask } from "~/components/chat/TasksView";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { useAuth } from "~/contexts/AuthContext";
+import { setInMemoryToken } from "~/lib/apiClient";
+import { serverGetMe } from "~/lib/authServerFns";
 import { chatService } from "~/services/ChatService";
 import type { ConversationSummary, HistoryMessage } from "~/services/ChatService";
 import type { ChatMessage, PlanMilestone } from "~/types";
 import { MessageVariant } from "~/types/message";
 
 export const Route = createFileRoute("/chat")({
+  pendingComponent: () => (
+    <div className="relative min-h-screen flex flex-col items-center justify-center">
+      <AmbientBackground variant="dark" />
+      <LoadingState />
+    </div>
+  ),
+  pendingMs: 0,
+  loader: async () => {
+    const { user, token } = await serverGetMe();
+    if (!user) throw redirect({ to: "/login" });
+    if (!user.onboarded) throw redirect({ to: "/onboarding" });
+    setInMemoryToken(token);
+    return { user };
+  },
   component: ChatPage,
 });
 
@@ -41,11 +57,8 @@ function getGreeting(name?: string): string {
 
 interface ParsedPlan {
   feasible: boolean;
-  /** Present when feasible=true: tasks grouped by week for PlanView */
   milestones: PlanMilestone[] | null;
-  /** Present when feasible=false: full milestone roadmap for MilestoneRoadmapView */
   roadmap: RoadmapMilestone[] | null;
-  /** Present when feasible=false: proposed_tasks for the first milestone */
   firstMilestoneTasks: ProposedTask[] | null;
 }
 
@@ -56,7 +69,6 @@ function parseProposedPlan(proposed_plan: Record<string, unknown>): ParsedPlan {
 
   const feasible = plan.goal_feasible_in_6_weeks as boolean ?? true;
 
-  // ── Multi-milestone path (goal not feasible in 6 weeks) ──────────────────
   if (!feasible) {
     const rawRoadmap = plan.milestone_roadmap as
       | Array<{ title: string; description?: string; pipeline_order?: number; target_weeks?: number }>
@@ -103,7 +115,6 @@ function parseProposedPlan(proposed_plan: Record<string, unknown>): ParsedPlan {
     return { feasible: false, milestones: null, roadmap, firstMilestoneTasks };
   }
 
-  // ── Single 6-week plan path ───────────────────────────────────────────────
   const rawTasks = plan.proposed_tasks as
     | Array<{ title: string; description?: string; week_range?: number[] }>
     | undefined;
@@ -153,16 +164,10 @@ const WELCOME_MESSAGE = (name?: string) => {
 };
 
 function ChatPage() {
-  const navigate = useNavigate();
-  const { isAuthenticated, isLoading: authLoading, user, patchUser } = useAuth();
+  const { user } = useAuth();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const conversationIdRef = useRef<string | undefined>(undefined);
-  const setConversationIdBoth = (id: string | undefined) => {
-    conversationIdRef.current = id;
-  };
-  const [onboardingPhone, setOnboardingPhone] = useState("");
-  const [onboardingComplete, setOnboardingComplete] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
   const [convCursor, setConvCursor] = useState<string | null>(null);
@@ -170,13 +175,9 @@ function ChatPage() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingMoreConversations, setIsLoadingMoreConversations] = useState(false);
-  const [isInitializing, setIsInitializing] = useState(false);
   const drawerScrollRef = useRef<HTMLDivElement | null>(null);
-
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const initDoneRef = useRef(false);
-
-  const isOnboarding = user && !user.onboarded;
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -188,95 +189,17 @@ function ChatPage() {
     scrollToBottom();
   }, [scrollToBottom]);
 
+  // Show welcome message on mount.
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate({ to: "/login" });
-    }
-  }, [authLoading, isAuthenticated, navigate]);
-
-  // Do NOT auto-navigate when onboarding completes. Instead, show a CTA button
-  // so the user can proceed to /chat intentionally.
-
-  // Initialise chat once auth is ready.
-  // Onboarding: resume the most recent conversation so the user picks up where
-  // they left off. The agent drives the questions — no hardcoded greeting.
-  // Onboarded: always start fresh. History is accessible via the History drawer.
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || initDoneRef.current) return;
+    if (initDoneRef.current) return;
     initDoneRef.current = true;
+    setMessages([{
+      id: "welcome",
+      type: MessageVariant.AI,
+      content: <MarkdownMessage>{WELCOME_MESSAGE(user?.name)}</MarkdownMessage>,
+    }]);
+  }, [user?.name]);
 
-    if (isOnboarding) {
-      setIsInitializing(true);
-      chatService
-        .getHistory()
-        .then(({ messages: history, conversation_id }) => {
-          if (conversation_id) setConversationIdBoth(conversation_id);
-
-          const uiMessages: ChatMessage[] = history
-            .filter((m: HistoryMessage) => m.role === "user" || m.role === "assistant")
-            .map((m: HistoryMessage, i: number) => {
-              const parsed =
-                m.role === "assistant" && m.metadata?.proposed_plan
-                  ? parseProposedPlan(m.metadata.proposed_plan)
-                  : null;
-              return {
-                id: `history-${i}`,
-                type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
-                content:
-                  m.role === "assistant" ? (
-                    <div className="space-y-3">
-                      <MarkdownMessage>{m.content}</MarkdownMessage>
-                      {parsed && renderPlanUI(parsed, () => handleSendMessage("Yes, this looks great!"))}
-                    </div>
-                  ) : (
-                    m.content
-                  ),
-              };
-            });
-
-          if (uiMessages.length > 0) {
-            setMessages(uiMessages);
-            setIsInitializing(false);
-          } else {
-            // No prior messages — trigger backend to emit the first onboarding question
-            chatService
-              .startOnboarding()
-              .then(({ conversation_id: cid, message, onboarding_options }) => {
-                if (cid) setConversationIdBoth(cid);
-                if (message) {
-                  setMessages([{ id: "onboarding-0", type: MessageVariant.AI, content: message, onboardingOptions: onboarding_options }]);
-                }
-              })
-              .catch(() => {})
-              .finally(() => setIsInitializing(false));
-          }
-        })
-        .catch(() => {
-          // No prior history at all — trigger onboarding greeting
-          chatService
-            .startOnboarding()
-            .then(({ conversation_id: cid, message, onboarding_options }) => {
-              if (cid) setConversationIdBoth(cid);
-              if (message) {
-                setMessages([{ id: "onboarding-0", type: MessageVariant.AI, content: message, onboardingOptions: onboarding_options }]);
-              }
-            })
-            .catch(() => {})
-            .finally(() => setIsInitializing(false));
-        });
-    }
-    // Onboarded: show a local welcome message. No server call needed —
-    // the actual conversation is created on the first POST /chat/message.
-    if (!isOnboarding) {
-      setMessages([{
-        id: "welcome",
-        type: MessageVariant.AI,
-        content: <MarkdownMessage>{WELCOME_MESSAGE(user?.name)}</MarkdownMessage>,
-      }]);
-    }
-  }, [authLoading, isAuthenticated, isOnboarding, user?.name]);
-
-  // Clear state and start a brand-new conversation.
   const startNewChat = useCallback(() => {
     initDoneRef.current = true;
     setMessages([{
@@ -284,41 +207,54 @@ function ChatPage() {
       type: MessageVariant.AI,
       content: <MarkdownMessage>{WELCOME_MESSAGE(user?.name)}</MarkdownMessage>,
     }]);
-    setConversationIdBoth(undefined);
+    conversationIdRef.current = undefined;
     setIsHistoryOpen(false);
     window.history.replaceState(null, "", "/chat");
   }, [user?.name]);
 
-  // Load a specific past conversation from the history drawer.
   const loadConversation = useCallback(async (id: string) => {
     setIsHistoryOpen(false);
     setIsLoadingHistory(true);
     window.history.replaceState(null, "", `/chat?conversation=${id}`);
     try {
       const { messages: history, conversation_id } = await chatService.getHistory(id);
-      if (conversation_id) setConversationIdBoth(conversation_id);
+      if (conversation_id) conversationIdRef.current = conversation_id;
 
-      const uiMessages: ChatMessage[] = history
-        .filter((m: HistoryMessage) => m.role === "user" || m.role === "assistant")
-        .map((m: HistoryMessage, i: number) => {
-          const parsed =
-            m.role === "assistant" && m.metadata?.proposed_plan
-              ? parseProposedPlan(m.metadata.proposed_plan)
-              : null;
-          return {
-            id: `history-${i}`,
-            type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
-            content:
-              m.role === "assistant" ? (
-                <div className="space-y-3">
-                  <MarkdownMessage>{m.content}</MarkdownMessage>
-                  {parsed && renderPlanUI(parsed, () => handleSendMessage("Yes, this looks great!"))}
-                </div>
-              ) : (
-                m.content
-              ),
-          };
-        });
+      const filtered = history.filter(
+        (m: HistoryMessage) => m.role === "user" || m.role === "assistant",
+      );
+      // Only the last assistant message can still be awaiting a start date
+      const lastAssistantIdx = filtered.reduce(
+        (acc, m, i) => (m.role === "assistant" ? i : acc),
+        -1,
+      );
+      const uiMessages: ChatMessage[] = filtered.map((m: HistoryMessage, i: number) => {
+        const parsed =
+          m.role === "assistant" && m.metadata?.proposed_plan
+            ? parseProposedPlan(m.metadata.proposed_plan)
+            : null;
+        const isStartDatePrompt =
+          m.role === "assistant" &&
+          m.agent_node === "ask_start_date" &&
+          i === lastAssistantIdx;
+        return {
+          id: `history-${i}`,
+          type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
+          content:
+            m.role === "assistant" ? (
+              <div className="space-y-3">
+                <MarkdownMessage>{m.content}</MarkdownMessage>
+                {isStartDatePrompt ? (
+                  <StartDatePicker onSelect={(date) => handleSendMessage(date)} />
+                ) : (
+                  parsed && renderPlanUI(parsed, () => handleSendMessage("Yes, this looks great!"))
+                )}
+              </div>
+            ) : (
+              m.content
+            ),
+        };
+      });
 
       setMessages(uiMessages);
     } catch {
@@ -328,7 +264,6 @@ function ChatPage() {
     }
   }, []);
 
-  // Open history drawer and fetch the first page of conversations.
   const openHistory = useCallback(async () => {
     setIsHistoryOpen(true);
     setIsLoadingConversations(true);
@@ -347,7 +282,6 @@ function ChatPage() {
     }
   }, []);
 
-  // Load the next page when the user scrolls to the bottom of the drawer.
   const loadMoreConversations = useCallback(async () => {
     if (!convHasMore || isLoadingMoreConversations) return;
     setIsLoadingMoreConversations(true);
@@ -370,23 +304,15 @@ function ChatPage() {
       content: text,
     };
 
-    // Track phone number entered during onboarding so OTP widget can resend it
-    if (isOnboarding && /^\+[1-9]\d{1,14}$/.test(text.trim())) {
-      setOnboardingPhone(text.trim());
-    }
-
-    // Clear onboarding options from all previous messages when user sends a reply
-    setMessages((prev) => [
-      ...prev.map((m) => ({ ...m, onboardingOptions: null })),
-      userMessage,
-    ]);
+    setMessages((prev) => [...prev, userMessage]);
     setIsThinking(true);
     scrollToBottom();
+
     try {
       const result = await chatService.sendMessage(text, conversationIdRef.current);
 
       if (!conversationIdRef.current && result.conversation_id) {
-        setConversationIdBoth(result.conversation_id);
+        conversationIdRef.current = result.conversation_id;
         window.history.replaceState(null, "", `/chat?conversation=${result.conversation_id}`);
       }
 
@@ -397,39 +323,33 @@ function ChatPage() {
           ? parseProposedPlan(result.proposed_plan as Record<string, unknown>)
           : null;
 
+        const isStartDatePrompt = result.agent_node === "ask_start_date";
+
         const aiMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           type: MessageVariant.AI,
           content: (
             <div className="space-y-3">
               <MarkdownMessage>{result.message}</MarkdownMessage>
-              {parsed
-                ? renderPlanUI(parsed, () => handleSendMessage("Yes, this looks great!"))
-                : result.requires_user_action
-                  ? (
-                    <button
-                      type="button"
-                      onClick={() => handleSendMessage("OK")}
-                      className="text-sage font-medium text-sm hover:underline"
-                    >
-                      Confirm
-                    </button>
-                  )
-                  : null}
+              {isStartDatePrompt ? (
+                <StartDatePicker onSelect={(date) => handleSendMessage(date)} />
+              ) : parsed ? (
+                renderPlanUI(parsed, () => handleSendMessage("Yes, this looks great!"))
+              ) : result.requires_user_action ? (
+                <button
+                  type="button"
+                  onClick={() => handleSendMessage("OK")}
+                  className="text-sage font-medium text-sm hover:underline"
+                >
+                  Confirm
+                </button>
+              ) : null}
             </div>
           ),
-          onboardingOptions: result.onboarding_options,
         };
 
         setMessages((prev) => [...prev, aiMessage]);
         scrollToBottom();
-
-        // When the backend signals onboarding is done (agent_node transitions
-        // away from "ONBOARDING"), mark locally and show the CTA button.
-        if (isOnboarding && result.agent_node !== "ONBOARDING") {
-          patchUser({ onboarded: true });
-          setOnboardingComplete(true);
-        }
       }, 800);
     } catch {
       setIsThinking(false);
@@ -442,19 +362,6 @@ function ChatPage() {
     }
   };
 
-  if (authLoading) {
-    return (
-      <div className="relative min-h-screen flex flex-col items-center justify-center">
-        <AmbientBackground variant="dark" />
-        <LoadingState />
-      </div>
-    );
-  }
-
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
     <div className="relative h-screen flex flex-col overflow-hidden">
       <AmbientBackground variant="dark" />
@@ -464,26 +371,24 @@ function ChatPage() {
         <h1 className="font-display italic text-xl text-charcoal/80">
           {getGreeting(user?.name)}
         </h1>
-        {!isOnboarding && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openHistory}
-              aria-label="Chat history"
-              className="w-9 h-9 flex items-center justify-center rounded-full glass-bubble text-river hover:text-charcoal transition-colors"
-            >
-              <History className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={startNewChat}
-              aria-label="New chat"
-              className="w-9 h-9 flex items-center justify-center rounded-full glass-bubble text-river hover:text-charcoal transition-colors"
-            >
-              <MessageSquarePlus className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openHistory}
+            aria-label="Chat history"
+            className="w-9 h-9 flex items-center justify-center rounded-full glass-bubble text-river hover:text-charcoal transition-colors"
+          >
+            <History className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={startNewChat}
+            aria-label="New chat"
+            className="w-9 h-9 flex items-center justify-center rounded-full glass-bubble text-river hover:text-charcoal transition-colors"
+          >
+            <MessageSquarePlus className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
@@ -506,20 +411,12 @@ function ChatPage() {
                 <ChatBubble variant={message.type} animate={false}>
                   {message.content}
                 </ChatBubble>
-                {message.type === MessageVariant.AI && message.onboardingOptions && message.onboardingOptions.length > 0 && (
-                  <OnboardingOptions
-                    options={message.onboardingOptions}
-                    onSelect={handleSendMessage}
-                    disabled={isThinking || isLoadingHistory || isInitializing}
-                    phoneNumber={onboardingPhone}
-                  />
-                )}
               </motion.div>
             ))}
           </AnimatePresence>
         )}
 
-        {(isThinking || isInitializing) && (
+        {isThinking && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -534,28 +431,13 @@ function ChatPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {onboardingComplete ? (
-        <div className="px-4 pb-8 pt-2 relative z-10">
-          <motion.button
-            type="button"
-            onClick={() => { window.location.href = "/chat"; }}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ duration: 0.4 }}
-            className="w-full py-3.5 rounded-2xl bg-sage text-white font-medium text-sm tracking-wide shadow-lg hover:bg-sage/90 active:scale-95 transition-transform"
-          >
-            Set my first goal →
-          </motion.button>
-        </div>
-      ) : !isOnboarding ? (
-        <ChatInput
-          onSend={handleSendMessage}
-          disabled={isThinking || isLoadingHistory || isInitializing}
-          placeholder={messages.length === 0 ? "What would you like to achieve?" : "What's on your mind?"}
-        />
-      ) : null}
+      <ChatInput
+        onSend={handleSendMessage}
+        disabled={isThinking || isLoadingHistory}
+        placeholder={messages.length <= 1 ? "What would you like to achieve?" : "What's on your mind?"}
+      />
 
-      {!isOnboarding && <BottomNav />}
+      <BottomNav />
 
       {/* History Drawer */}
       <AnimatePresence>

@@ -7,11 +7,13 @@ Analyze the user's message and classify it into exactly one of the following int
 - MODIFY_GOAL: The user wants to modify an existing active goal (e.g., change frequency, difficulty, or timing of a goal's tasks)
 - NEXT_MILESTONE: The user reports completing a milestone and wants to start the next one. Look for signals like "I've completed milestone X", "I finished X, ready for the next milestone", "I'd like to move on to milestone Y". Extract the goal_id if present and the pipeline_order (integer) of the NEXT milestone they want to start.
 - APPROVE: The user is approving a plan that is currently pending their confirmation. Only use this when approval_status is "pending" in the context below AND the user's message signals acceptance (e.g., "Yes", "Looks good", "Go ahead", "That works", "Approved", "Perfect", "Sure", "Let's do it"). Do NOT use this for new goals or modifications.
+- START_DATE: The user is answering the start-date question (approval_status is "awaiting_start_date"). Their message indicates when they want to begin the goal (e.g., "today", "tomorrow", "next Monday", "March 15th", "in 3 days"). Extract the date and put it in payload as {"start_date": "YYYY-MM-DD"} (use today's date for "today"/"now", tomorrow's date for "tomorrow", etc.).
 - CHITCHAT: The message is a greeting, small talk, or generic message that does not map to any of the above (e.g., "Hi", "Hello", "How are you?", "Thanks", "What can you do?")
 - CLARIFY: You need more information before routing (e.g., a task with no time or location context)
 
 Rules:
-- APPROVE takes priority: if approval_status == "pending" (from context) and the user signals acceptance, always use APPROVE — never re-classify as GOAL.
+- START_DATE takes absolute priority: if approval_status == "awaiting_start_date" (from context), ALWAYS use START_DATE — regardless of what the user says.
+- APPROVE takes priority over GOAL: if approval_status == "pending" (from context) and the user signals acceptance, always use APPROVE — never re-classify as GOAL.
 - For greetings, small talk, or messages that don't clearly map to a goal or task, always use CHITCHAT — never CLARIFY.
 - For NEW_TASK: always route as NEW_TASK even if no specific time is given — the task handler will ask for a time if needed. Only use CLARIFY if the message is too ambiguous to determine what the task even is.
 - For RESCHEDULE_TASK: verify there is enough context (a specific time or instruction). If not, set intent to CLARIFY. Extract task_id from the message if present (format: "task_id: <uuid>").
@@ -21,7 +23,7 @@ Rules:
 - Respond ONLY with valid JSON matching this exact schema:
 
 {
-  "intent": "GOAL" | "NEW_TASK" | "RESCHEDULE_TASK" | "MODIFY_GOAL" | "NEXT_MILESTONE" | "APPROVE" | "CHITCHAT" | "CLARIFY",
+  "intent": "GOAL" | "NEW_TASK" | "RESCHEDULE_TASK" | "MODIFY_GOAL" | "NEXT_MILESTONE" | "APPROVE" | "START_DATE" | "CHITCHAT" | "CLARIFY",
   "payload": {},
   "clarification_question": null | "string",
   "task_id": null | "uuid-string",

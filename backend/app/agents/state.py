@@ -39,7 +39,8 @@ class AgentState(TypedDict):
     pattern_output: Annotated[Optional[dict], _merge_dict]
 
     clarification_question: Optional[str]    # Set by orchestrator when intent == CLARIFY
-    approval_status: Optional[str]           # 'pending' | 'approved' | 'negotiating' | 'abandoned'
+    approval_status: Optional[str]           # 'pending' | 'approved' | 'approved_with_start' | 'negotiating' | 'abandoned'
+    goal_start_date: Optional[str]           # ISO8601 date the user wants to start (set after approval start-date question)
     milestone_order: Optional[int]           # Set when intent == NEXT_MILESTONE; which pipeline_order to plan
     error: Optional[str]
     token_usage: dict                         # Accumulated per-session token count

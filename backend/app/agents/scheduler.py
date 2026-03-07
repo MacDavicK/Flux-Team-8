@@ -14,6 +14,17 @@ _PROMPT = (Path(__file__).parent / "prompts" / "scheduler.txt").read_text()
 _MODEL = "openrouter/openai/gpt-4o-mini"
 
 
+def _parse_as_local(raw: str, tz: object) -> pendulum.DateTime:
+    """Parse an ISO8601 string as a local-tz datetime, stripping any offset suffix first."""
+    naive = raw
+    if naive.endswith("Z"):
+        naive = naive[:-1]
+    plus_idx = naive.find("+", 10)  # search for offset marker after date portion
+    if plus_idx != -1:
+        naive = naive[:plus_idx]
+    return pendulum.parse(naive, tz=tz)  # type: ignore[return-value, arg-type]
+
+
 async def scheduler_node(state: AgentState) -> dict:
     """
     Finds available time slots for the proposed tasks over the next 6 weeks.
@@ -53,8 +64,12 @@ async def scheduler_node(state: AgentState) -> dict:
     work_hours = profile.get("work_hours", {"start": "09:00", "end": "17:00"})
 
     # 9.4.4 — Build slot-finding context
+    today_utc = pendulum.now("UTC").format("YYYY-MM-DD")
+    goal_start_date: str | None = state.get("goal_start_date")
     context_block = (
         f"\n\nContext:\n"
+        f"today_date_utc: {today_utc}\n"
+        f"goal_start_date: {goal_start_date or today_utc}\n"
         f"user_timezone: {user_tz}\n"
         f"sleep_window: {json.dumps(sleep_window)}\n"
         f"work_hours: {json.dumps(work_hours)}\n"
@@ -80,12 +95,15 @@ async def scheduler_node(state: AgentState) -> dict:
         user_id=user_id,
     )
 
-    # 9.4.6 — Convert any local-time scheduled_at values to UTC via pendulum
+    # 9.4.6 — Convert local-time scheduled_at strings to UTC.
+    # The prompt instructs the LLM to output naive local-time ISO8601 strings.
+    # Strip any accidental Z/offset suffix before parsing as local, to avoid
+    # double-conversion if the LLM adds one anyway.
     tz = pendulum.timezone(user_tz)
     converted_slots = []
     for slot in result.slots:
         try:
-            dt = pendulum.parse(slot.scheduled_at, tz=tz)
+            dt = _parse_as_local(slot.scheduled_at, tz)
             slot_dict = slot.model_dump()
             slot_dict["scheduled_at"] = dt.in_timezone("UTC").isoformat()
             converted_slots.append(slot_dict)

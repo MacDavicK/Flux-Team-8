@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReflectionRouteImport } from './routes/reflection'
 import { Route as ProfileRouteImport } from './routes/profile'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChatRouteImport } from './routes/chat'
 import { Route as IndexRouteImport } from './routes/index'
@@ -24,6 +25,11 @@ const ReflectionRoute = ReflectionRouteImport.update({
 const ProfileRoute = ProfileRouteImport.update({
   id: '/profile',
   path: '/profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -51,6 +57,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/profile': typeof ProfileRoute
   '/reflection': typeof ReflectionRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -59,6 +66,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/profile': typeof ProfileRoute
   '/reflection': typeof ReflectionRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -68,6 +76,7 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/profile': typeof ProfileRoute
   '/reflection': typeof ReflectionRoute
   '/auth/callback': typeof AuthCallbackRoute
@@ -78,16 +87,25 @@ export interface FileRouteTypes {
     | '/'
     | '/chat'
     | '/login'
+    | '/onboarding'
     | '/profile'
     | '/reflection'
     | '/auth/callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chat' | '/login' | '/profile' | '/reflection' | '/auth/callback'
+  to:
+    | '/'
+    | '/chat'
+    | '/login'
+    | '/onboarding'
+    | '/profile'
+    | '/reflection'
+    | '/auth/callback'
   id:
     | '__root__'
     | '/'
     | '/chat'
     | '/login'
+    | '/onboarding'
     | '/profile'
     | '/reflection'
     | '/auth/callback'
@@ -97,6 +115,7 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ChatRoute: typeof ChatRoute
   LoginRoute: typeof LoginRoute
+  OnboardingRoute: typeof OnboardingRoute
   ProfileRoute: typeof ProfileRoute
   ReflectionRoute: typeof ReflectionRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
@@ -116,6 +135,13 @@ declare module '@tanstack/react-router' {
       path: '/profile'
       fullPath: '/profile'
       preLoaderRoute: typeof ProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -153,6 +179,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ChatRoute: ChatRoute,
   LoginRoute: LoginRoute,
+  OnboardingRoute: OnboardingRoute,
   ProfileRoute: ProfileRoute,
   ReflectionRoute: ReflectionRoute,
   AuthCallbackRoute: AuthCallbackRoute,

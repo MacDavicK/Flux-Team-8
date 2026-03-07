@@ -1,6 +1,8 @@
 import uuid
 from pathlib import Path
 
+import pendulum
+
 from app.agents.state import AgentState
 from app.models.agent_outputs import OrchestratorOutput
 from app.services.llm import check_token_budget, validated_llm_call
@@ -12,6 +14,41 @@ _PROMPT = (Path(__file__).parent / "prompts" / "orchestrator.txt").read_text()
 # Model assignments per §6.1
 _MODEL_PRIMARY = "openrouter/openai/gpt-4o"
 _MODEL_BUDGET = "openrouter/openai/gpt-4o-mini"
+
+
+def _parse_start_date(payload: dict, messages: list, user_tz: str) -> str:
+    """
+    Extract the ISO8601 start date from the orchestrator payload or fall back
+    to parsing the user's last message with pendulum. Returns today's date in
+    the user's timezone if nothing can be parsed.
+    """
+    # Orchestrator may put the parsed date directly in payload
+    raw = payload.get("start_date") or payload.get("date") or ""
+    if not raw and messages:
+        # Grab the last user turn text as a fallback
+        for msg in reversed(messages):
+            if msg.get("role") == "user":
+                raw = msg.get("content", "")
+                break
+
+    tz = pendulum.timezone(user_tz)
+    now_local = pendulum.now(tz)
+
+    if raw:
+        # Handle natural-language keywords
+        lower = raw.strip().lower()
+        if lower in ("today", "now"):
+            return now_local.to_date_string()
+        if lower in ("tomorrow",):
+            return now_local.add(days=1).to_date_string()
+        # Try to parse as an ISO date or free-form date string
+        try:
+            dt = pendulum.parse(raw, tz=tz)
+            return dt.to_date_string()
+        except Exception:
+            pass
+
+    return now_local.to_date_string()
 
 
 async def orchestrator_node(state: AgentState) -> dict:
@@ -56,10 +93,20 @@ async def orchestrator_node(state: AgentState) -> dict:
         user_id=user_id,
     )
 
-    # APPROVE intent: user confirmed a pending plan — set approval_status and
-    # skip goal_planner entirely. route_from_orchestrator will route to save_tasks.
+    # APPROVE intent: user confirmed a pending plan — ask when they want to start.
+    # route_from_orchestrator will route to ask_start_date.
     if result.intent == "APPROVE":
         return {"approval_status": "approved"}
+
+    # START_DATE intent: user replied to the start-date question.
+    # Parse their reply into an ISO8601 date and route to save_tasks.
+    if result.intent == "START_DATE":
+        user_tz = profile.get("timezone", "UTC")
+        goal_start_date = _parse_start_date(result.payload, messages, user_tz)
+        return {
+            "approval_status": "approved",
+            "goal_start_date": goal_start_date,
+        }
 
     out: dict = {
         "intent": result.intent,

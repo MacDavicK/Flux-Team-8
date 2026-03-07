@@ -123,11 +123,19 @@ async def send_message(
         if row["role"] == "assistant" and row["metadata"]:
             meta = json.loads(row["metadata"]) if isinstance(row["metadata"], str) else dict(row["metadata"])
             plan = meta.get("proposed_plan")
-            if plan and plan.get("plan", {}).get("approval_status") == "pending":
-                pending_goal_draft = plan
-                pending_proposed_tasks = plan.get("plan", {}).get("proposed_tasks")
-                pending_approval_status = "pending"
-                pending_classifier_output = meta.get("classifier_output")
+            if plan:
+                plan_approval = plan.get("plan", {}).get("approval_status")
+                if plan_approval == "pending":
+                    pending_goal_draft = plan
+                    pending_proposed_tasks = plan.get("plan", {}).get("proposed_tasks")
+                    pending_approval_status = "pending"
+                    pending_classifier_output = meta.get("classifier_output")
+                elif meta.get("approval_status") == "awaiting_start_date":
+                    # User approved and was asked for a start date — restore context
+                    pending_goal_draft = plan
+                    pending_proposed_tasks = plan.get("plan", {}).get("proposed_tasks")
+                    pending_approval_status = "awaiting_start_date"
+                    pending_classifier_output = meta.get("classifier_output")
             break
 
     # ── Build initial AgentState ─────────────────────────────────────────────
@@ -174,18 +182,26 @@ async def send_message(
         body.message,
     )
     goal_draft = result.get("goal_draft")
-    approval_pending = result.get("approval_status") == "pending"
-    # Only persist the plan in metadata when the user still needs to act on it.
+    result_approval = result.get("approval_status")
+    approval_pending = result_approval == "pending"
+    awaiting_start_date = result_approval == "awaiting_start_date"
+    # Persist plan metadata when the user still needs to act on it:
+    #   - "pending": user hasn't approved yet
+    #   - "awaiting_start_date": user approved, now answering the start-date question
     # After save_tasks runs, approval_status is None — don't echo the plan back.
-    # Also persist classifier_output so class_tags can be written when the goal
-    # row is created on the approval turn (classifier doesn't re-run then).
-    if goal_draft and approval_pending:
+    if goal_draft and (approval_pending or awaiting_start_date):
         metadata: dict | None = {
             "proposed_plan": goal_draft,
             "classifier_output": result.get("classifier_output"),
+            # Persist the awaiting_start_date status so the next turn can restore it
+            "approval_status": result_approval,
         }
     else:
         metadata = None
+    # agent_node: prefer explicit intent; fall back to approval status sentinel
+    agent_node_value = result.get("intent") or (
+        "ask_start_date" if awaiting_start_date else None
+    )
     await db.execute(
         """
         INSERT INTO messages (conversation_id, role, content, agent_node, metadata)
@@ -193,7 +209,7 @@ async def send_message(
         """,
         conv_id,
         reply,
-        result.get("intent"),
+        agent_node_value,
         json.dumps(metadata) if metadata else None,
     )
 
@@ -231,7 +247,7 @@ async def send_message(
     return ChatMessageResponse(
         conversation_id=str(conv_id),
         message=reply,
-        agent_node=result.get("intent"),
+        agent_node=agent_node_value,
         proposed_plan=goal_draft if approval_pending else None,
         requires_user_action=approval_pending,
         onboarding_options=result.get("onboarding_options"),

@@ -18,6 +18,7 @@ from typing import Optional
 import pendulum
 
 from app.agents.pattern_observer import flag_goal_milestone_completion
+from app.services.rrule_expander import next_occurrence_after
 from app.agents.state import AgentState
 from app.services.supabase import db
 
@@ -186,15 +187,63 @@ async def save_tasks_node(state: AgentState) -> dict:
         shared_with_goal_ids: list = task.get("shared_with_goal_ids") or []
         week_range: list[int] = task.get("week_range") or []
 
-        # Determine scheduled_at: task dict wins, scheduler slot is fallback.
+        # Determine scheduled_at: task dict wins, scheduler slot is fallback,
+        # then suggested_time anchored to goal_start_date / today.
         # Match by task_id first (stable), fall back to title.
         scheduled_at_utc: Optional[str] = task.get("scheduled_at")
         task_id_key: Optional[str] = task.get("task_id")
         slot = (slots_by_id.get(task_id_key) if task_id_key else None) or slots_by_title.get(title)
-        if not scheduled_at_utc and slot:
-            scheduled_at_utc = slot.get("scheduled_at")
-        if not scheduled_at_utc and slot:
+        if slot:
+            if not scheduled_at_utc:
+                scheduled_at_utc = slot.get("scheduled_at")
             duration_minutes = slot.get("duration_minutes") or duration_minutes
+
+        # Last-resort fallback: build scheduled_at from suggested_time if the
+        # scheduler produced no matching slot (e.g. title mismatch, LLM omission).
+        if not scheduled_at_utc:
+            suggested_time: Optional[str] = task.get("suggested_time")  # e.g. "07:00"
+            if suggested_time:
+                try:
+                    anchor_date: str = state.get("goal_start_date") or pendulum.now(user_tz).to_date_string()
+                    dt_local = pendulum.parse(f"{anchor_date}T{suggested_time}:00", tz=pendulum.timezone(user_tz))
+                    scheduled_at_utc = dt_local.in_timezone("UTC").isoformat()
+                except Exception:
+                    pass
+
+        # ── Past-time guard ──────────────────────────────────────────────
+        # If the resolved scheduled_at is already in the past (e.g. user said
+        # "start today" but it's already 3 PM and some tasks were at 7 AM / 10 AM),
+        # advance to the next valid occurrence rather than scheduling a missed slot.
+        #
+        # For recurring tasks: use next_occurrence_after(rrule, now) so intra-day
+        # recurrences (e.g. every 20 min, every hour) land as soon as possible
+        # today rather than being pushed a full day forward.
+        # For one-off tasks: simply push to the same time tomorrow.
+        if scheduled_at_utc:
+            try:
+                tz_obj = pendulum.timezone(user_tz)
+                now_local = pendulum.now(tz_obj)
+                dt_scheduled = pendulum.parse(scheduled_at_utc).in_timezone(tz_obj)
+
+                if dt_scheduled <= now_local:
+                    if recurrence_rule:
+                        next_utc = next_occurrence_after(
+                            rrule_string=recurrence_rule,
+                            after_dt=pendulum.now("UTC"),
+                            user_timezone=user_tz,
+                        )
+                        scheduled_at_utc = next_utc if next_utc else scheduled_at_utc
+                    else:
+                        scheduled_days: list[str] = task.get("scheduled_days") or []
+                        scheduled_days_norm = [d.strip().title() for d in scheduled_days]
+                        candidate = dt_scheduled
+                        for _ in range(14):  # safety cap: never loop more than 2 weeks
+                            candidate = candidate.add(days=1)
+                            if not scheduled_days_norm or candidate.format("dddd") in scheduled_days_norm:
+                                break
+                        scheduled_at_utc = candidate.in_timezone("UTC").isoformat()
+            except Exception:
+                pass
 
         base_row: dict = {
             "user_id": user_id,
@@ -213,7 +262,7 @@ async def save_tasks_node(state: AgentState) -> dict:
         # If a recurring task has no scheduled_at, default to now so the rrule
         # expander has a valid dtstart and the task shows up in today's events.
         if recurrence_rule and not scheduled_at_utc:
-            scheduled_at_utc = pendulum.now("UTC").isoformat()
+            scheduled_at_utc = pendulum.now("UTC").set(microsecond=0).isoformat()
 
         if recurrence_rule and scheduled_at_utc:
             # All recurring tasks: insert only the first occurrence.
@@ -294,4 +343,5 @@ async def save_tasks_node(state: AgentState) -> dict:
         "goal_draft": updated_goal_draft,
         "approval_status": None,
         "proposed_tasks": None,
+        "goal_start_date": None,
     }

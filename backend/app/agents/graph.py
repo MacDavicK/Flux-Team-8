@@ -18,6 +18,7 @@ from langgraph.graph import END, StateGraph
 from langgraph.types import Send
 from psycopg_pool import AsyncConnectionPool
 
+from app.agents.ask_start_date import ask_start_date_node
 from app.agents.classifier import classifier_node
 from app.agents.goal_planner import goal_planner_node
 from app.agents.onboarding import onboarding_node
@@ -76,13 +77,16 @@ async def clarify_node(state: AgentState) -> dict:
 
 def route_from_orchestrator(state: AgentState) -> str:
     """Routes from orchestrator to the appropriate agent based on intent."""
-    # If the user just approved a pending plan, skip goal_planner entirely and
-    # go straight to save_tasks — all necessary context is already in state.
-    if (
-        state.get("approval_status") == "approved"
-        and state.get("proposed_tasks")
-    ):
-        return "save_tasks"
+    approval = state.get("approval_status") or ""
+
+    # User just approved — ask when they want to start before saving tasks.
+    if approval == "approved" and state.get("proposed_tasks") and not state.get("goal_start_date"):
+        return "ask_start_date"
+
+    # User answered the start-date question — re-run scheduler with the new
+    # start date, then save tasks.
+    if approval == "approved" and state.get("proposed_tasks") and state.get("goal_start_date"):
+        return "reschedule"
 
     intent = state.get("intent") or ""
     return {
@@ -153,7 +157,10 @@ def route_from_goal_planner(state: AgentState) -> str | list[Send]:
     # 10.8 — Approval check after all sub-agents have reported
     approval = state.get("approval_status") or "negotiating"
     if approval == "approved":
-        return "save_tasks"
+        # Route via ask_start_date unless a start date was already provided
+        if state.get("goal_start_date"):
+            return "save_tasks"
+        return "ask_start_date"
     if approval == "abandoned":
         return END
     # NEGOTIATING — end this turn; orchestrator re-routes on next user message
@@ -180,6 +187,10 @@ def _build_graph() -> StateGraph:
     graph.add_node("task_handler",     task_handler_node)
     graph.add_node("goal_modifier",    goal_modifier_node)
     graph.add_node("save_tasks",       save_tasks_node)
+    graph.add_node("ask_start_date",   ask_start_date_node)
+    # reschedule reuses scheduler_node but runs standalone (not via Send fan-out)
+    # so save_tasks gets fresh slots anchored to goal_start_date.
+    graph.add_node("reschedule",       scheduler_node)
 
     # 10.2 — Entry point
     graph.set_entry_point("orchestrator")
@@ -208,9 +219,13 @@ def _build_graph() -> StateGraph:
     graph.add_edge("pattern_observer", "goal_planner")
 
     # 10.9 — Terminal edges
-    graph.add_edge("save_tasks",    END)
-    graph.add_edge("task_handler",  "save_tasks")
-    graph.add_edge("goal_modifier", "save_tasks")
+    graph.add_edge("save_tasks",      END)
+    graph.add_edge("task_handler",    "save_tasks")
+    graph.add_edge("goal_modifier",   "save_tasks")
+    # ask_start_date ends the turn; user's next message re-enters via orchestrator
+    graph.add_edge("ask_start_date",  END)
+    # reschedule → save_tasks: fresh slots anchored to goal_start_date
+    graph.add_edge("reschedule",      "save_tasks")
 
     return graph
 

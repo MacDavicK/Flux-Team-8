@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { CheckCircle2, Clock, Flame, SlidersHorizontal } from "lucide-react";
 import { BottomNav } from "~/components/navigation/BottomNav";
@@ -31,6 +31,7 @@ export const Route = createFileRoute("/reflection")({
   pendingMs: 0,
   loader: async () => {
     const { user, token } = await serverGetMe();
+    if (!user) throw redirect({ to: "/login" });
     const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
     const headers = { Authorization: `Bearer ${token}` };
 

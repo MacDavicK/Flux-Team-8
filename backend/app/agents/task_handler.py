@@ -167,7 +167,7 @@ async def task_handler_node(state: AgentState) -> dict:
     # rrule_expander has a valid dtstart and the poll query can match rows.
     scheduled_at_utc: Optional[str] = None
     start_local_str = result.scheduled_at_local or (
-        pendulum.now(user_tz).isoformat() if result.recurrence_rule else None
+        pendulum.now(user_tz).set(microsecond=0).isoformat() if result.recurrence_rule else None
     )
     if start_local_str:
         try:

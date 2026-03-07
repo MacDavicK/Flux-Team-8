@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { BottomNav } from "~/components/navigation/BottomNav";
@@ -32,7 +32,8 @@ export const Route = createFileRoute("/profile")({
       return data;
     }
     // Server-side: use serverGetMe for token, then fetch with absolute URL
-    const { token } = await serverGetMe();
+    const { user, token } = await serverGetMe();
+    if (!user) throw redirect({ to: "/login" });
     const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
     const res = await fetch(`${backendUrl}/api/v1/account/me`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
