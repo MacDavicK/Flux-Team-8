@@ -11,7 +11,7 @@ pydantic==2.10.4
 pydantic-settings==2.7.1
 
 # Database (Supabase + SQLAlchemy)
-supabase==2.11.0
+supabase>=2.15.0,<3
 sqlalchemy[asyncio]==2.0.35
 asyncpg==0.31.0
 alembic==1.13.3

@@ -635,7 +635,6 @@ backend/
 │
 ├── Dockerfile                           # Docker image
 ├── .dockerignore
-├── docker-compose.dao-service.yml       # Service compose (internal network)
 ├── Makefile
 ├── pytest.ini
 └── pyproject.toml
@@ -1280,24 +1279,27 @@ Use this flow to try the API interactively via Swagger UI:
 
 ### Running the DAO Service via Docker
 
-```bash
-# Build the Docker image
-docker build -t flux-dao-service backend/
+The dao service is defined in the root `docker-compose.yml`. Run from the project root:
 
-# Deploy using docker compose
-docker compose -f backend/docker-compose.dao-service.yml up -d
+```bash
+# Start the dao service (and its dependencies)
+docker compose up dao
+
+# Or start standalone in detached mode
+docker compose up -d dao
 
 # Verify it's running
-curl http://localhost:8000/health
+curl http://localhost:8001/health
 
 # Swagger UI
-open http://localhost:8000/docs
+open http://localhost:8001/docs
 
 # Stop
-docker compose -f backend/docker-compose.dao-service.yml down
+docker compose down dao
 ```
 
 The Docker container connects to Supabase on the host via `host.docker.internal:54322`.
+Within the Docker network, other services reach the dao service at `http://dao:8001`.
 
 ### Running Tests
 

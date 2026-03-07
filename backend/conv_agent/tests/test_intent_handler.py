@@ -8,9 +8,9 @@ from __future__ import annotations
 
 import pytest
 
-from app.conv_agent.mocks import patch_conv_agent
-from app.conv_agent.intent_handler import handle_intent
-from app.conv_agent import voice_service
+from conv_agent.mocks import patch_conv_agent
+from conv_agent.intent_handler import handle_intent
+from conv_agent import voice_service
 
 
 async def _create_session() -> str:

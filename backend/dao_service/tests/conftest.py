@@ -32,7 +32,7 @@ load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:54322/postgres"
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def test_engine():
     """
     Create the async engine inside the session event loop.
@@ -46,7 +46,7 @@ async def test_engine():
     await engine.dispose()
 
 
-@pytest_asyncio.fixture(scope="session")
+@pytest_asyncio.fixture(scope="session", loop_scope="session")
 async def setup_database(test_engine):
     """
     Truncate all tables once per test session to ensure clean starting state.

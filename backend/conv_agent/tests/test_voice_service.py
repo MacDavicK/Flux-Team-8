@@ -10,8 +10,8 @@ import sys
 import types
 import pytest
 
-from app.conv_agent.mocks import patch_conv_agent
-from app.conv_agent import voice_service
+from conv_agent.mocks import patch_conv_agent
+from conv_agent import voice_service
 
 
 # -- Config Loading Tests ----------------------------------------------------

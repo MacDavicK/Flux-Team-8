@@ -11,7 +11,7 @@ from __future__ import annotations
 import logging
 from typing import Any
 
-from app.conv_agent.dao_client import get_dao_client
+from conv_agent.dao_client import get_dao_client
 
 logger = logging.getLogger(__name__)
 

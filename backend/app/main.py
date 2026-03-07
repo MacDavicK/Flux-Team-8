@@ -10,6 +10,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
+from conv_agent import router as voice_router
+from app.routers import goals, rag, scheduler
 from app.conv_agent import router as voice_router
 from app.routers import analytics, chat, goals, rag, scheduler, tasks
 

@@ -1,338 +1,177 @@
-# Project Structure
+# Backend — Project Structure
+
+This document describes the layout of the `backend/` directory and the purpose of each major component.
+
+---
+
+## Directory Tree
 
 ```
-Flux/
+backend/
 │
-├── main.py                      # FastAPI application with all endpoints
-├── config.py                    # Application configuration and settings
-├── database.py                  # Database setup, session management
-├── models.py                    # SQLAlchemy ORM models
-├── schemas.py                   # Pydantic schemas for API validation
+├── app/                             # Core FastAPI application package
+│   ├── main.py                      # Application entry point; mounts all routers and CORS middleware
+│   ├── config.py                    # Application settings via pydantic-settings (reads .env)
+│   ├── database.py                  # Supabase client + async SQLAlchemy engine setup
+│   └── routers/
+│       ├── goals.py                 # Goal CRUD and AI planner endpoints
+│       ├── rag.py                   # RAG (Retrieval-Augmented Generation) endpoints
+│       └── scheduler.py             # Scheduler agent endpoints
 │
-├── ai_agent.py                  # AI agent for goal analysis and breakdown
-├── calendar_service.py          # Calendar and scheduling logic
-├── notification_service.py      # Notification management service
+├── conv_agent/                      # Conversational (voice) agent — REST control plane
+│   ├── router.py                    # /api/v1/voice/* endpoints (session, messages, intents)
+│   ├── voice_service.py             # Deepgram session lifecycle management
+│   ├── intent_handler.py            # Routes Deepgram function calls to backend services
+│   ├── schemas.py                   # Pydantic request/response models for voice API
+│   ├── config.py                    # Conv-agent settings (Deepgram key, prompt paths, etc.)
+│   └── config/
+│       ├── voice_prompt.md          # System prompt loaded at session start
+│       └── intents.yaml             # Deepgram function-call intent definitions
 │
-├── test_main.py                 # Unit tests for API endpoints
-├── example_usage.py             # Python example showing API usage
+├── scrum_40_notification_priority_model/  # Sprint feature: notification priority scoring
+├── scrum_41_push_notification_integration/ # Sprint feature: Web Push notifications
+├── scrum_42_whatsapp_message_integration/  # Sprint feature: WhatsApp messaging
+├── scrum_43_phone_call_trigger/            # Sprint feature: VoIP call escalation
+├── scrum_44_escalation_demo_ui/            # Sprint feature: escalation demo endpoint
+├── scrum_50_pattern_observer/              # Sprint feature: behavioral pattern observer
+├── scrum_57_notifier_agent/                # Sprint feature: notifier agent
 │
-├── requirements.txt             # Python dependencies
-├── .env.example                 # Example environment variables
-├── .gitignore                   # Git ignore rules
-├── LICENSE                      # MIT License
+├── tests/                           # Unit + integration tests for app/ routers and services
+│   ├── conftest.py
+│   ├── test_goal_service.py
+│   ├── test_goal_planner_agent.py
+│   ├── test_goals_router.py
+│   └── test_schemas.py
 │
-├── README.md                    # Main documentation
-├── USAGE_GUIDE.md              # Comprehensive usage guide
-├── PROJECT_STRUCTURE.md        # This file
+├── conv_agent/tests/                # Unit + integration tests for conv_agent
+│   ├── conftest.py
+│   ├── test_router.py
+│   ├── test_voice_service.py
+│   ├── test_intent_handler.py
+│   └── test_integration.py
 │
-├── run.ps1                     # PowerShell script to run the app
-└── test_api.ps1                # PowerShell script to test API
+├── .env.example                     # Template for required environment variables
+├── Dockerfile                       # Python 3.11 slim image; entry: uvicorn app.main:app
+├── Makefile                         # Common dev commands (install, dev, test, lint, format)
+└── requirements.txt                 # Python dependencies (pinned versions)
 ```
+
+---
 
 ## Core Components
 
-### 1. FastAPI Application (`main.py`)
+### 1. Application Entry Point (`app/main.py`)
 
-The main application file that defines all REST API endpoints:
+Creates the FastAPI application, registers CORS middleware, and mounts all routers:
 
-- `POST /goals` - Create a new goal
-- `GET /goals` - List all goals
-- `GET /goals/{id}` - Get specific goal
-- `GET /goals/{id}/breakdown` - Get goal breakdown
-- `POST /notifications/acknowledge` - Acknowledge notifications
-- `POST /tasks/{id}/complete` - Mark task as complete
-- `GET /calendar/events` - Get calendar events
-- `GET /tasks` - List tasks with filters
+- `app.routers.goals` — goal management and AI planner
+- `app.routers.rag` — RAG pipeline for context retrieval
+- `app.routers.scheduler` — intelligent scheduling agent
+- `conv_agent.router` — voice session control plane
+- Sprint feature routers (loaded conditionally; missing dependencies produce a startup warning but do not prevent the app from starting)
 
-### 2. Configuration (`config.py`)
+Health check endpoint: `GET /health` → `{"status": "ok", "service": "flux-backend"}`
 
-Manages application settings using Pydantic Settings:
+### 2. Configuration (`app/config.py`)
 
-- OpenAI API configuration
-- Database connection string
-- Working hours settings
-- Notification preferences
-- Task scheduling parameters
+Reads environment variables via `pydantic-settings`. Key settings groups:
 
-### 3. Database Layer (`database.py`, `models.py`)
+- **Database:** `DATABASE_URL`, `SUPABASE_URL`, `SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`
+- **AI/LLM:** `OPEN_ROUTER_API_KEY`, `OPENAI_MODEL`, `EMBEDDING_MODEL`
+- **RAG (Pinecone):** `PINECONE_API_KEY`, `PINECONE_INDEX_NAME`, `RAG_TOP_K`
+- **Scheduler:** `SCHEDULER_MODEL`, `SCHEDULER_CUTOFF_HOUR`, `SCHEDULER_BUFFER_MINUTES`
+- **Server:** `HOST`, `PORT`, `DEBUG`, `CORS_ORIGINS`
 
-**database.py:**
+### 3. Database Layer (`app/database.py`)
 
-- SQLAlchemy engine setup
-- Session management
-- Database initialization
+- Initializes the async SQLAlchemy engine using `asyncpg` against `DATABASE_URL`
+- Provides the Supabase client (standard key) and admin client (service role key)
+- The admin client is used for server-side writes that must bypass Row Level Security (RLS)
 
-**models.py:**
+### 4. Conversational Agent (`conv_agent/`)
 
-- `Goal` - User goals with due dates
-- `Milestone` - Weekly checkpoints
-- `Task` - Daily actionable items
-- `CalendarEvent` - Scheduled events
-- `Notification` - Task reminders
+A REST-only control plane that enables voice interactions via Deepgram. It does not run as a separate service — it is mounted directly into the main FastAPI app.
 
-### 4. API Schemas (`schemas.py`)
+**Endpoints:**
 
-Pydantic models for request/response validation:
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/v1/voice/session` | Start a new voice session; returns a short-lived Deepgram token |
+| `POST` | `/api/v1/voice/messages` | Persist a transcript message (fire-and-forget) |
+| `GET` | `/api/v1/voice/sessions/{id}/messages` | Retrieve full session transcript |
+| `POST` | `/api/v1/voice/intents` | Route a Deepgram function-call intent to the backend |
+| `DELETE` | `/api/v1/voice/session/{id}` | Close a session |
 
-- `GoalCreate`, `GoalResponse`
-- `MilestoneResponse`
-- `TaskResponse`
-- `CalendarEventResponse`
-- `NotificationResponse`
-- `GoalBreakdownResponse`
+**Configuration paths** (`conv_agent/config.py`):
+- `voice_prompt_file`: `conv_agent/config/voice_prompt.md` — relative to `WORKDIR=/app` (i.e., the `backend/` directory)
+- `voice_intents_file`: `conv_agent/config/intents.yaml` — same base
 
-### 5. AI Agent (`ai_agent.py`)
+### 5. Sprint Feature Routers (`scrum_*/`)
 
-Intelligent goal processing using LangChain and OpenAI:
+Each `scrum_N_*/` directory contains a self-contained feature module developed in a sprint. They are loaded at startup via a `try/except` block in `app/main.py`. If a module fails to load (for example, because `VAPID_PRIVATE_KEY` is not set for push notifications), the app logs a warning and continues without that router.
 
-- **analyze_goal()** - Provides empathetic analysis of goals
-- **breakdown_goal()** - Breaks goals into milestones and tasks
-- **suggest_reschedule_time()** - AI-powered rescheduling
-
-### 6. Calendar Service (`calendar_service.py`)
-
-Manages scheduling and calendar operations:
-
-- **get_available_slots()** - Find free time slots
-- **schedule_task()** - Place task on calendar
-- **reschedule_task()** - Reschedule missed tasks
-- **get_events()** - Query calendar events
-
-### 7. Notification Service (`notification_service.py`)
-
-Handles task reminders and acknowledgments:
-
-- **create_notification()** - Create task reminder
-- **send_notification()** - Send notification to user
-- **acknowledge_notification()** - Handle user response
-- **check_missed_tasks()** - Auto-reschedule missed tasks
-- **complete_task()** - Mark task as done
+---
 
 ## Data Flow
 
-### Goal Creation Flow
+### Goal Creation
 
 ```
-User -> POST /goals -> FastAPI
-                        |
-                        v
-                   Create Goal in DB
-                        |
-                        v
-              Background Task Started
-                        |
-                        v
-                   AI Agent Analysis
-                        |
-                        v
-              Create Milestones & Tasks
-                        |
-                        v
-              Schedule on Calendar
-                        |
-                        v
-              Create Notifications
+POST /goals
+    └── goals router
+           └── GoalPlannerAgent (OpenRouter / GPT-4o-mini)
+                  └── plan stored in Supabase → tasks created
 ```
 
-### Notification Flow
+### Voice Session
 
 ```
-Scheduled Time -> Notification Service
-                        |
-                        v
-                  Send Notification
-                        |
-                        v
-                   User Response?
-                   /           \
-                  /             \
-            Acknowledged    Not Acknowledged
-                 |                 |
-                 v                 v
-         Start Task         Reschedule Task
-                                   |
-                                   v
-                          Create New Notification
+POST /api/v1/voice/session
+    └── voice_service.build_session_config()
+           ├── Loads user context from Supabase
+           ├── Builds system prompt from voice_prompt.md
+           └── Mints short-lived Deepgram token
+               → Returns token + prompt to frontend
+               → Frontend connects directly to Deepgram WebSocket
+
+Deepgram emits FunctionCallRequest
+    → Frontend POSTs to /api/v1/voice/intents
+        └── intent_handler.handle_intent()
+               └── Routes to goals / task / scheduler service
 ```
 
-### Task Completion Flow
+---
 
-```
-User -> POST /tasks/{id}/complete
-              |
-              v
-       Update Task Status
-              |
-              v
-   Mark Notifications as Complete
-              |
-              v
-      Check Milestone Progress
-              |
-              v
-       Update Goal Status
-```
+## Makefile Targets
+
+| Target | Command | Description |
+|--------|---------|-------------|
+| `install` | `make install` | Install production dependencies |
+| `dev` | `make dev` | Start uvicorn with auto-reload |
+| `test` | `make test` | Run full test suite (`tests/`) |
+| `test-unit` | `make test-unit` | Unit tests only |
+| `test-integration` | `make test-integration` | Integration tests only (requires Supabase) |
+| `lint` | `make lint` | Check formatting and linting |
+| `format` | `make format` | Auto-fix formatting issues |
+
+> **Note:** The Makefile `dev` target currently invokes `dao_service.main:app` — use `uvicorn app.main:app --reload` directly until the Makefile is updated.
+
+---
 
 ## Key Design Decisions
 
-### 1. Async Background Processing
+### Single backend service
 
-- Goal breakdown happens in background using FastAPI BackgroundTasks
-- Allows immediate response to user while AI processes
-- Prevents timeout issues with long-running AI calls
+The conversational agent (`conv_agent`) is mounted directly into the FastAPI app rather than deployed as a separate microservice. This avoids inter-service HTTP calls in the local dev and Docker Compose environments.
 
-### 2. Calendar-First Scheduling
+### Async throughout
 
-- All tasks must fit in available calendar slots
-- Respects working hours (configurable)
-- Automatically finds gaps between existing events
+All database operations use `asyncpg` with SQLAlchemy's async session. The Deepgram token request and Supabase Auth verification use `httpx.AsyncClient`.
 
-### 3. Intelligent Rescheduling
+### Pydantic v2 models
 
-- Missed tasks automatically rescheduled
-- AI can suggest optimal reschedule times
-- Tracks reschedule history for analytics
+All request/response schemas use Pydantic v2. `model_config` replaces the old `class Config` inner class.
 
-### 4. Flexible Notification System
+### RLS-aware admin client
 
-- Notifications created when task scheduled
-- Configurable notification timing
-- Supports acknowledgment or dismissal
-
-### 5. Modular Service Architecture
-
-- Separation of concerns (AI, Calendar, Notifications)
-- Easy to test individual components
-- Can be extended with new services
-
-## Database Schema
-
-```
-Goal (1) ─────────────── (M) Milestone
-  │                           │
-  │                           │
-  └─────────────────── (M) Task
-                          │
-                          ├── (1) CalendarEvent
-                          └── (M) Notification
-```
-
-### Relationships
-
-- One Goal has many Milestones
-- One Goal has many Tasks
-- One Milestone has many Tasks
-- One Task has one CalendarEvent
-- One Task has many Notifications
-
-## Extension Points
-
-### Adding New Features
-
-1. **Custom AI Models**
-   - Modify `ai_agent.py` to use different LLM providers
-   - Swap OpenAI with Anthropic, Cohere, etc.
-
-2. **External Calendar Integration**
-   - Extend `calendar_service.py` to sync with Google Calendar
-   - Add OAuth authentication
-
-3. **Real Notifications**
-   - Implement push notifications in `notification_service.py`
-   - Add email/SMS providers
-
-4. **User Authentication**
-   - Add JWT/OAuth to `main.py`
-   - Implement user management
-
-5. **Analytics Dashboard**
-   - Track completion rates
-   - Visualize progress
-   - Goal achievement insights
-
-## Testing Strategy
-
-### Unit Tests (`test_main.py`)
-
-- Test each API endpoint independently
-- Mock database and external services
-- Verify request/response schemas
-
-### Integration Tests
-
-- Test complete workflows (create goal → breakdown → schedule)
-- Verify service interactions
-- Test error handling
-
-### Manual Testing
-
-- `test_api.ps1` - PowerShell script for quick testing
-- `example_usage.py` - Python script demonstrating usage
-- Swagger UI at `/docs` - Interactive testing
-
-## Deployment Considerations
-
-### Development
-
-- SQLite database (single file)
-- File-based logging
-- Debug mode enabled
-
-### Production
-
-- PostgreSQL database (replace SQLite)
-- Cloud logging (AWS CloudWatch, Azure Monitor)
-- Environment-based configuration
-- API rate limiting
-- Authentication/Authorization
-- HTTPS/SSL
-- Containerization (Docker)
-- Orchestration (Kubernetes)
-
-## Performance Optimization
-
-### Database
-
-- Add indexes on frequently queried fields
-- Use connection pooling
-- Implement caching (Redis)
-
-### API
-
-- Add pagination for list endpoints
-- Implement request throttling
-- Use async database drivers
-
-### AI
-
-- Cache common goal breakdowns
-- Batch AI requests
-- Use streaming for long responses
-
-## Security Considerations
-
-1. **API Keys**
-   - Store in environment variables
-   - Never commit to version control
-   - Rotate regularly
-
-2. **User Data**
-   - Encrypt sensitive information
-   - Implement access controls
-   - GDPR compliance for user data
-
-3. **API Security**
-   - Add authentication (JWT)
-   - Rate limiting
-   - Input validation
-   - SQL injection prevention (SQLAlchemy handles this)
-
-## Future Enhancements
-
-See README.md for the full roadmap. Priority items:
-
-1. User authentication
-2. External calendar sync
-3. Real-time notifications
-4. Mobile apps
-5. Team collaboration
+Certain server-side operations (e.g., syncing a Supabase Auth user into `public.users`) require bypassing RLS. These calls use the admin Supabase client initialized with `SUPABASE_SERVICE_ROLE_KEY`.

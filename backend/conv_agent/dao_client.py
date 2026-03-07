@@ -12,7 +12,7 @@ from typing import Any, Optional
 
 import httpx
 
-from app.config import settings
+from conv_agent.config import settings
 
 logger = logging.getLogger(__name__)
 
