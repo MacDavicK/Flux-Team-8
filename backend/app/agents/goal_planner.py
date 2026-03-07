@@ -29,12 +29,6 @@ from app.services import rag_service
 
 logger = logging.getLogger(__name__)
 
-# ── Fallback message when RAG has no expert content ──
-FALLBACK_NO_EXPERT_CONTENT = (
-    "I don't have expert guidance for this specific goal yet. "
-    "Want me to create a general plan instead?"
-)
-
 # ── System Prompt ───────────────────────────────────────────
 
 SYSTEM_PROMPT = """\
@@ -88,7 +82,7 @@ Generate a JSON object with this exact structure:
       "title": "Article title",
       "source": "URL"
     }}
-  ]
+  ],
   "sources_used": ["Article title 1", "Article title 2"]
 }}
 
@@ -121,7 +115,7 @@ NO_RAG_RULES = """\
 
 FALLBACK_NO_EXPERT_CONTENT = (
     "I don't have expert guidance for this specific goal yet. "
-    "I'll create a plan based on general best practices instead."
+    "Want me to create a general plan instead?"
 )
 
 
@@ -148,10 +142,8 @@ class GoalPlannerAgent:
             base_url=settings.openrouter_base_url,
             http_client=httpx.AsyncClient(trust_env=False),
         )
-        self._model = settings.openai_model
-        self._sources: list[dict] = []
-        self._rag_available = False
         self._model = settings.goal_planner_model
+        self._rag_available = False
 
     # ── Public API ──────────────────────────────────────────
 
@@ -335,17 +327,23 @@ class GoalPlannerAgent:
         self._sources = sources
 
         # Build response message based on whether RAG content was found
-        if self._rag_available:
+        if self._rag_available and self._sources:
+            # AC2: Append source citations to the plan summary
+            source_lines = "\n".join(
+                f'• "{s["title"]}" — {s["source"]}'
+                for s in self._sources
+            )
             ai_response = (
                 "I've put together a personalized 6-week plan based on our conversation "
                 "and expert health & fitness research! 🎯\n\n"
                 "Here's what I've designed for you. Take a look and let me know if you'd like "
-                "to adjust anything, or say **'Looks good!'** to lock it in."
+                "to adjust anything, or say **'Looks good!'** to lock it in.\n\n"
+                f"📚 Sources:\n{source_lines}"
             )
         else:
             ai_response = (
                 f"{FALLBACK_NO_EXPERT_CONTENT}\n\n"
-                "I've put together a 6-week plan based on our conversation! 🎯\n\n"
+                "I've put together a 6-week plan based on general best practices! 🎯\n\n"
                 "Take a look and let me know if you'd like to adjust anything, "
                 "or say **'Looks good!'** to lock it in."
             )
@@ -420,10 +418,11 @@ class GoalPlannerAgent:
         that was injected into the prompt.
         """
         sources: list[dict] = []
-        rag_section = "\n"
         formatted = ""
 
         # --- RAG retrieval (blocking I/O → run in thread) ---------------
+        # AC3: If Pinecone is unreachable, fall back silently (AC4).
+        _RAG_EXPERT_THRESHOLD = 0.4  # AC3: minimum score to consider results "relevant"
         try:
             query = " ".join(filter(None, [
                 self.context.get("goal", ""),
@@ -431,13 +430,13 @@ class GoalPlannerAgent:
                 self.context.get("preferences", ""),
             ]))
             chunks = await asyncio.to_thread(rag_service.retrieve, query)
-            formatted = rag_service.format_rag_context(chunks)
+
+            # AC3: If 0 chunks returned OR all scores < 0.4, treat as no-RAG
+            has_relevant = any(c["score"] >= _RAG_EXPERT_THRESHOLD for c in chunks)
+            if chunks and has_relevant:
+                formatted = rag_service.format_rag_context(chunks)
 
             if formatted:
-                rag_section = (
-                    "\n## Expert Content (use these to ground your plan)\n"
-                    f"{formatted}\n\n"
-                )
                 # Deduplicate sources by title
                 seen_titles: set[str] = set()
                 for c in chunks:
@@ -446,7 +445,7 @@ class GoalPlannerAgent:
                         sources.append({"title": c["title"], "source": c["source"]})
                 logger.info("RAG: injected %d chars, %d unique sources", len(formatted), len(sources))
             else:
-                logger.info("RAG: no chunks above threshold — generating without expert content")
+                logger.info("RAG: no chunks above %.2f threshold — generating without expert content", _RAG_EXPERT_THRESHOLD)
         except Exception as e:
             logger.warning("RAG retrieval failed (will generate without): %s", e)
 
@@ -456,15 +455,16 @@ class GoalPlannerAgent:
 
         try:
             if formatted:
+                # AC1: inject expert context in the specified format
                 expert_context_section = (
-                    "## Expert Content\n\n"
-                    "The following excerpts come from curated, expert-reviewed articles. "
-                    "Use them as the primary basis for your plan.\n\n"
-                    f"{formatted}"
+                    "EXPERT CONTEXT (use this to ground your plan):\n"
+                    "---\n"
+                    f"{formatted}\n"
+                    "---\n"
+                    "You MUST base your plan recommendations on the expert content above.\n"
+                    "If the content doesn't cover this goal, say so honestly."
                 )
                 rag_rules = RAG_RULES
-                # Avoid duplicating content: prompt has both placeholders; use only expert_context_section.
-                rag_section = ""
             else:
                 expert_context_section = ""
                 rag_rules = NO_RAG_RULES
@@ -477,7 +477,7 @@ class GoalPlannerAgent:
                 preferences=self.context.get("preferences", ""),
                 expert_context_section=expert_context_section,
                 rag_rules=rag_rules,
-                rag_section=rag_section,
+                rag_section="",
             )
 
             response = await self._client.chat.completions.create(
@@ -578,7 +578,6 @@ class GoalPlannerAgent:
             "context": self.context,
             "messages": self.messages,
             "plan": [m.model_dump() for m in self.plan] if self.plan else None,
-            "sources": getattr(self, "_sources", []),
             "sources": self._sources,
         }
 
@@ -598,7 +597,5 @@ class GoalPlannerAgent:
         raw_plan = data.get("plan")
         if raw_plan:
             agent.plan = [PlanMilestone(**m) for m in raw_plan]
-
-        agent._sources = data.get("sources", [])
 
         return agent

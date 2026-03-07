@@ -10,14 +10,21 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as ReflectionRouteImport } from './routes/reflection'
+import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as ChatRouteImport } from './routes/chat'
+import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthCallbackRouteImport } from './routes/auth/callback'
 
 const ReflectionRoute = ReflectionRouteImport.update({
   id: '/reflection',
   path: '/reflection',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OnboardingRoute = OnboardingRouteImport.update({
+  id: '/onboarding',
+  path: '/onboarding',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LoginRoute = LoginRouteImport.update({
@@ -28,6 +35,11 @@ const LoginRoute = LoginRouteImport.update({
 const ChatRoute = ChatRouteImport.update({
   id: '/chat',
   path: '/chat',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AnalyticsRoute = AnalyticsRouteImport.update({
+  id: '/analytics',
+  path: '/analytics',
   getParentRoute: () => rootRouteImport,
 } as any)
 const IndexRoute = IndexRouteImport.update({
@@ -43,38 +55,68 @@ const AuthCallbackRoute = AuthCallbackRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/reflection': typeof ReflectionRoute
   '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/reflection': typeof ReflectionRoute
   '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/analytics': typeof AnalyticsRoute
   '/chat': typeof ChatRoute
   '/login': typeof LoginRoute
+  '/onboarding': typeof OnboardingRoute
   '/reflection': typeof ReflectionRoute
   '/auth/callback': typeof AuthCallbackRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/chat' | '/login' | '/reflection' | '/auth/callback'
+  fullPaths:
+    | '/'
+    | '/analytics'
+    | '/chat'
+    | '/login'
+    | '/onboarding'
+    | '/reflection'
+    | '/auth/callback'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/chat' | '/login' | '/reflection' | '/auth/callback'
-  id: '__root__' | '/' | '/chat' | '/login' | '/reflection' | '/auth/callback'
+  to:
+    | '/'
+    | '/analytics'
+    | '/chat'
+    | '/login'
+    | '/onboarding'
+    | '/reflection'
+    | '/auth/callback'
+  id:
+    | '__root__'
+    | '/'
+    | '/analytics'
+    | '/chat'
+    | '/login'
+    | '/onboarding'
+    | '/reflection'
+    | '/auth/callback'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AnalyticsRoute: typeof AnalyticsRoute
   ChatRoute: typeof ChatRoute
   LoginRoute: typeof LoginRoute
+  OnboardingRoute: typeof OnboardingRoute
   ReflectionRoute: typeof ReflectionRoute
   AuthCallbackRoute: typeof AuthCallbackRoute
 }
@@ -86,6 +128,13 @@ declare module '@tanstack/react-router' {
       path: '/reflection'
       fullPath: '/reflection'
       preLoaderRoute: typeof ReflectionRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/onboarding': {
+      id: '/onboarding'
+      path: '/onboarding'
+      fullPath: '/onboarding'
+      preLoaderRoute: typeof OnboardingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/login': {
@@ -100,6 +149,13 @@ declare module '@tanstack/react-router' {
       path: '/chat'
       fullPath: '/chat'
       preLoaderRoute: typeof ChatRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/analytics': {
+      id: '/analytics'
+      path: '/analytics'
+      fullPath: '/analytics'
+      preLoaderRoute: typeof AnalyticsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/': {
@@ -121,8 +177,10 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AnalyticsRoute: AnalyticsRoute,
   ChatRoute: ChatRoute,
   LoginRoute: LoginRoute,
+  OnboardingRoute: OnboardingRoute,
   ReflectionRoute: ReflectionRoute,
   AuthCallbackRoute: AuthCallbackRoute,
 }

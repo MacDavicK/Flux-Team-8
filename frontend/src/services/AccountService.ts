@@ -50,7 +50,7 @@ class AccountService {
   }
 
   async getMissedByCategory(): Promise<unknown[]> {
-    const response = await apiFetch("/api/v1/analytics/missed-by-cat");
+    const response = await apiFetch("/api/v1/analytics/missed-by-category");
 
     if (!response.ok) {
       throw new Error("Failed to fetch missed-by-category data");

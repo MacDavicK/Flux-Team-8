@@ -133,6 +133,27 @@ docker compose restart backend
 brew install supabase/tap/supabase
 ```
 
+### DB container unhealthy: "could not open configuration directory /etc/postgresql-custom/conf.d"
+
+Older Supabase config volumes can miss the `conf.d` directory required by newer Postgres images. Fix:
+
+```bash
+# Replace Flux-Team-8 with your project id if different (see supabase/config.toml project_id)
+docker run --rm -v supabase_config_Flux-Team-8:/mnt alpine mkdir -p /mnt/conf.d
+supabase stop && supabase start
+```
+
+### Realtime / "relation \"migrations\" does not exist" or "password authentication failed for user authenticator"
+
+Usually a **CLI vs image version mismatch**. Upgrade Supabase CLI and do a clean start:
+
+```bash
+brew upgrade supabase/tap/supabase
+supabase stop --no-backup
+supabase start
+supabase db reset
+```
+
 ### Migration failures
 
 1. Confirm migration files are present in `supabase/migrations/`.

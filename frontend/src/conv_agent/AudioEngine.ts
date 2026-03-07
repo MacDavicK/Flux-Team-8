@@ -62,8 +62,8 @@ export class AudioEngine {
 
       // Resample if the AudioContext rate differs from target
       const resampled =
-        this.audioCtx!.sampleRate !== TARGET_SAMPLE_RATE
-          ? this._resample(inputData, this.audioCtx!.sampleRate)
+        this.audioCtx?.sampleRate !== TARGET_SAMPLE_RATE
+          ? this._resample(inputData, this.audioCtx?.sampleRate ?? 0)
           : inputData;
 
       // Convert Float32 [-1, 1] to Int16 for Deepgram
@@ -80,7 +80,9 @@ export class AudioEngine {
   stopCapture(): void {
     this.processorNode?.disconnect();
     this.sourceNode?.disconnect();
-    this.micStream?.getTracks().forEach((t) => t.stop());
+    this.micStream?.getTracks().forEach((t) => {
+      t.stop();
+    });
 
     this.processorNode = null;
     this.sourceNode = null;
@@ -132,7 +134,11 @@ export class AudioEngine {
     }
 
     this.isPlaying = true;
-    const samples = this.playbackQueue.shift()!;
+    const samples = this.playbackQueue.shift();
+    if (!samples) {
+      this.isPlaying = false;
+      return;
+    }
 
     // Create a buffer and fill it with the Float32 samples
     const buffer = this.audioCtx.createBuffer(

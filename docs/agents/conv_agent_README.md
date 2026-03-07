@@ -1,7 +1,5 @@
 # Flux Conv Agent
 
-> Last verified: 2026-03-02
-
 Voice-first conversational agent for the Flux life assistant. Users speak goals, tasks, and reschedule requests through a real-time Deepgram voice connection. The backend processes three intents (goal creation, task creation, task rescheduling) and persists all data via the Flux DAO Service REST API.
 
 ## Architecture
@@ -25,6 +23,7 @@ Browser                         Backend (FastAPI)            Deepgram
 ```
 
 **Three intents:**
+
 - `submit_goal_intent` -- Create a multi-week goal
 - `submit_new_task_intent` -- Create a time- or location-triggered task
 - `submit_reschedule_intent` -- Reschedule an existing task
@@ -38,6 +37,13 @@ Browser                         Backend (FastAPI)            Deepgram
 | Supabase CLI      | latest    | Required to run Supabase locally (`brew install supabase/tap/supabase`) |
 | Docker Desktop    | latest    | Required for `docker compose up` deployment                |
 | DEEPGRAM_API_KEY  | --        | Required for live voice (not needed for unit tests)        |
+| Requirement      | Version | Notes                                          |
+| ---------------- | ------- | ---------------------------------------------- |
+| Python           | 3.11+   | Backend runtime                                |
+| Node.js          | 18+     | Frontend build                                 |
+| DAO Service      | --      | Must be running on port 8001 (see below)       |
+| DEEPGRAM_API_KEY | --      | Required for live voice (not unit tests)       |
+| Supabase         | --      | Required for dao_service and integration tests |
 
 **Important:** The conv_agent does not connect to the database directly. All persistence goes through the DAO Service (`http://localhost:8001`). When running without Docker, start the DAO Service before starting the backend.
 
@@ -57,6 +63,8 @@ echo 'DEEPGRAM_API_KEY=your_key_here' >> backend/.env
 ## Running with Mocks (Recommended for Dev)
 
 The mock module (`backend/conv_agent/mocks.py`) provides in-memory replacements for:
+The mock module (`backend/app/conv_agent/mocks.py`) provides in-memory replacements for:
+
 - **DAO Service** -- `MockDaoClient` stores conversations, messages, users, tasks, and goals in Python dicts
 - **Deepgram token minting** -- Returns `MOCK_DEEPGRAM_TOKEN_FOR_TESTING`
 
@@ -89,6 +97,41 @@ brew install supabase/tap/supabase
 # Linux / WSL
 npx supabase
 ```
+
+- `app.conv_agent.dao_client.get_dao_client` -- `MockDaoClient` instance (replaces all DAO Service HTTP calls)
+- `app.conv_agent.voice_service.mint_deepgram_token` -- returns fake token
+
+## Running the Full Stack
+
+1. **Start Supabase** (if not already running):
+
+   ```bash
+   supabase start
+   ```
+
+2. **Set environment variables** in `backend/.env`:
+
+   ```
+   DEEPGRAM_API_KEY=your_deepgram_key
+   DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:54322/postgres
+   ```
+
+3. **Start all three services** (dao_service + backend + frontend):
+
+   ```bash
+   ./scripts/conv_agent.sh deploy
+   ```
+
+   This starts:
+   - **dao_service** on `http://localhost:8001` (data persistence layer)
+   - **backend** on `http://localhost:8080` (conv_agent + other APIs)
+   - **frontend** on `http://localhost:3000` (React dev server)
+
+   Or start them separately:
+
+   ```bash
+   # Terminal 1: dao_service
+   cd backend && uvicorn dao_service.main:app --host 0.0.0.0 --port 8001
 
 **Start Supabase:**
 ```bash
@@ -190,6 +233,14 @@ Open the chat/voice UI and tap the mic button.
 | dao_service health | http://localhost:8001/health | http://localhost:8001/health |
 | Supabase API | http://localhost:54321 | http://localhost:54321 |
 | Supabase Studio | http://localhost:54323 | http://localhost:54323 |
+| What you want              | URL                          |
+| -------------------------- | ---------------------------- |
+| **App UI (chat + voice)**  | http://localhost:3000/chat   |
+| Home / flow view           | http://localhost:3000/       |
+| Backend API docs (Swagger) | http://localhost:8080/docs   |
+| Backend health check       | http://localhost:8080/health |
+| dao_service health         | http://localhost:8001/health |
+| dao_service readiness      | http://localhost:8001/ready  |
 
 > **Note:** The backend and dao_service are REST APIs — opening `/` in a browser returns 404. Use `/docs` to browse the API interactively.
 
@@ -198,6 +249,7 @@ Open the chat/voice UI and tap the mic button.
 All examples use port `8000` (Docker Compose). If running locally via `conv_agent.sh`, replace `8000` with `8080`.
 
 ### POST /api/v1/voice/session
+
 Create a new voice session. Returns a Deepgram token and agent configuration.
 
 ```bash
@@ -209,6 +261,7 @@ curl -X POST http://localhost:8000/api/v1/voice/session \
 Response: `{ "session_id": "...", "deepgram_token": "...", "config": { ... } }`
 
 ### POST /api/v1/voice/messages
+
 Save a transcript message (fire-and-forget).
 
 ```bash
@@ -220,6 +273,7 @@ curl -X POST http://localhost:8000/api/v1/voice/messages \
 Response: `{ "message_id": "...", "status": "saved" }`
 
 ### GET /api/v1/voice/sessions/{session_id}/messages
+
 Retrieve the full transcript for a session.
 
 ```bash
@@ -229,6 +283,7 @@ curl http://localhost:8000/api/v1/voice/sessions/{session_id}/messages
 Response: `{ "session_id": "...", "messages": [ ... ] }`
 
 ### POST /api/v1/voice/intents
+
 Process a Deepgram function call (goal, task, or reschedule).
 
 ```bash
@@ -245,6 +300,7 @@ curl -X POST http://localhost:8000/api/v1/voice/intents \
 Response: `{ "function_call_id": "fc_123", "result": "Goal created: Learn guitar with a target of 3 months." }`
 
 ### DELETE /api/v1/voice/session/{session_id}
+
 Close a voice session.
 
 ```bash
@@ -315,10 +371,12 @@ python -m pytest conv_agent/tests/test_voice_service.py -v
 Integration tests run against a real local Supabase database and the DAO Service in-process via ASGI transport. They verify the full flow from voice session creation through intent handling to data persistence.
 
 **Prerequisites:**
+
 1. Supabase running locally (`supabase start`)
 2. `DEEPGRAM_API_KEY` set in environment or `backend/.env`
 
 **Steps:**
+
 ```bash
 # 1. Start Supabase
 supabase start
@@ -338,12 +396,12 @@ Integration tests are automatically skipped when `DEEPGRAM_API_KEY` is not set.
 
 ### What each test file covers
 
-| File                      | Type        | Coverage                                         |
-|---------------------------|-------------|--------------------------------------------------|
-| `test_voice_service.py`   | Unit        | Prompt loading, intent loading, session CRUD, build_session_config |
-| `test_intent_handler.py`  | Unit        | Goal/task/reschedule intents, unknown intent handling |
-| `test_router.py`          | Unit        | All 5 REST endpoints via AsyncClient              |
-| `test_integration.py`     | Integration | Full flow: session create, message save, intent handling, session close |
+| File                     | Type        | Coverage                                                                |
+| ------------------------ | ----------- | ----------------------------------------------------------------------- |
+| `test_voice_service.py`  | Unit        | Prompt loading, intent loading, session CRUD, build_session_config      |
+| `test_intent_handler.py` | Unit        | Goal/task/reschedule intents, unknown intent handling                   |
+| `test_router.py`         | Unit        | All 5 REST endpoints via AsyncClient                                    |
+| `test_integration.py`    | Integration | Full flow: session create, message save, intent handling, session close |
 
 ### Adding new tests
 
@@ -357,7 +415,10 @@ Integration tests are automatically skipped when `DEEPGRAM_API_KEY` is not set.
 ### Mic permission denied
 The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:3000` (both Docker and local `conv_agent.sh`), not an IP address.
 
+The browser requires HTTPS or localhost to grant microphone access. Make sure you are accessing the app via `http://localhost:5173`, not an IP address.
+
 ### Deepgram token error
+
 If you see "Failed to create voice session", check that `DEEPGRAM_API_KEY` is set in `backend/.env`. For local development without a key, run tests with mocks instead.
 
 ### DB migration errors
@@ -369,6 +430,9 @@ psql postgresql://postgres:postgres@localhost:54322/postgres \
 ```
 
 To start completely fresh:
+
+If Supabase tables are missing columns (e.g., `voice_session_id`, `ended_at`, `duration_seconds`), run the voice migration:
+
 ```bash
 supabase db reset
 psql postgresql://postgres:postgres@localhost:54322/postgres \
@@ -377,6 +441,10 @@ psql postgresql://postgres:postgres@localhost:54322/postgres \
 
 ### Import errors
 If you see `ModuleNotFoundError: No module named 'conv_agent'`, make sure you are running pytest from the `backend/` directory where `conv_agent/` is a top-level package:
+### Import errors after restructure
+
+If you see `ModuleNotFoundError: No module named 'app.services.voice_service'`, an import was not updated to the new `app.conv_agent` path. Search for old import paths:
+
 ```bash
 cd backend
 python -m pytest conv_agent/tests/ -v
@@ -385,6 +453,8 @@ python -m pytest conv_agent/tests/ -v
 ## Extending -- Adding a New Intent
 
 1. **Define the intent in YAML** -- Add a new entry to `backend/conv_agent/config/intents.yaml`:
+1. **Define the intent in YAML** -- Add a new entry to `backend/app/conv_agent/config/intents.yaml`:
+
    ```yaml
    - name: submit_my_new_intent
      route: MY_INTENT
@@ -400,6 +470,7 @@ python -m pytest conv_agent/tests/ -v
 2. **Add a handler in intent_handler.py** -- Create a `_handle_my_intent()` function and register it in the `handlers` dict inside `handle_intent()`.
 
 3. **Write a test** -- Add a test in `test_intent_handler.py`:
+
    ```python
    @pytest.mark.asyncio
    async def test_handle_my_new_intent():
