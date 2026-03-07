@@ -33,6 +33,7 @@ async def dispatch_push(task: dict, user_push_subscription: dict) -> bool:
         "title": title,
         "body": f"Your task is due: {title}",
         "task_id": task_id,
+        "task_name": title,
         "actions": [
             {"action": "done",       "title": "✓ Done"},
             {"action": "reschedule", "title": "⏰ Reschedule"},

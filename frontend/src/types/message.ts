@@ -182,7 +182,7 @@ export interface ChatMessageResponse {
   agent_node?: string | null;
   proposed_plan?: { [key: string]: unknown } | null;
   requires_user_action: boolean;
-  onboarding_options?: OnboardingOption[] | null;
+  options?: OnboardingOption[] | null;
 }
 
 /**
@@ -196,6 +196,6 @@ export interface ChatMessage {
   type: MessageVariant;
   /** Content as React node for UI rendering */
   content: React.ReactNode;
-  /** Quick-select options shown below this message during onboarding */
-  onboardingOptions?: OnboardingOption[] | null;
+  /** Quick-select options shown below this message */
+  options?: OnboardingOption[] | null;
 }

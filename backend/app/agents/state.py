@@ -48,5 +48,5 @@ class AgentState(TypedDict):
     # 5.3 — End-to-end trace correlation with structlog / Sentry
     correlation_id: Optional[str]
 
-    # Quick-select options for the current onboarding question (UI-only, not persisted)
-    onboarding_options: Optional[list]
+    # Quick-select options shown below the latest assistant message (UI-only, not persisted)
+    options: Optional[list]

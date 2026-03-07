@@ -14,6 +14,8 @@ from pydantic import BaseModel
 class ChatMessageRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
+    intent: Optional[str] = None      # Pre-set intent — skips orchestrator LLM call
+    task_id: Optional[str] = None     # Required when intent == "RESCHEDULE_TASK"
 
 
 class OnboardingStartRequest(BaseModel):
@@ -33,7 +35,7 @@ class ChatMessageResponse(BaseModel):
     agent_node: Optional[str] = None
     proposed_plan: Optional[dict] = None
     requires_user_action: bool = False
-    onboarding_options: Optional[list[OnboardingOptionSchema]] = None
+    options: Optional[list[OnboardingOptionSchema]] = None
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -188,6 +190,10 @@ class PhoneVerifyConfirmRequest(BaseModel):
 
 class RescheduleRequest(BaseModel):
     message: str
+
+
+class RescheduleConfirmRequest(BaseModel):
+    scheduled_at: str  # ISO 8601 UTC datetime string
 
 
 # ─────────────────────────────────────────────────────────────────

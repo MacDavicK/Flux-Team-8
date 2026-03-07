@@ -3,9 +3,10 @@ import { TimelineEvent } from "./TimelineEvent";
 
 interface FlowTimelineProps {
   events: TimelineEventType[];
+  onTaskClick?: (event: TimelineEventType) => void;
 }
 
-export function FlowTimeline({ events }: FlowTimelineProps) {
+export function FlowTimeline({ events, onTaskClick }: FlowTimelineProps) {
   return (
     <div className="flex-1 relative overflow-hidden">
       <div className="px-6 pt-4 pb-2">
@@ -15,7 +16,7 @@ export function FlowTimeline({ events }: FlowTimelineProps) {
       </div>
       <div className="absolute inset-0 overflow-y-auto scrollbar-hide px-6 space-y-4 pb-32 pt-10">
         {events.map((event, _index) => (
-          <div key={event.id} className={event.isPast ? "opacity-70" : ""}>
+          <div key={event.id} className={event.isPast && event.status !== "missed" ? "opacity-70" : ""}>
             <TimelineEvent
               title={event.title}
               description={event.description}
@@ -23,6 +24,8 @@ export function FlowTimeline({ events }: FlowTimelineProps) {
               period={event.period}
               type={event.type}
               avatars={event.avatars}
+              status={event.status}
+              onClick={onTaskClick ? () => onTaskClick(event) : undefined}
             />
           </div>
         ))}

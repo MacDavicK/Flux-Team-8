@@ -358,7 +358,7 @@ async def onboarding_node(state: AgentState) -> dict:
                             "conversation_history": updated_history,
                             "user_profile": profile,
                             "intent": "ONBOARDING",
-                            "onboarding_options": [o.model_dump() for o in next_options] if next_options else None,
+                            "options": [o.model_dump() for o in next_options] if next_options else None,
                         }
                     else:
                         updated_history = history + [{"role": "assistant", "content": canned}]
@@ -380,7 +380,7 @@ async def onboarding_node(state: AgentState) -> dict:
                     "conversation_history": updated_history,
                     "user_profile": profile,
                     "intent": "ONBOARDING",
-                    "onboarding_options": [o.model_dump() for o in options] if options else None,
+                    "options": [o.model_dump() for o in options] if options else None,
                 }
 
             # Verified — mark phone_verified in DB
@@ -427,7 +427,7 @@ async def onboarding_node(state: AgentState) -> dict:
                 "conversation_history": updated_history,
                 "user_profile": profile,
                 "intent": "ONBOARDING",
-                "onboarding_options": [o.model_dump() for o in next_options] if next_options else None,
+                "options": [o.model_dump() for o in next_options] if next_options else None,
             }
 
         # Step did not advance — re-ask (shouldn't happen with validated frontend input)
@@ -438,7 +438,7 @@ async def onboarding_node(state: AgentState) -> dict:
             "conversation_history": updated_history,
             "user_profile": profile,
             "intent": "ONBOARDING",
-            "onboarding_options": [o.model_dump() for o in options] if options else None,
+            "options": [o.model_dump() for o in options] if options else None,
         }
 
     # ── No user message yet — ask the current step question ──────────────────
@@ -460,7 +460,7 @@ async def onboarding_node(state: AgentState) -> dict:
         ],
         "user_profile": profile,
         "intent": "ONBOARDING",
-        "onboarding_options": [o.model_dump() for o in options] if options else None,
+        "options": [o.model_dump() for o in options] if options else None,
     }
 
 

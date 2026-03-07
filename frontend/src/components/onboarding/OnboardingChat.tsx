@@ -44,10 +44,10 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
     const startFresh = () =>
       chatService
         .startOnboarding()
-        .then(({ conversation_id: cid, message, onboarding_options }) => {
+        .then(({ conversation_id: cid, message, options }) => {
           if (cid) conversationIdRef.current = cid;
           if (message) {
-            setMessages([{ id: "onboarding-0", type: MessageVariant.AI, content: message, onboardingOptions: onboarding_options }]);
+            setMessages([{ id: "onboarding-0", type: MessageVariant.AI, content: message, options }]);
           }
         })
         .catch(() => {})
@@ -89,11 +89,25 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: MessageVariant.USER,
-      content: text,
+      content: /^\d{4}-\d{2}-\d{2}T/.test(text)
+        ? (() => {
+            try {
+              return new Intl.DateTimeFormat(undefined, {
+                weekday: "short",
+                month: "short",
+                day: "numeric",
+                hour: "numeric",
+                minute: "2-digit",
+              }).format(new Date(text));
+            } catch {
+              return text;
+            }
+          })()
+        : text,
     };
 
     setMessages((prev) => [
-      ...prev.map((m) => ({ ...m, onboardingOptions: null })),
+      ...prev.map((m) => ({ ...m, options: null })),
       userMessage,
     ]);
     setIsThinking(true);
@@ -113,7 +127,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
           id: (Date.now() + 1).toString(),
           type: MessageVariant.AI,
           content: <MarkdownMessage>{result.message}</MarkdownMessage>,
-          onboardingOptions: result.onboarding_options,
+          options: result.options,
         };
 
         setMessages((prev) => [...prev, aiMessage]);
@@ -151,9 +165,9 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
               <ChatBubble variant={message.type} animate={false}>
                 {message.content}
               </ChatBubble>
-              {message.type === MessageVariant.AI && message.onboardingOptions && message.onboardingOptions.length > 0 && (
+              {message.type === MessageVariant.AI && message.options && message.options.length > 0 && (
                 <OnboardingOptions
-                  options={message.onboardingOptions}
+                  options={message.options}
                   onSelect={handleSendMessage}
                   disabled={isThinking || isInitializing}
                   phoneNumber={onboardingPhone}

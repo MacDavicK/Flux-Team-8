@@ -44,13 +44,13 @@ async def get_overview(request: Request, user=Depends(get_current_user)) -> dict
     today_done = await db.fetchval("SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status = 'done' AND DATE(scheduled_at) = $2", user_id, today) or 0
     today_total = await db.fetchval("SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status IN ('pending', 'done') AND DATE(scheduled_at) = $2", user_id, today) or 0
     today_completion_pct = (today_done / today_total) if today_total > 0 else 0.0
-    heatmap_rows = await db.fetch("SELECT day, done_count FROM activity_heatmap WHERE user_id = $1 ORDER BY day DESC LIMIT 365", user_id)
+    heatmap_rows = await db.fetch("SELECT day, completed_count FROM activity_heatmap WHERE user_id = $1 ORDER BY day DESC LIMIT 365", user_id)
     return {
         "streak_days": streak_days,
         "today_done": today_done,
         "today_total": today_total,
         "today_completion_pct": round(today_completion_pct, 4),
-        "heatmap": [{"day": str(row["day"]), "done_count": row["done_count"]} for row in heatmap_rows],
+        "heatmap": [{"day": str(row["day"]), "done_count": row["completed_count"]} for row in heatmap_rows],
     }
 
 
@@ -80,5 +80,5 @@ async def get_missed_by_category(request: Request, user=Depends(get_current_user
 @limiter.limit("30/minute")
 async def get_weekly_stats(request: Request, weeks: int = Query(default=12, ge=1, le=52), user=Depends(get_current_user)) -> list:
     user_id = str(user["sub"])
-    rows = await db.fetch("SELECT week_start, done, total FROM user_weekly_stats WHERE user_id = $1 ORDER BY week_start DESC LIMIT $2", user_id, weeks)
-    return [{"week_start": str(row["week_start"]), "done": row["done"], "total": row["total"], "completion_pct": round(row["done"] / row["total"], 4) if row["total"] > 0 else 0.0} for row in rows]
+    rows = await db.fetch("SELECT week, completed, total FROM user_weekly_stats WHERE user_id = $1 ORDER BY week DESC LIMIT $2", user_id, weeks)
+    return [{"week": str(row["week"]), "completed": row["completed"], "total": row["total"], "completion_pct": round(row["completed"] / row["total"], 4) if row["total"] > 0 else 0.0} for row in rows]

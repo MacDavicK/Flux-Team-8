@@ -1,34 +1,31 @@
 import { motion } from "framer-motion";
-import type { FocusCategory, FocusMetrics } from "~/types/analytics";
+
+interface CategoryData {
+  name: string;
+  count: number;
+  percent: number;
+  color: string;
+}
 
 interface FocusDistributionProps {
-  work: number;
-  personal: number;
-  health: number;
+  categories: CategoryData[];
   className?: string;
 }
 
-export function FocusDistribution({
-  work,
-  personal,
-  health,
-  className,
-}: FocusDistributionProps) {
-  const total = work + personal + health;
-  const workPercent = (work / total) * 100;
-  const personalPercent = (personal / total) * 100;
-  const healthPercent = (health / total) * 100;
+const CATEGORY_COLORS: Record<string, string> = {
+  work: "#5C7C66",
+  personal: "#C27D66",
+  health: "#8A8F8B",
+  fitness: "#8A8F8B",
+  finance: "#7B8C6E",
+  education: "#6E7B8C",
+  social: "#8C6E7B",
+};
 
-  const categories: FocusCategory[] = [
-    { name: "Work", value: work, percent: workPercent, color: "#5C7C66" },
-    {
-      name: "Personal",
-      value: personal,
-      percent: personalPercent,
-      color: "#C27D66",
-    },
-    { name: "Health", value: health, percent: healthPercent, color: "#8A8F8B" },
-  ];
+const DEFAULT_COLOR = "#A0A89C";
+
+export function FocusDistribution({ categories = [], className }: FocusDistributionProps) {
+  if (categories.length === 0) return null;
 
   return (
     <motion.div
@@ -73,14 +70,14 @@ export function FocusDistribution({
         </div>
 
         {/* Legend */}
-        <div className="flex justify-center gap-4 mt-4">
+        <div className="flex flex-wrap justify-center gap-4 mt-4">
           {categories.map((category) => (
             <div key={category.name} className="flex items-center gap-2">
               <div
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: category.color }}
               />
-              <span className="text-charcoal text-sm">{category.name}</span>
+              <span className="text-charcoal text-sm capitalize">{category.name}</span>
               <span className="text-river text-xs">
                 ({Math.round(category.percent)}%)
               </span>
@@ -92,4 +89,5 @@ export function FocusDistribution({
   );
 }
 
-export type { FocusMetrics, FocusCategory };
+export { CATEGORY_COLORS, DEFAULT_COLOR };
+export type { CategoryData };

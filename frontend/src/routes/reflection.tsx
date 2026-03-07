@@ -1,9 +1,10 @@
-import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { CheckCircle2, Clock, Flame, SlidersHorizontal } from "lucide-react";
+import { CheckCircle2, Clock, Flame } from "lucide-react";
 import { BottomNav } from "~/components/navigation/BottomNav";
+import { GoalProgressCard } from "~/components/flow/v2/GoalProgressCard";
 import { EnergyAura } from "~/components/reflection/EnergyAura";
-import { FocusDistribution } from "~/components/reflection/FocusDistribution";
+import { CATEGORY_COLORS, DEFAULT_COLOR, FocusDistribution } from "~/components/reflection/FocusDistribution";
 import { ProfileHeader } from "~/components/reflection/ProfileHeader";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
@@ -56,11 +57,16 @@ export const Route = createFileRoute("/reflection")({
       }),
     );
 
-    const byCategory = missed as { category?: string; count?: number }[];
-    const work = byCategory.find((c) => c.category === "work")?.count ?? 0;
-    const personal = byCategory.find((c) => c.category === "personal")?.count ?? 0;
-    const health = byCategory.find((c) => c.category === "health")?.count ?? 0;
-    const total = work + personal + health || 1;
+    const byCategory = missed as { category?: string; missed_count?: number }[];
+    const totalMissed = byCategory.reduce((s, c) => s + (c.missed_count ?? 0), 0) || 1;
+    const focusCategories = byCategory
+      .filter((c) => c.category)
+      .map((c) => ({
+        name: c.category!,
+        count: c.missed_count ?? 0,
+        percent: Math.round(((c.missed_count ?? 0) / totalMissed) * 100),
+        color: CATEGORY_COLORS[c.category!] ?? DEFAULT_COLOR,
+      }));
 
     const data = {
       profile: user ? { id: user.id, name: user.name ?? "User", email: user.email } : null,
@@ -77,11 +83,7 @@ export const Route = createFileRoute("/reflection")({
         text: o.insight ?? "Keep up the great work! You're building strong habits.",
       },
       energyData,
-      focusData: {
-        work: Math.round((work / total) * 100),
-        personal: Math.round((personal / total) * 100),
-        health: Math.round((health / total) * 100),
-      },
+      focusCategories,
     };
     debugSsrLog("/reflection (ReflectionPage)", data);
     return data;
@@ -90,7 +92,7 @@ export const Route = createFileRoute("/reflection")({
 });
 
 function ReflectionPage() {
-  const { profile, stats, insight, energyData, focusData } = Route.useLoaderData();
+  const { profile, stats, insight, energyData, focusCategories } = Route.useLoaderData();
 
   if (!profile) {
     return <LoadingState />;
@@ -102,7 +104,10 @@ function ReflectionPage() {
 
       <ProfileHeader name={profile.name} avatarUrl={undefined} />
 
+      <GoalProgressCard />
+
       <main className="px-5 space-y-6">
+        <h2 className="text-display text-2xl italic text-charcoal">Your reflection</h2>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -139,11 +144,7 @@ function ReflectionPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          <FocusDistribution
-            work={focusData.work}
-            personal={focusData.personal}
-            health={focusData.health}
-          />
+          <FocusDistribution categories={focusCategories} />
         </motion.div>
 
         <motion.div
@@ -161,25 +162,6 @@ function ReflectionPage() {
           </div>
         </motion.div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.6 }}
-          className="pb-2"
-        >
-          <Link
-            to="/profile"
-            className="w-full glass-card p-4 flex items-center gap-3 hover:bg-white/30 transition-colors duration-200 active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-2xl fab-gradient flex items-center justify-center shrink-0">
-              <SlidersHorizontal className="w-5 h-5 text-white" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-charcoal">Tune your preferences</p>
-              <p className="text-xs text-river/60 mt-0.5">Schedule, timezone & notifications</p>
-            </div>
-          </Link>
-        </motion.div>
       </main>
 
       <BottomNav />

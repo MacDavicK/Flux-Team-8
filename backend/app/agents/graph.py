@@ -93,7 +93,6 @@ def route_from_orchestrator(state: AgentState) -> str:
         "ONBOARDING":      "onboarding",
         "GOAL":            "goal_planner",
         "NEW_TASK":        "task_handler",
-        "RESCHEDULE_TASK": "scheduler",
         "MODIFY_GOAL":     "goal_modifier",
         "NEXT_MILESTONE":  "goal_planner",
         "CHITCHAT":        "chitchat",

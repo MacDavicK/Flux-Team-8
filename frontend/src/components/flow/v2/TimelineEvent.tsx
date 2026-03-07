@@ -10,6 +10,8 @@ interface TimelineEventProps {
   type: EventType;
   avatars?: string[];
   isLast?: boolean;
+  status?: string;
+  onClick?: () => void;
 }
 
 export function TimelineEvent({
@@ -18,12 +20,22 @@ export function TimelineEvent({
   time,
   period,
   type,
+  status,
+  onClick,
 }: TimelineEventProps) {
   const typeClasses = {
     sage: "glass-pebble-sage rounded-tl-md",
     terra: "glass-pebble-terra rounded-bl-md",
     stone: "glass-pebble-stone rounded-tr-md",
   };
+
+  // Status-based left border accent
+  const statusBorder =
+    status === "missed"
+      ? "border-l-4 border-l-red-400"
+      : status === "done" || status === "completed"
+        ? "border-l-4 border-l-green-400"
+        : "";
 
   return (
     <div className="flex gap-4 group">
@@ -36,9 +48,12 @@ export function TimelineEvent({
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
         whileHover={{ scale: 1.02 }}
+        onClick={onClick}
         className={cn(
           "flex-1 p-5 rounded-[1.5rem] transition-transform",
           typeClasses[type],
+          statusBorder,
+          onClick && "cursor-pointer",
         )}
       >
         <h3 className="text-lg font-semibold text-charcoal mb-1 pt-0">

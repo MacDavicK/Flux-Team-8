@@ -1,11 +1,12 @@
 import * as Sentry from "@sentry/react";
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { serverGetMe } from "~/lib/authServerFns";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { z } from "zod";
 import { DateHeader } from "~/components/flow/v2/DateHeader";
 import { FlowTimeline } from "~/components/flow/v2/FlowTimeline";
 import { TaskRail } from "~/components/flow/v2/TaskRail";
-import { RescheduleModal } from "~/components/modals/RescheduleModal";
+import { TaskDetailSheet } from "~/components/modals/TaskDetailSheet";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
@@ -27,6 +28,10 @@ function FlowPagePending() {
 export const Route = createFileRoute("/")({
   pendingComponent: FlowPagePending,
   pendingMs: 0,
+  validateSearch: z.object({
+    complete_task_id: z.string().optional(),
+    missed_task_id: z.string().optional(),
+  }),
   loader: async () => {
     const { user, token } = await serverGetMe();
     if (!user) throw redirect({ to: "/login" });
@@ -98,9 +103,11 @@ function mapTaskToDisplayTypes(task: { [key: string]: unknown }): {
   if (category === "work") eventType = EventType.SAGE;
   else if (category === "personal") eventType = EventType.TERRA;
 
+  const durationMinutes = typeof task.duration_minutes === "number" ? task.duration_minutes : undefined;
+
   return {
     railItem: { id, title, completed: isDone },
-    event: { id, title, description, time, period, type: eventType, isPast },
+    event: { id, title, description, time, period, type: eventType, isPast, status, durationMinutes },
   };
 }
 
@@ -112,6 +119,7 @@ function getGreeting(name?: string): string {
 
 function FlowPage() {
   const { events: initialEvents, tasks: initialTasks, user: loaderUser } = Route.useLoaderData();
+  const { complete_task_id, missed_task_id } = Route.useSearch();
   const { user } = useAuth();
   const [data, setData] = useState<{ events: TimelineEvent[]; tasks: TaskRailItem[] }>({
     events: initialEvents,
@@ -168,22 +176,32 @@ function FlowPage() {
     });
   };
 
-  const [rescheduleModal, setRescheduleModal] = useState<{
-    isOpen: boolean;
-    taskTitle: string;
-    taskId: string;
-  }>({ isOpen: false, taskTitle: "", taskId: "" });
+  const navigate = useNavigate();
+  const [selectedTask, setSelectedTask] = useState<TimelineEvent | null>(null);
 
-  const handleReschedule = (option: string) => {
-    if (rescheduleModal.taskId) {
-      tasksService
-        .rescheduleTask(rescheduleModal.taskId, { message: option })
-        .catch((error) => {
-          Sentry.captureException(error, { extra: { taskId: rescheduleModal.taskId, option } });
-        });
-    }
-    setRescheduleModal({ isOpen: false, taskTitle: "", taskId: "" });
+  const handleMissed = (taskId: string) => {
+    setData((prev) => ({
+      ...prev,
+      events: prev.events.map((e) =>
+        e.id === taskId ? { ...e, status: "missed", isPast: true } : e,
+      ),
+    }));
+    tasksService.missedTask(taskId).catch((error: unknown) => {
+      Sentry.captureException(error, { extra: { taskId } });
+    });
   };
+
+  // Handle deep-links from push notification actions (done / missed)
+  useEffect(() => {
+    if (complete_task_id) {
+      handleComplete(complete_task_id);
+      window.history.replaceState(null, "", "/");
+    } else if (missed_task_id) {
+      handleMissed(missed_task_id);
+      window.history.replaceState(null, "", "/");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="relative w-full max-w-md mx-auto h-screen flex flex-col overflow-hidden">
@@ -193,17 +211,31 @@ function FlowPage() {
 
       <TaskRail tasks={data.tasks} onComplete={handleComplete} onAddTodo={handleAddTodo} />
 
-      <FlowTimeline events={data.events} />
+      <FlowTimeline
+        events={data.events}
+        onTaskClick={(event) => setSelectedTask(event)}
+      />
 
       <BottomNav />
 
-      <RescheduleModal
-        isOpen={rescheduleModal.isOpen}
-        onClose={() =>
-          setRescheduleModal({ isOpen: false, taskTitle: "", taskId: "" })
-        }
-        taskTitle={rescheduleModal.taskTitle}
-        onReschedule={handleReschedule}
+      <TaskDetailSheet
+        task={selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onComplete={(taskId) => {
+          handleComplete(taskId);
+          setSelectedTask(null);
+        }}
+        onMissed={(taskId) => {
+          handleMissed(taskId);
+          setSelectedTask(null);
+        }}
+        onReschedule={(taskId, taskTitle) => {
+          setSelectedTask(null);
+          navigate({
+            to: "/chat",
+            search: { reschedule_task_id: taskId, task_name: taskTitle },
+          });
+        }}
       />
     </div>
   );

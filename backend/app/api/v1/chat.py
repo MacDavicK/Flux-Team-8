@@ -28,6 +28,11 @@ from app.models.api_schemas import (
 )
 from app.services.context_manager import window_conversation_history
 from app.services.supabase import db
+from app.api.v1.tasks import (
+    _fetch_task_or_404,
+    _compute_simple_reschedule_slots,
+    _build_slot_options,
+)
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -44,6 +49,70 @@ async def send_message(
     results to DB, and return the assistant reply with metadata.
     """
     user_id: str = str(current_user["sub"])
+
+    # ── Short-circuit: RESCHEDULE_TASK with pre-set intent ───────────────────
+    # Frontend sends intent="RESCHEDULE_TASK" + task_id to skip the orchestrator
+    # LLM call. We compute slots directly, create a real conversation, persist
+    # messages, and return a proper conversation_id for follow-up /message calls.
+    if body.intent == "RESCHEDULE_TASK" and body.task_id:
+        task = await _fetch_task_or_404(body.task_id, user_id)
+
+        user_row = await db.fetchrow(
+            "SELECT timezone, profile FROM users WHERE id = $1",
+            uuid.UUID(user_id),
+        )
+        user_tz = "UTC"
+        if user_row:
+            user_tz = user_row["timezone"] or "UTC"
+
+        # Create a new conversation for this reschedule thread
+        thread_id = str(uuid.uuid4())
+        conv = await db.fetchrow(
+            """
+            INSERT INTO conversations (user_id, langgraph_thread_id, context_type)
+            VALUES ($1, $2, 'general')
+            RETURNING id
+            """,
+            uuid.UUID(user_id),
+            thread_id,
+        )
+        conv_id: uuid.UUID = conv["id"]
+
+        task_title = task["title"]
+        simple_slots = await _compute_simple_reschedule_slots(task, user_id, user_tz)
+        slot_options = _build_slot_options(simple_slots, user_tz, body.task_id)
+        real_slots = [o for o in slot_options if o.value != f"missed:{body.task_id}"]
+        slot_count = len(real_slots)
+        reply = (
+            f"Here {'is' if slot_count == 1 else 'are'} the next available "
+            f"{'slot' if slot_count == 1 else 'slots'} for **{task_title}**. "
+            f"Pick one or mark it as missed."
+        )
+
+        # Persist both turns so conversation history is complete
+        await db.execute(
+            "INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)",
+            conv_id,
+            body.message,
+        )
+        await db.execute(
+            "INSERT INTO messages (conversation_id, role, content, agent_node) VALUES ($1, 'assistant', $2, 'RESCHEDULE_TASK')",
+            conv_id,
+            reply,
+        )
+        await db.execute(
+            "UPDATE conversations SET last_message_at = NOW() WHERE id = $1",
+            conv_id,
+        )
+
+        return ChatMessageResponse(
+            conversation_id=str(conv_id),
+            message=reply,
+            agent_node="RESCHEDULE_TASK",
+            proposed_plan=None,
+            requires_user_action=True,
+            options=slot_options,
+        )
 
     # ── 17.1.2  Resolve or create conversation ──────────────────────────────
     if body.conversation_id is None:
@@ -145,7 +214,7 @@ async def send_message(
     state: dict = {
         "user_id": user_id,
         "conversation_history": history,
-        "intent": None,
+        "intent": body.intent or None,
         "goal_draft": pending_goal_draft,
         "proposed_tasks": pending_proposed_tasks,
         "classifier_output": pending_classifier_output,
@@ -155,7 +224,7 @@ async def send_message(
         "error": None,
         "token_usage": {},
         "correlation_id": str(uuid.uuid4()),
-        "onboarding_options": None,
+        "options": None,
         **({"user_profile": user_profile} if user_profile else {}),
     }
 
@@ -250,7 +319,7 @@ async def send_message(
         agent_node=agent_node_value,
         proposed_plan=goal_draft if approval_pending else None,
         requires_user_action=approval_pending,
-        onboarding_options=result.get("onboarding_options"),
+        options=result.get("options"),
     )
 
 
@@ -346,7 +415,7 @@ async def start_onboarding(
         "error": None,
         "token_usage": {},
         "correlation_id": str(uuid.uuid4()),
-        "onboarding_options": None,
+        "options": None,
         "user_profile": user_profile,
     }
     result: dict = await _graph_module.compiled_graph.ainvoke(
@@ -383,7 +452,7 @@ async def start_onboarding(
         conversation_id=str(conv_id),
         message=greeting or "Hi there! I'm Flux, your AI life coach. What should I call you?",
         agent_node="ONBOARDING",
-        onboarding_options=result.get("onboarding_options"),
+        options=result.get("options"),
     )
 
 

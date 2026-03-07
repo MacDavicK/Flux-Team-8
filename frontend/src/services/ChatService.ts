@@ -72,12 +72,15 @@ class ChatService {
   async sendMessage(
     message: string,
     conversationId?: string,
+    options?: { intent?: string; task_id?: string },
   ): Promise<ChatMessageResponse> {
     const response = await apiFetch("/api/v1/chat/message", {
       method: "POST",
       body: JSON.stringify({
         message,
         conversation_id: conversationId ?? null,
+        ...(options?.intent ? { intent: options.intent } : {}),
+        ...(options?.task_id ? { task_id: options.task_id } : {}),
       }),
     });
 

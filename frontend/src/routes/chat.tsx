@@ -2,10 +2,12 @@ import { createFileRoute, redirect } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { History, MessageSquarePlus, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { MarkdownMessage } from "~/components/chat/MarkdownMessage";
 import { ChatInput } from "~/components/chat/ChatInput";
 import { MilestoneRoadmapView, type RoadmapMilestone } from "~/components/chat/MilestoneRoadmapView";
+import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { PlanView } from "~/components/chat/PlanView";
 import { StartDatePicker } from "~/components/chat/StartDatePicker";
 import { TasksView, type ProposedTask } from "~/components/chat/TasksView";
@@ -18,6 +20,7 @@ import { setInMemoryToken } from "~/lib/apiClient";
 import { serverGetMe } from "~/lib/authServerFns";
 import { chatService } from "~/services/ChatService";
 import type { ConversationSummary, HistoryMessage } from "~/services/ChatService";
+import { tasksService } from "~/services/TasksService";
 import type { ChatMessage, PlanMilestone } from "~/types";
 import { MessageVariant } from "~/types/message";
 
@@ -29,6 +32,11 @@ export const Route = createFileRoute("/chat")({
     </div>
   ),
   pendingMs: 0,
+  validateSearch: z.object({
+    reschedule_task_id: z.string().optional(),
+    task_name: z.string().optional(),
+    conversation: z.string().optional(),
+  }),
   loader: async () => {
     const { user, token } = await serverGetMe();
     if (!user) throw redirect({ to: "/login" });
@@ -165,6 +173,7 @@ const WELCOME_MESSAGE = (name?: string) => {
 
 function ChatPage() {
   const { user } = useAuth();
+  const { reschedule_task_id, task_name } = Route.useSearch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const conversationIdRef = useRef<string | undefined>(undefined);
@@ -178,6 +187,9 @@ function ChatPage() {
   const drawerScrollRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const initDoneRef = useRef(false);
+  // Preserve reschedule_task_id across URL rewrites (it's cleared from search params
+  // when conversation_id is substituted in, but we still need it for slot confirmation).
+  const rescheduleTaskIdRef = useRef<string | undefined>(reschedule_task_id);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -189,16 +201,65 @@ function ChatPage() {
     scrollToBottom();
   }, [scrollToBottom]);
 
-  // Show welcome message on mount.
+  // On mount: if reschedule_task_id is present, auto-submit the reschedule request.
+  // Otherwise show the standard welcome message.
   useEffect(() => {
     if (initDoneRef.current) return;
     initDoneRef.current = true;
+
+    if (reschedule_task_id) {
+      const displayName = task_name ?? "this task";
+      const userMsg: ChatMessage = {
+        id: "reschedule-user",
+        type: MessageVariant.USER,
+        content: `Help me reschedule "${displayName}"`,
+      };
+      setMessages([userMsg]);
+      setIsThinking(true);
+
+      chatService
+        .sendMessage(`Help me reschedule "${displayName}"`, undefined, {
+          intent: "RESCHEDULE_TASK",
+          task_id: reschedule_task_id,
+        })
+        .then((result) => {
+          setIsThinking(false);
+          if (result.conversation_id) {
+            conversationIdRef.current = result.conversation_id;
+            window.history.replaceState(null, "", `/chat?conversation=${result.conversation_id}`);
+          } else {
+            window.history.replaceState(null, "", "/chat");
+          }
+          const aiMsg: ChatMessage = {
+            id: "reschedule-ai",
+            type: MessageVariant.AI,
+            content: <MarkdownMessage>{result.message}</MarkdownMessage>,
+            options: result.options,
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+          scrollToBottom();
+        })
+        .catch(() => {
+          setIsThinking(false);
+          window.history.replaceState(null, "", "/chat");
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: "reschedule-error",
+              type: MessageVariant.AI,
+              content: "Sorry, I couldn't load reschedule options. Please try again.",
+            },
+          ]);
+        });
+      return;
+    }
+
     setMessages([{
       id: "welcome",
       type: MessageVariant.AI,
       content: <MarkdownMessage>{WELCOME_MESSAGE(user?.name)}</MarkdownMessage>,
     }]);
-  }, [user?.name]);
+  }, [user?.name, reschedule_task_id, task_name, scrollToBottom]);
 
   const startNewChat = useCallback(() => {
     initDoneRef.current = true;
@@ -297,14 +358,85 @@ function ChatPage() {
     }
   }, [convHasMore, convCursor, isLoadingMoreConversations]);
 
+  function formatSlotLabel(iso: string): string {
+    try {
+      return new Intl.DateTimeFormat(undefined, {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+        hour: "numeric",
+        minute: "2-digit",
+      }).format(new Date(iso));
+    } catch {
+      return iso;
+    }
+  }
+
   const handleSendMessage = async (text: string) => {
+    // Handle slot confirmation (ISO UTC string from reschedule options)
+    if (rescheduleTaskIdRef.current && /^\d{4}-\d{2}-\d{2}T/.test(text)) {
+      const slotLabel = formatSlotLabel(text);
+      setMessages((prev) => [
+        ...prev.map((m) => ({ ...m, options: null })),
+        { id: Date.now().toString(), type: MessageVariant.USER, content: slotLabel },
+      ]);
+      setIsThinking(true);
+      tasksService
+        .confirmReschedule(rescheduleTaskIdRef.current, text)
+        .then(() => {
+          setIsThinking(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: MessageVariant.AI,
+              content: <MarkdownMessage>Done! Your task has been rescheduled. You'll get a reminder at the new time.</MarkdownMessage>,
+            },
+          ]);
+          scrollToBottom();
+        })
+        .catch(() => {
+          setIsThinking(false);
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: Date.now().toString(),
+              type: MessageVariant.AI,
+              content: "Sorry, I couldn't confirm that reschedule. Please try again.",
+            },
+          ]);
+        });
+      return;
+    }
+
+    // Handle "Mark as Missed" sentinel from reschedule options
+    if (text.startsWith("missed:")) {
+      const taskId = text.slice("missed:".length);
+      const missedMsg: ChatMessage = {
+        id: Date.now().toString(),
+        type: MessageVariant.AI,
+        content: <MarkdownMessage>Got it — marked as missed. You're all set.</MarkdownMessage>,
+      };
+      setMessages((prev) => [
+        ...prev.map((m) => ({ ...m, options: null })),
+        missedMsg,
+      ]);
+      tasksService.missedTask(taskId).catch(() => {});
+      scrollToBottom();
+      return;
+    }
+
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: MessageVariant.USER,
-      content: text,
+      content: /^\d{4}-\d{2}-\d{2}T/.test(text) ? formatSlotLabel(text) : text,
     };
 
-    setMessages((prev) => [...prev, userMessage]);
+    // Clear options from all previous messages when the user responds
+    setMessages((prev) => [
+      ...prev.map((m) => ({ ...m, options: null })),
+      userMessage,
+    ]);
     setIsThinking(true);
     scrollToBottom();
 
@@ -335,7 +467,7 @@ function ChatPage() {
                 <StartDatePicker onSelect={(date) => handleSendMessage(date)} />
               ) : parsed ? (
                 renderPlanUI(parsed, () => handleSendMessage("Yes, this looks great!"))
-              ) : result.requires_user_action ? (
+              ) : result.requires_user_action && !result.options?.length ? (
                 <button
                   type="button"
                   onClick={() => handleSendMessage("OK")}
@@ -346,6 +478,7 @@ function ChatPage() {
               ) : null}
             </div>
           ),
+          options: result.options,
         };
 
         setMessages((prev) => [...prev, aiMessage]);
@@ -411,6 +544,13 @@ function ChatPage() {
                 <ChatBubble variant={message.type} animate={false}>
                   {message.content}
                 </ChatBubble>
+                {message.type === MessageVariant.AI && message.options && message.options.length > 0 && (
+                  <OnboardingOptions
+                    options={message.options}
+                    onSelect={handleSendMessage}
+                    disabled={isThinking}
+                  />
+                )}
               </motion.div>
             ))}
           </AnimatePresence>

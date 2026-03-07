@@ -1,5 +1,4 @@
 import { apiFetch } from "~/lib/apiClient";
-import type { ChatMessageResponse, RescheduleRequest } from "~/types";
 
 class TasksService {
   async getTodayTasks(): Promise<{ [key: string]: unknown }[]> {
@@ -37,21 +36,28 @@ class TasksService {
     return response.json();
   }
 
-  async rescheduleTask(
-    taskId: string,
-    data: RescheduleRequest,
-  ): Promise<ChatMessageResponse> {
-    const response = await apiFetch(`/api/v1/tasks/${taskId}/reschedule`, {
-      method: "POST",
-      body: JSON.stringify(data),
+  async missedTask(taskId: string): Promise<{ task_id: string; status: string }> {
+    const response = await apiFetch(`/api/v1/tasks/${taskId}/missed`, {
+      method: "PATCH",
     });
 
     if (!response.ok) {
-      throw new Error("Failed to reschedule task");
+      throw new Error("Failed to mark task as missed");
     }
 
     return response.json();
   }
+
+  async confirmReschedule(taskId: string, scheduledAt: string): Promise<{ original_task_id: string; new_task_id: string; status: string; scheduled_at: string }> {
+    const response = await apiFetch(`/api/v1/tasks/${taskId}/reschedule-confirm`, {
+      method: "PATCH",
+      body: JSON.stringify({ scheduled_at: scheduledAt }),
+    });
+    if (!response.ok) throw new Error("Failed to confirm reschedule");
+    return response.json();
+  }
+
+
 }
 
 export const tasksService = new TasksService();

@@ -1,11 +1,11 @@
 """
 Tasks API endpoints — §17.3
 
-GET   /api/v1/tasks/today              — Today's pending tasks in user timezone.
-GET   /api/v1/tasks/{task_id}          — Fetch single task.
-PATCH /api/v1/tasks/{task_id}/complete — Mark task done; check goal completion + pipeline.
-PATCH /api/v1/tasks/{task_id}/missed   — Mark task missed; fire pattern observer async.
-POST  /api/v1/tasks/{task_id}/reschedule — Reschedule via LangGraph.
+GET   /api/v1/tasks/today                      — Today's pending tasks in user timezone.
+GET   /api/v1/tasks/{task_id}                  — Fetch single task.
+PATCH /api/v1/tasks/{task_id}/complete         — Mark task done; check goal completion + pipeline.
+PATCH /api/v1/tasks/{task_id}/missed           — Mark task missed; fire pattern observer async.
+PATCH /api/v1/tasks/{task_id}/reschedule-confirm — Confirm a reschedule slot.
 """
 from __future__ import annotations
 
@@ -13,11 +13,12 @@ import asyncio
 import uuid
 from datetime import datetime, timedelta, timezone
 
+import pendulum
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.agents.graph import compiled_graph
 from app.middleware.auth import get_current_user
-from app.models.api_schemas import ChatMessageResponse, EscalationPolicyUpdate, RescheduleRequest, TodoCreateRequest
+from app.models.api_schemas import EscalationPolicyUpdate, OnboardingOptionSchema, RescheduleConfirmRequest, TodoCreateRequest
 from app.services.recurrence import advance_recurring_task
 from app.services.supabase import db
 
@@ -61,7 +62,7 @@ async def get_today_tasks(
                recurrence_rule, shared_with_goal_ids, escalation_policy, completed_at, created_at
         FROM tasks
         WHERE user_id = $1
-          AND status = 'pending'
+          AND status IN ('pending', 'missed', 'done')
           AND scheduled_at >= $2
           AND scheduled_at < $3
         ORDER BY scheduled_at ASC
@@ -244,59 +245,191 @@ async def update_escalation_policy(
     return _serialize_task(task)
 
 
-@router.post("/{task_id}/reschedule", response_model=ChatMessageResponse)
-async def reschedule_task(
+@router.patch("/{task_id}/reschedule-confirm")
+async def reschedule_confirm(
     task_id: str,
-    body: RescheduleRequest,
+    body: RescheduleConfirmRequest,
     current_user=Depends(get_current_user),
-) -> ChatMessageResponse:
-    """17.3.5 — Run the LangGraph agent with a RESCHEDULE_TASK intent."""
-    user_id = str(current_user["sub"])
-    task = await _fetch_task_or_404(task_id, user_id)
+) -> dict:
+    """Confirm a reschedule slot.
 
-    correlation_id = str(uuid.uuid4())
-    state: dict = {
-        "user_id": user_id,
-        "conversation_history": [{"role": "user", "content": body.message}],
-        "intent": "RESCHEDULE_TASK",
-        "user_profile": {},
-        "goal_draft": None,
-        "proposed_tasks": [_serialize_task(task)],
-        "classifier_output": None,
-        "scheduler_output": None,
-        "pattern_output": None,
-        "approval_status": None,
-        "error": None,
-        "token_usage": {},
-        "correlation_id": correlation_id,
+    Keeps the original task as 'missed' (preserving pattern-observer data) and
+    creates a new 'pending' task at the chosen time. Returns the new task's ID.
+    """
+    user_id = str(current_user["sub"])
+    user_uuid = uuid.UUID(user_id)
+    task = await _fetch_task_or_404(task_id, user_id)
+    task_uuid = uuid.UUID(task_id)
+
+    try:
+        scheduled_at_dt = datetime.fromisoformat(body.scheduled_at.replace("Z", "+00:00"))
+    except ValueError:
+        raise HTTPException(status_code=422, detail="Invalid scheduled_at format; expected ISO 8601")
+
+    # Ensure the original task is marked missed so history is preserved
+    await db.execute(
+        "UPDATE tasks SET status = 'missed' WHERE id = $1 AND user_id = $2",
+        task_uuid,
+        user_uuid,
+    )
+
+    # Create a new pending task for the rescheduled slot, copying relevant fields
+    new_task_id = await db.fetchval(
+        """
+        INSERT INTO tasks (
+            user_id, goal_id, title, description, status,
+            scheduled_at, duration_minutes, trigger_type,
+            recurrence_rule, escalation_policy
+        )
+        VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9)
+        RETURNING id
+        """,
+        user_uuid,
+        task["goal_id"],
+        task["title"],
+        task["description"],
+        scheduled_at_dt,
+        task["duration_minutes"],
+        task["trigger_type"],
+        task["recurrence_rule"],
+        task["escalation_policy"],
+    )
+
+    return {
+        "original_task_id": task_id,
+        "new_task_id": str(new_task_id),
+        "status": "rescheduled",
+        "scheduled_at": scheduled_at_dt.isoformat(),
     }
 
-    thread_id = f"reschedule-{task_id}-{correlation_id}"
-    result: dict = await compiled_graph.ainvoke(
-        state,
-        config={"configurable": {"thread_id": thread_id}},
+
+async def _compute_simple_reschedule_slots(
+    task: dict,
+    user_id: str,
+    user_tz: str,
+) -> list[dict]:
+    """
+    For tasks without a recurrence_rule, compute up to 3 next-hourly slots
+    that don't overlap with existing pending/rescheduled tasks today, plus
+    a "Tomorrow, same time" slot.
+
+    Returns a list of dicts: [{"scheduled_at": <UTC ISO>, "label": <str>}]
+    """
+    tz = pendulum.timezone(user_tz)
+    now_local = pendulum.now(tz)
+
+    # Determine original time-of-day from task's scheduled_at (fall back to now)
+    original_hour: int = now_local.hour
+    original_minute: int = now_local.minute
+    task_scheduled_at = task.get("scheduled_at")
+    if task_scheduled_at:
+        try:
+            orig_dt = pendulum.parse(task_scheduled_at).in_timezone(tz)  # type: ignore[union-attr]
+            original_hour = orig_dt.hour
+            original_minute = orig_dt.minute
+        except Exception:
+            pass
+
+    duration = int(task.get("duration_minutes") or 30)
+
+    # Fetch existing tasks for today to detect clashes
+    today_local = now_local.start_of("day")
+    tomorrow_local = today_local.add(days=1)
+    existing = await db.fetch(
+        """
+        SELECT scheduled_at, duration_minutes
+        FROM tasks
+        WHERE user_id = $1
+          AND status IN ('pending', 'rescheduled')
+          AND scheduled_at >= $2
+          AND scheduled_at < $3
+        ORDER BY scheduled_at
+        """,
+        uuid.UUID(user_id),
+        today_local.in_timezone("UTC"),
+        tomorrow_local.add(days=1).in_timezone("UTC"),  # include tomorrow
     )
 
-    reply: str = ""
-    for msg in reversed(result.get("conversation_history", [])):
-        if msg.get("role") == "assistant":
-            reply = msg.get("content", "")
-            break
+    busy_intervals: list[tuple[pendulum.DateTime, pendulum.DateTime]] = []
+    for row in existing:
+        if row["scheduled_at"] is None:
+            continue
+        start = pendulum.instance(row["scheduled_at"]).in_timezone(tz)
+        end = start.add(minutes=int(row["duration_minutes"] or 30))
+        busy_intervals.append((start, end))
 
-    return ChatMessageResponse(
-        conversation_id=task_id,
-        message=reply,
-        agent_node=result.get("intent"),
-        proposed_plan=result.get("scheduler_output"),
-        requires_user_action=result.get("approval_status") == "pending",
+    def _overlaps(candidate: pendulum.DateTime) -> bool:
+        cand_end = candidate.add(minutes=duration)
+        for b_start, b_end in busy_intervals:
+            # 15-minute buffer
+            if candidate < b_end.add(minutes=15) and cand_end > b_start.subtract(minutes=15):
+                return True
+        return False
+
+    slots: list[dict] = []
+
+    # --- Today: next hourly intervals starting from the next whole hour ---
+    # Cap at 5 so the "Tomorrow, same time" slot always fits within the 6-slot limit (7 total with "Mark as Missed").
+    candidate = now_local.add(hours=1).replace(minute=0, second=0, microsecond=0)
+    end_of_today = now_local.end_of("day")
+    while candidate <= end_of_today and len(slots) < 5:
+        if not _overlaps(candidate):
+            slots.append({
+                "scheduled_at": candidate.in_timezone("UTC").isoformat(),
+                "label": candidate.format("ddd, MMM D [at] h:mm A"),
+            })
+        candidate = candidate.add(hours=1)
+
+    # --- Tomorrow, same time ---
+    tomorrow_same = tomorrow_local.replace(
+        hour=original_hour, minute=original_minute, second=0, microsecond=0
     )
+    slots.append({
+        "scheduled_at": tomorrow_same.in_timezone("UTC").isoformat(),
+        "label": f"Tomorrow at {tomorrow_same.format('h:mm A')}",
+    })
+
+    return slots
+
+
+def _build_slot_options(
+    slots: list[dict],
+    user_tz: str,
+    task_id: str,
+) -> list[OnboardingOptionSchema]:
+    """Convert up to 6 scheduler slots into button options, plus a Mark as Missed option (7 total)."""
+    options: list[OnboardingOptionSchema] = []
+    tz = pendulum.timezone(user_tz)
+
+    for slot in slots[:6]:
+        raw_at = slot.get("scheduled_at", "")
+        if not raw_at:
+            continue
+        try:
+            dt_utc = pendulum.parse(raw_at)
+            dt_local = dt_utc.in_timezone(tz)  # type: ignore[union-attr]
+            label = dt_local.format("ddd, MMM D [at] h:mm A")
+        except Exception:
+            label = raw_at
+
+        options.append(OnboardingOptionSchema(
+            label=label,
+            value=raw_at,  # ISO UTC — backend uses this to update scheduled_at
+        ))
+
+    options.append(OnboardingOptionSchema(
+        label="Mark as Missed",
+        value=f"missed:{task_id}",
+    ))
+
+    return options
 
 
 # ─────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────
 
-async def _fetch_task_or_404(task_id: str, user_id: str):
+async def _fetch_task_or_404(task_id: str, user_id: str) -> dict:
     try:
         task_uuid = uuid.UUID(task_id)
     except ValueError:
@@ -315,7 +448,7 @@ async def _fetch_task_or_404(task_id: str, user_id: str):
         raise HTTPException(status_code=404, detail="Task not found")
     if str(task["user_id"]) != user_id:
         raise HTTPException(status_code=403, detail="Access denied")
-    return task
+    return dict(task)  # type: ignore[arg-type]
 
 
 def _serialize_task(row) -> dict:

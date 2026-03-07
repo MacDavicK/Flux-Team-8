@@ -113,4 +113,8 @@ export interface TimelineEvent {
   avatars?: string[];
   /** Whether the event is in the past */
   isPast?: boolean;
+  /** Raw task status from backend (pending | done | missed | rescheduled | in_progress) */
+  status?: string;
+  /** Duration in minutes */
+  durationMinutes?: number;
 }
