@@ -1,4 +1,4 @@
-import { createFileRoute, redirect } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { History, MessageSquarePlus, X } from "lucide-react";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -173,6 +173,7 @@ const WELCOME_MESSAGE = (name?: string) => {
 };
 
 function ChatPage() {
+  const router = useRouter();
   const { user } = useAuth();
   const { reschedule_task_id, task_name } = Route.useSearch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -387,6 +388,8 @@ function ChatPage() {
         .confirmReschedule(rescheduleTaskIdRef.current, text)
         .then(() => {
           setIsThinking(false);
+          // Invalidate router cache so the home page re-fetches updated tasks.
+          router.invalidate();
           setMessages((prev) => [
             ...prev,
             {

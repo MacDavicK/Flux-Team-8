@@ -130,6 +130,12 @@ function FlowPage() {
     events: initialEvents,
     tasks: initialTasks,
   });
+
+  // Keep local state in sync whenever the router loader provides fresh data
+  // (e.g. after router.invalidate() is called from the chat page post-reschedule).
+  useEffect(() => {
+    setData({ events: initialEvents, tasks: initialTasks });
+  }, [initialEvents, initialTasks]);
   const [isLoadingDate, setIsLoadingDate] = useState(false);
 
   const displayName = user?.name ?? loaderUser.name;

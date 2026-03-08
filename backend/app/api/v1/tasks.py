@@ -283,9 +283,10 @@ async def reschedule_confirm(
         raise HTTPException(status_code=422, detail="Invalid scheduled_at format; expected ISO 8601")
 
     if task["goal_id"] is None:
-        # Silent task (no goal) — mutate in place; no new row needed
+        # Silent task (no goal) — mutate in place; no new row needed.
+        # Reset reminder_sent_at so the notifier fires again at the new time.
         await db.execute(
-            "UPDATE tasks SET scheduled_at = $1, status = 'rescheduled' WHERE id = $2 AND user_id = $3",
+            "UPDATE tasks SET scheduled_at = $1, status = 'pending', reminder_sent_at = NULL WHERE id = $2 AND user_id = $3",
             scheduled_at_dt,
             task_uuid,
             user_uuid,
