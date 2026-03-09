@@ -15,3 +15,12 @@ repos:
         files: ^frontend/
         additional_dependencies: ["@biomejs/biome@2.3.15"]
         entry: bash -c 'cd frontend && biome check --write ${@#frontend/}' --
+
+  - repo: local
+    hooks:
+      - id: tsc
+        name: TypeScript type check (frontend)
+        language: system
+        entry: bash -c 'cd frontend && npx tsc --noEmit'
+        files: ^frontend/
+        pass_filenames: false

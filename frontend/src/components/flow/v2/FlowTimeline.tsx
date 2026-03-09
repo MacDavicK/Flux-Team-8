@@ -1,3 +1,4 @@
+import type { TimelineEvent as TimelineEventType } from "~/types/event";
 import { TimelineEvent } from "./TimelineEvent";
 
 interface FlowTimelineProps {
@@ -32,7 +33,6 @@ export function FlowTimeline({ events, onTaskClick }: FlowTimelineProps) {
               goalName={event.goalName}
               onClick={onTaskClick ? () => onTaskClick(event) : undefined}
             />
-            {nowIndex > 0 && index === insertNowAfter && nowDivider}
           </div>
         ))}
         <div className="h-24"></div>

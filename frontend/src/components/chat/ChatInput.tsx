@@ -9,26 +9,18 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { VoiceFAB } from "~/conv_agent/components/VoiceFAB";
-import type { VoiceStatus } from "~/conv_agent/types";
 import { cn } from "~/utils/cn";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
   placeholder?: string;
   disabled?: boolean;
-  /** Current voice session status — controls VoiceFAB appearance. */
-  voiceStatus?: VoiceStatus;
-  /** Called when the mic button is tapped. */
-  onVoiceToggle?: () => void;
 }
 
 export function ChatInput({
   onSend,
   placeholder = "What is on your mind?",
   disabled = false,
-  voiceStatus = "idle",
-  onVoiceToggle,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
@@ -87,7 +79,7 @@ export function ChatInput({
         />
 
         <AnimatePresence mode="wait">
-          {hasContent ? (
+          {hasContent && (
             <motion.button
               key="send"
               type="submit"
@@ -104,20 +96,7 @@ export function ChatInput({
             >
               <Send className="w-4 h-4" />
             </motion.button>
-          ) : onVoiceToggle ? (
-            <motion.div
-              key="mic"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-            >
-              <VoiceFAB
-                status={voiceStatus}
-                onClick={onVoiceToggle}
-                disabled={disabled}
-              />
-            </motion.div>
-          ) : null}
+          )}
         </AnimatePresence>
       </div>
     </motion.form>

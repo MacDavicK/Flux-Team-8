@@ -10,7 +10,6 @@ import { apiFetch, setInMemoryToken } from "~/lib/apiClient";
 import { serverGetMe } from "~/lib/authServerFns";
 import { authService } from "~/services/AuthService";
 import type { User } from "~/types";
-import { api } from "~/utils/api";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -74,7 +73,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return serverUser;
     } catch {
       setInMemoryToken(null);
-      api.setToken(null);
       setIsAuthenticated(false);
       setUser(undefined);
       setHasTasks(false);
@@ -147,7 +145,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     await authService.logout();
     setInMemoryToken(null);
-    api.setToken(null);
     setIsAuthenticated(false);
     setUser(undefined);
     setHasTasks(false);

@@ -24,7 +24,7 @@ function ProfilePagePending() {
 export const Route = createFileRoute("/profile")({
   pendingComponent: ProfilePagePending,
   pendingMs: 0,
-  loader: async () => {
+  loader: async (): Promise<{ account: AccountMe }> => {
     if (isClient()) {
       const account = await accountService.getMe();
       const data = { account };
@@ -38,7 +38,7 @@ export const Route = createFileRoute("/profile")({
     const res = await fetch(`${backendUrl}/api/v1/account/me`, {
       headers: token ? { Authorization: `Bearer ${token}` } : {},
     });
-    const account: AccountMe = res.ok ? await res.json() : ({} as AccountMe);
+    const account = (res.ok ? await res.json() : {}) as AccountMe;
     return { account };
   },
   component: ProfilePage,

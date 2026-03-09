@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { Home, MessageCircle, Sparkles } from "lucide-react";
+import { BarChart2, Home, MessageCircle, Sparkles } from "lucide-react";
 import { useAuth } from "~/contexts/AuthContext";
 import { cn } from "~/utils/cn";
 

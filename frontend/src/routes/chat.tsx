@@ -21,8 +21,6 @@ import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { useAuth } from "~/contexts/AuthContext";
-import { VoiceOverlay } from "~/conv_agent/components/VoiceOverlay";
-import { useVoiceAgent } from "~/conv_agent/useVoiceAgent";
 import { setInMemoryToken } from "~/lib/apiClient";
 import { serverGetMe } from "~/lib/authServerFns";
 import type { ConversationSummary } from "~/services/ChatService";
@@ -60,9 +58,6 @@ export const Route = createFileRoute("/chat")({
   },
   component: ChatPage,
 });
-
-/** Mock user ID for MVP — matches Alice in seed_test_data.sql. Will come from auth in production. */
-const MOCK_USER_ID = "a1000000-0000-0000-0000-000000000001";
 
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -255,10 +250,6 @@ function ChatPage() {
   // Preserve reschedule_task_id across URL rewrites (it's cleared from search params
   // when conversation_id is substituted in, but we still need it for slot confirmation).
   const rescheduleTaskIdRef = useRef<string | undefined>(reschedule_task_id);
-
-  // Voice agent hook
-  const voice = useVoiceAgent(MOCK_USER_ID);
-  const isVoiceActive = voice.status !== "idle";
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -682,18 +673,6 @@ function ChatPage() {
             : "What's on your mind?"
         }
       />
-
-      {/* Voice overlay — shown when a voice session is active */}
-      <AnimatePresence>
-        {isVoiceActive && (
-          <VoiceOverlay
-            status={voice.status}
-            messages={voice.messages}
-            isAgentSpeaking={voice.isAgentSpeaking}
-            onEndSession={voice.endSession}
-          />
-        )}
-      </AnimatePresence>
 
       <BottomNav />
 
