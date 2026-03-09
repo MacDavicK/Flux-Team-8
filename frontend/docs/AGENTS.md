@@ -202,7 +202,7 @@ All endpoints: `/api/v1/`
 | | POST | `/api/v1/tasks/{task_id}/reschedule` | Body: `{ message: string }` |
 | **Analytics** | GET | `/api/v1/analytics/overview` | |
 | | GET | `/api/v1/analytics/goals` | Goals progress list |
-| | GET | `/api/v1/analytics/missed-by-cat` | Missed tasks by category |
+| | GET | `/api/v1/analytics/missed-by-category` | Missed tasks by category |
 | | GET | `/api/v1/analytics/weekly` | Optional `?weeks=` param |
 | **Patterns** | GET | `/api/v1/patterns/` | |
 | | GET | `/api/v1/patterns/{pattern_id}` | |

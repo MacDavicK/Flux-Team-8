@@ -10,6 +10,7 @@ import { serverGetMe } from "~/lib/authServerFns";
 import { apiFetch, setInMemoryToken } from "~/lib/apiClient";
 import { authService } from "~/services/AuthService";
 import type { User } from "~/types";
+import { api } from "~/utils/api";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -17,7 +18,11 @@ interface AuthContextType {
   user: User | undefined;
   hasTasks: boolean;
   login: (email: string, password: string) => Promise<User | undefined>;
-  signup: (name: string, email: string, password: string) => Promise<User | undefined>;
+  signup: (
+    name: string,
+    email: string,
+    password: string,
+  ) => Promise<User | undefined>;
   logout: () => Promise<void>;
   refreshAuthStatus: () => Promise<User | undefined>;
   loginWithGoogle: () => Promise<void>;
@@ -67,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       return serverUser;
     } catch {
       setInMemoryToken(null);
+      api.setToken(null);
       setIsAuthenticated(false);
       setUser(undefined);
       setHasTasks(false);
@@ -113,7 +119,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const signup = useCallback(
-    async (name: string, email: string, password: string): Promise<User | undefined> => {
+    async (
+      name: string,
+      email: string,
+      password: string,
+    ): Promise<User | undefined> => {
       await authService.signup({ name, email, password });
       return refreshAuthStatus();
     },
@@ -131,6 +141,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
     await authService.logout();
     setInMemoryToken(null);
+    api.setToken(null);
     setIsAuthenticated(false);
     setUser(undefined);
     setHasTasks(false);

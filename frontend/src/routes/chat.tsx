@@ -24,6 +24,15 @@ import type { ConversationSummary, HistoryMessage } from "~/services/ChatService
 import { tasksService } from "~/services/TasksService";
 import type { ChatMessage, PlanMilestone } from "~/types";
 import { MessageVariant } from "~/types/message";
+import { api, type RAGSource } from "~/utils/api";
+import { useBackendReady } from "~/utils/useMockFallback";
+
+const MAX_CHAT_RETRIES = 2;
+
+/** Substring that indicates the "no expert guidance" fallback message (show in plan card banner). */
+const FALLBACK_EXPERT_PREFIX =
+  "I don't have expert guidance for this specific goal yet";
+const RETRY_DELAY_MS = 1500;
 
 export const Route = createFileRoute("/chat")({
   pendingComponent: () => (
@@ -48,10 +57,15 @@ export const Route = createFileRoute("/chat")({
   component: ChatPage,
 });
 
+/** Mock user ID for MVP — matches Alice in seed_test_data.sql. Will come from auth in production. */
+const MOCK_USER_ID = "a1000000-0000-0000-0000-000000000001";
+
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
   const now = new Date();
-  const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24));
+  const diffDays = Math.floor(
+    (now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24),
+  );
   if (diffDays === 0) return "Today";
   if (diffDays === 1) return "Yesterday";
   if (diffDays < 7) return `${diffDays} days ago`;
@@ -60,7 +74,8 @@ function formatRelativeTime(dateStr: string): string {
 
 function getGreeting(name?: string): string {
   const hour = new Date().getHours();
-  const salutation = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const salutation =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return name ? `${salutation}, ${name.split(" ")[0]}` : salutation;
 }
 
@@ -193,6 +208,10 @@ function ChatPage() {
   // Preserve reschedule_task_id across URL rewrites (it's cleared from search params
   // when conversation_id is substituted in, but we still need it for slot confirmation).
   const rescheduleTaskIdRef = useRef<string | undefined>(reschedule_task_id);
+
+  // Voice agent hook
+  const voice = useVoiceAgent(MOCK_USER_ID);
+  const isVoiceActive = voice.status !== "idle";
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -344,7 +363,7 @@ function ChatPage() {
     } finally {
       setIsLoadingConversations(false);
     }
-  }, []);
+  }, [backendReady]);
 
   const loadMoreConversations = useCallback(async () => {
     if (!convHasMore || isLoadingMoreConversations) return;
@@ -483,11 +502,21 @@ function ChatPage() {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: MessageVariant.AI,
-        content: "Sorry, I had trouble understanding that. Could you try again?",
+        content:
+          lastError?.message ??
+          "Sorry, I had trouble understanding that. Could you try again?",
       };
       setMessages((prev) => [...prev, errorMessage]);
-    }
-  };
+    },
+    [
+      backendReady,
+      conversationId,
+      isOnboarding,
+      scrollToBottom,
+      stopEscalation,
+      refreshAuthStatus,
+    ],
+  );
 
   return (
     <div className="relative h-screen flex flex-col overflow-hidden">
@@ -533,7 +562,9 @@ function ChatPage() {
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
                 transition={{ delay: index * 0.05 }}
-                className={message.type === MessageVariant.USER ? "flex justify-end" : ""}
+                className={
+                  message.type === MessageVariant.USER ? "flex justify-end" : ""
+                }
               >
                 <ChatBubble variant={message.type} animate={false}>
                   {message.content}
@@ -571,6 +602,18 @@ function ChatPage() {
         placeholder={messages.length <= 1 ? "What would you like to achieve?" : "What's on your mind?"}
       />
 
+      {/* Voice overlay — shown when a voice session is active */}
+      <AnimatePresence>
+        {isVoiceActive && (
+          <VoiceOverlay
+            status={voice.status}
+            messages={voice.messages}
+            isAgentSpeaking={voice.isAgentSpeaking}
+            onEndSession={voice.endSession}
+          />
+        )}
+      </AnimatePresence>
+
       <BottomNav />
 
       {/* History Drawer */}
@@ -593,7 +636,9 @@ function ChatPage() {
               transition={{ type: "spring", damping: 30, stiffness: 300 }}
             >
               <div className="flex items-center justify-between px-5 pt-5 pb-3">
-                <h2 className="font-display italic text-lg text-charcoal">Past Chats</h2>
+                <h2 className="font-display italic text-lg text-charcoal">
+                  Past Chats
+                </h2>
                 <button
                   type="button"
                   onClick={() => setIsHistoryOpen(false)}
@@ -639,7 +684,9 @@ function ChatPage() {
                             {conv.title ?? conv.preview ?? "New conversation"}
                           </p>
                           <p className="text-river/60 text-xs mt-0.5">
-                            {formatRelativeTime(conv.last_message_at ?? conv.created_at)}
+                            {formatRelativeTime(
+                              conv.last_message_at ?? conv.created_at,
+                            )}
                           </p>
                         </button>
                       </li>

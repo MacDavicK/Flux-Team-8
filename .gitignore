@@ -64,7 +64,11 @@ docker-compose.override.yml
 
 # ---------- Files ----------
 *.pdf
+CURSOR-PROMPT-README.md
 .python-version
 
 # ---------- Cursor / Claude internal ----------
 .claude/
+.claude
+docs/BIOME-CI-RISK-REPORT.md
+/.vs

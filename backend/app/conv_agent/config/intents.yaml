@@ -1,0 +1,66 @@
+intents:
+  - name: submit_goal_intent
+    route: GOAL
+    description: >
+      Submit a fully extracted goal intent. Call this when the user has clearly
+      expressed a multi-week aspiration and you have gathered the goal statement.
+    parameters:
+      - name: goal_statement
+        type: string
+        required: true
+        description: "The user's goal in their own words"
+      - name: timeline
+        type: string
+        required: false
+        description: "Target date, event, or timeframe"
+      - name: context_notes
+        type: string
+        required: false
+        description: "Additional context for the Goal Planner"
+
+  - name: submit_new_task_intent
+    route: NEW_TASK
+    description: >
+      Submit a fully extracted task intent. Call this when the user wants a
+      discrete reminder or one-time/recurring task and all required params are gathered.
+    parameters:
+      - name: title
+        type: string
+        required: true
+        description: "Short task title"
+      - name: trigger_type
+        type: string
+        required: true
+        enum: ["time", "location"]
+        description: "Whether the task is triggered by time or location"
+      - name: scheduled_at
+        type: string
+        required: false
+        description: "When the task should occur (natural language). Required if trigger_type is time."
+      - name: recurrence_rule
+        type: string
+        required: false
+        description: "Recurrence pattern (natural language). Omit for one-time tasks."
+      - name: location_trigger
+        type: string
+        required: false
+        description: "Location condition. Required if trigger_type is location."
+
+  - name: submit_reschedule_intent
+    route: RESCHEDULE_TASK
+    description: >
+      Submit a reschedule request for an existing task. Call this when the user
+      wants to move a task and you have identified which task they mean.
+    parameters:
+      - name: task_id
+        type: string
+        required: true
+        description: "UUID of the task to reschedule"
+      - name: preferred_new_time
+        type: string
+        required: false
+        description: "When the user wants to move the task to (natural language)"
+      - name: reason
+        type: string
+        required: false
+        description: "Why the user wants to reschedule"

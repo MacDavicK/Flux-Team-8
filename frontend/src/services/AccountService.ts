@@ -36,9 +36,10 @@ class AccountService {
   }
 
   async getWeeklyStats(weeks?: number): Promise<unknown[]> {
-    const url = weeks != null
-      ? `/api/v1/analytics/weekly?weeks=${weeks}`
-      : "/api/v1/analytics/weekly";
+    const url =
+      weeks != null
+        ? `/api/v1/analytics/weekly?weeks=${weeks}`
+        : "/api/v1/analytics/weekly";
     const response = await apiFetch(url);
 
     if (!response.ok) {
@@ -49,7 +50,7 @@ class AccountService {
   }
 
   async getMissedByCategory(): Promise<unknown[]> {
-    const response = await apiFetch("/api/v1/analytics/missed-by-cat");
+    const response = await apiFetch("/api/v1/analytics/missed-by-category");
 
     if (!response.ok) {
       throw new Error("Failed to fetch missed-by-category data");

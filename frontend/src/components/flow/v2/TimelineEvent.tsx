@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import type { EventType } from "~/types/event";
 import { cn } from "~/utils/cn";
+
+export type EventType = "sage" | "terra" | "stone";
 
 interface TimelineEventProps {
   title: string;
@@ -52,7 +53,7 @@ export function TimelineEvent({
         whileHover={{ scale: 1.02 }}
         onClick={onClick}
         className={cn(
-          "flex-1 p-5 rounded-[1.5rem] transition-transform",
+          "flex-1 p-5 rounded-[1.5rem] transition-transform relative",
           typeClasses[type],
           statusBorder,
           onClick && "cursor-pointer",

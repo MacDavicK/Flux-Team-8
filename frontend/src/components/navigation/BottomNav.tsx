@@ -25,6 +25,12 @@ const navItems: NavItem[] = [
     position: "center",
   },
   {
+    to: "/analytics",
+    icon: <BarChart2 className="w-5 h-5" />,
+    label: "Progress",
+    position: "right",
+  },
+  {
     to: "/reflection",
     icon: <Sparkles className="w-5 h-5" />,
     label: "Reflect",

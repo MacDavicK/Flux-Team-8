@@ -1,6 +1,11 @@
 import { apiFetch } from "~/lib/apiClient";
 import type { ChatMessageResponse, GoalClarifierAnswer } from "~/types";
 
+const API_BASE =
+  (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env
+    ?.VITE_API_URL || "http://localhost:8002";
+const DEMO_USER_ID = "a1000000-0000-0000-0000-000000000001";
+
 export interface HistoryMessage {
   id: string;
   role: "user" | "assistant" | "system" | "summary";
@@ -25,7 +30,10 @@ export interface ConversationListPage {
 }
 
 class ChatService {
-  async getHistory(conversationId?: string, limit = 50): Promise<{ messages: HistoryMessage[]; conversation_id: string | null }> {
+  async getHistory(
+    conversationId?: string,
+    limit = 50,
+  ): Promise<{ messages: HistoryMessage[]; conversation_id: string | null }> {
     const params = new URLSearchParams({ limit: String(limit) });
     if (conversationId) params.set("conversation_id", conversationId);
     const response = await apiFetch(`/api/v1/chat/history?${params}`);
@@ -74,8 +82,9 @@ class ChatService {
     conversationId?: string,
     options?: { intent?: string; task_id?: string; answers?: GoalClarifierAnswer[] },
   ): Promise<ChatMessageResponse> {
-    const response = await apiFetch("/api/v1/chat/message", {
+    const response = await fetch(`${API_BASE}/orchestrator/message`, {
       method: "POST",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
         conversation_id: conversationId ?? null,
@@ -89,7 +98,22 @@ class ChatService {
       throw new Error("Failed to send chat message");
     }
 
-    return response.json();
+    const data = (await response.json()) as {
+      conversation_id?: string | null;
+      message: string;
+      route?: string;
+      proposed_plan?: { [key: string]: unknown }[] | null;
+      requires_user_action?: boolean;
+      suggested_action?: string | null;
+    };
+
+    return {
+      conversation_id: data.conversation_id ?? conversationId ?? "",
+      message: data.message,
+      agent_node: data.route ?? null,
+      proposed_plan: data.proposed_plan ?? null,
+      requires_user_action: Boolean(data.requires_user_action),
+    };
   }
 }
 

@@ -5,7 +5,9 @@ import { getCookies, setCookie } from "@tanstack/react-start/server";
 
 export function getServerSupabaseClient() {
   return createServerClient(
+    // biome-ignore lint/style/noNonNullAssertion: env vars validated at startup
     process.env.SUPABASE_URL!,
+    // biome-ignore lint/style/noNonNullAssertion: env vars validated at startup
     process.env.SUPABASE_ANON_KEY!,
     {
       cookies: {

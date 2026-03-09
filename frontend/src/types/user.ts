@@ -177,4 +177,3 @@ export enum ColorTheme {
   STONE = "stone",
   CHARCOAL = "charcoal",
 }
-

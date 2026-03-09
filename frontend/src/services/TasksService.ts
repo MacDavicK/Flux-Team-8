@@ -12,7 +12,9 @@ class TasksService {
     return response.json();
   }
 
-  async completeTask(taskId: string): Promise<{ task_id: string; status: string }> {
+  async completeTask(
+    taskId: string,
+  ): Promise<{ task_id: string; status: string }> {
     const response = await apiFetch(`/api/v1/tasks/${taskId}/complete`, {
       method: "PATCH",
     });

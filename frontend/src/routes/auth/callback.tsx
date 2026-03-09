@@ -8,7 +8,8 @@ import { getServerSupabaseClient } from "~/lib/supabaseServer";
 const exchangeOAuthCode = createServerFn({ method: "GET" })
   .inputValidator((d: { code: string }) => d)
   .handler(async ({ data }) => {
-    const { error } = await getServerSupabaseClient().auth.exchangeCodeForSession(data.code);
+    const { error } =
+      await getServerSupabaseClient().auth.exchangeCodeForSession(data.code);
     if (error) {
       throw new Error(error.message);
     }
