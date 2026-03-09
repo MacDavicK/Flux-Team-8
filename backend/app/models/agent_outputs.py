@@ -7,12 +7,27 @@ from pydantic import BaseModel
 # 6.1 — Orchestrator
 # ─────────────────────────────────────────────────────────────────
 
+
 class OrchestratorOutput(BaseModel):
-    intent: Literal["GOAL", "GOAL_CLARIFY", "NEW_TASK", "RESCHEDULE_TASK", "MODIFY_GOAL", "NEXT_MILESTONE", "CHITCHAT", "CLARIFY", "ONBOARDING", "APPROVE", "START_DATE"]
+    intent: Literal[
+        "GOAL",
+        "GOAL_CLARIFY",
+        "NEW_TASK",
+        "RESCHEDULE_TASK",
+        "MODIFY_GOAL",
+        "NEXT_MILESTONE",
+        "CHITCHAT",
+        "CLARIFY",
+        "ONBOARDING",
+        "APPROVE",
+        "START_DATE",
+    ]
     payload: dict
     clarification_question: Optional[str] = None
-    task_id: Optional[str] = None       # Present when intent == RESCHEDULE_TASK
-    goal_id: Optional[str] = None       # Present when intent == MODIFY_GOAL or NEXT_MILESTONE
+    task_id: Optional[str] = None  # Present when intent == RESCHEDULE_TASK
+    goal_id: Optional[str] = (
+        None  # Present when intent == MODIFY_GOAL or NEXT_MILESTONE
+    )
     milestone_order: Optional[int] = None  # Present when intent == NEXT_MILESTONE
 
 
@@ -20,20 +35,22 @@ class OrchestratorOutput(BaseModel):
 # 6.3 — ProposedTask (used inside GoalPlannerOutput)
 # ─────────────────────────────────────────────────────────────────
 
+
 class ProposedTask(BaseModel):
-    task_id: Optional[str] = None       # Stable ID echoed by scheduler for slot matching
+    task_id: Optional[str] = None  # Stable ID echoed by scheduler for slot matching
     title: str
     description: str
-    scheduled_days: list[str]           # e.g. ["Monday", "Wednesday", "Friday"]
-    suggested_time: str                 # "07:00" — in user local time
+    scheduled_days: list[str]  # e.g. ["Monday", "Wednesday", "Friday"]
+    suggested_time: str  # "07:00" — in user local time
     duration_minutes: int
-    recurrence_rule: str                # iCal RRULE string
-    week_range: list[int]               # e.g. [1, 6]
+    recurrence_rule: str  # iCal RRULE string
+    week_range: list[int]  # e.g. [1, 6]
 
 
 # ─────────────────────────────────────────────────────────────────
 # 6.4 — Milestone (used inside GoalPlannerOutput)
 # ─────────────────────────────────────────────────────────────────
+
 
 class Milestone(BaseModel):
     title: str
@@ -46,42 +63,46 @@ class Milestone(BaseModel):
 # 6.5 — ConflictDetected (used inside GoalPlannerOutput)
 # ─────────────────────────────────────────────────────────────────
 
+
 class ConflictDetected(BaseModel):
     existing_task_title: str
     scheduled_at: str
-    message: str                        # Human-readable description of the conflict
+    message: str  # Human-readable description of the conflict
 
 
 # ─────────────────────────────────────────────────────────────────
 # 6.2 — GoalPlannerOutput
 # ─────────────────────────────────────────────────────────────────
 
+
 class GoalPlannerOutput(BaseModel):
-    goal_title: str                     # Short title for the goal (e.g. "Learn Japanese")
+    goal_title: str  # Short title for the goal (e.g. "Learn Japanese")
     goal_feasible_in_6_weeks: bool
     milestone_roadmap: Optional[list[Milestone]] = None
     proposed_tasks: list[ProposedTask]
     conflicts_detected: list[ConflictDetected] = []
-    plan_summary: str                   # Human-readable plan to present to the user
-    approval_status: str                # "pending" | "approved" | "negotiating" | "abandoned"
+    plan_summary: str  # Human-readable plan to present to the user
+    approval_status: str  # "pending" | "approved" | "negotiating" | "abandoned"
 
 
 # ─────────────────────────────────────────────────────────────────
 # 6.6 — ClassifierOutput
 # ─────────────────────────────────────────────────────────────────
 
+
 class ClassifierOutput(BaseModel):
-    tags: list[str]                     # 1–3 tags from the fixed 14-tag taxonomy
+    tags: list[str]  # 1–3 tags from the fixed 14-tag taxonomy
 
 
 # ─────────────────────────────────────────────────────────────────
 # 6.8 — SlotResult (used inside SchedulerOutput)
 # ─────────────────────────────────────────────────────────────────
 
+
 class SlotResult(BaseModel):
-    task_id: Optional[str] = None       # Echoed from ProposedTask for reliable matching
+    task_id: Optional[str] = None  # Echoed from ProposedTask for reliable matching
     task_title: str
-    scheduled_at: str                   # ISO8601 UTC
+    scheduled_at: str  # ISO8601 UTC
     duration_minutes: int
     conflict: bool = False
 
@@ -90,15 +111,19 @@ class SlotResult(BaseModel):
 # 6.7 — SchedulerOutput
 # ─────────────────────────────────────────────────────────────────
 
+
 class SchedulerOutput(BaseModel):
     slots: list[SlotResult]
     conflicts: list[dict]
-    first_available_start: Optional[str] = None  # ISO8601 date if no slots available now
+    first_available_start: Optional[str] = (
+        None  # ISO8601 date if no slots available now
+    )
 
 
 # ─────────────────────────────────────────────────────────────────
 # 6.10 — AvoidSlot (used inside PatternObserverOutput)
 # ─────────────────────────────────────────────────────────────────
+
 
 class AvoidSlot(BaseModel):
     day: str
@@ -111,6 +136,7 @@ class AvoidSlot(BaseModel):
 # 6.11 — CategoryPerformance (used inside PatternObserverOutput)
 # ─────────────────────────────────────────────────────────────────
 
+
 class CategoryPerformance(BaseModel):
     category: str
     completion_rate: float
@@ -120,8 +146,9 @@ class CategoryPerformance(BaseModel):
 # 6.9 — PatternObserverOutput
 # ─────────────────────────────────────────────────────────────────
 
+
 class PatternObserverOutput(BaseModel):
-    best_times: list[str]               # e.g. ["07:00–09:00", "18:00–19:30"]
+    best_times: list[str]  # e.g. ["07:00–09:00", "18:00–19:30"]
     avoid_slots: list[AvoidSlot]
     category_performance: list[CategoryPerformance]
     general_notes: str
@@ -131,27 +158,29 @@ class PatternObserverOutput(BaseModel):
 # 6.12 — UserPreferenceNote + UserPreferenceExtractOutput
 # ─────────────────────────────────────────────────────────────────
 
+
 class UserPreferenceNote(BaseModel):
-    key: str                            # Stable slug e.g. "gym_tuesday_evening"
-    description: str                    # Human-readable e.g. "Goes to gym on Tuesdays around 19:00"
-    activity: Optional[str] = None     # e.g. "gym", "yoga", "running"
-    days: list[str] = []               # e.g. ["Tuesday"]
-    time: Optional[str] = None         # e.g. "19:00"
+    key: str  # Stable slug e.g. "gym_tuesday_evening"
+    description: str  # Human-readable e.g. "Goes to gym on Tuesdays around 19:00"
+    activity: Optional[str] = None  # e.g. "gym", "yoga", "running"
+    days: list[str] = []  # e.g. ["Tuesday"]
+    time: Optional[str] = None  # e.g. "19:00"
     duration_minutes: Optional[int] = None
 
 
 class UserPreferenceExtractOutput(BaseModel):
-    notes: list[UserPreferenceNote]     # May be empty if nothing new was detected
+    notes: list[UserPreferenceNote]  # May be empty if nothing new was detected
 
 
 # ─────────────────────────────────────────────────────────────────
 # 6.13 — GoalClarifierOutput
 # ─────────────────────────────────────────────────────────────────
 
+
 class ClarifierQuestion(BaseModel):
-    id: str                             # stable slug e.g. "current_fitness_level"
+    id: str  # stable slug e.g. "current_fitness_level"
     question: str
-    options: list[str] = []            # pre-defined choices (empty = open-ended)
+    options: list[str] = []  # pre-defined choices (empty = open-ended)
     allows_custom: bool = True
     zod_validator: Optional[str] = None  # e.g. "z.string().min(1).max(500)"
     required: bool = True

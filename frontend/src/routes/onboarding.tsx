@@ -2,8 +2,8 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { OnboardingChat } from "~/components/onboarding/OnboardingChat";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
-import { serverGetMe } from "~/lib/authServerFns";
 import { setInMemoryToken } from "~/lib/apiClient";
+import { serverGetMe } from "~/lib/authServerFns";
 
 export const Route = createFileRoute("/onboarding")({
   pendingComponent: () => (
@@ -25,7 +25,8 @@ export const Route = createFileRoute("/onboarding")({
 
 function getGreeting(name?: string): string {
   const hour = new Date().getHours();
-  const salutation = hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
+  const salutation =
+    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
   return name ? `${salutation}, ${name.split(" ")[0]}` : salutation;
 }
 

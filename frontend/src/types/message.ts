@@ -158,9 +158,9 @@ type TaskSuggestion = {
  * A single answer to a clarifying question, submitted as part of GOAL_CLARIFY intent.
  */
 export interface GoalClarifierAnswer {
-  question_id: string;  // matches GoalClarifierQuestion.id
-  question: string;     // original question text (for conversation history context)
-  answer: string;       // selected option or custom input
+  question_id: string; // matches GoalClarifierQuestion.id
+  question: string; // original question text (for conversation history context)
+  answer: string; // selected option or custom input
 }
 
 /**
@@ -170,9 +170,9 @@ export interface GoalClarifierAnswer {
 export interface GoalClarifierQuestion {
   id: string;
   question: string;
-  options: string[];          // pre-defined choices (empty = open-ended)
-  allows_custom: boolean;     // true if user can type a custom answer
-  zod_validator: string | null;  // Zod schema string for validating custom input
+  options: string[]; // pre-defined choices (empty = open-ended)
+  allows_custom: boolean; // true if user can type a custom answer
+  zod_validator: string | null; // Zod schema string for validating custom input
   required: boolean;
 }
 
@@ -182,8 +182,8 @@ export interface GoalClarifierQuestion {
 export interface ChatMessageRequest {
   message: string;
   conversation_id?: string | null;
-  intent?: string | null;                  // "GOAL_CLARIFY" when submitting answers batch
-  answers?: GoalClarifierAnswer[] | null;  // structured answers for GOAL_CLARIFY
+  intent?: string | null; // "GOAL_CLARIFY" when submitting answers batch
+  answers?: GoalClarifierAnswer[] | null; // structured answers for GOAL_CLARIFY
 }
 
 /**
@@ -194,7 +194,7 @@ export interface OnboardingOption {
   label: string;
   value: string | null;
   zod_validator: string | null;
-  input_type?: string | null;  // "otp" renders the OTP verification widget
+  input_type?: string | null; // "otp" renders the OTP verification widget
 }
 
 /**
@@ -207,7 +207,7 @@ export interface ChatMessageResponse {
   conversation_id: string;
   message: string;
   agent_node?: string | null;
-  proposed_plan?: { [key: string]: unknown }[] | null;
+  proposed_plan?: Record<string, unknown> | null;
   requires_user_action: boolean;
   options?: OnboardingOption[] | null;
   questions?: GoalClarifierQuestion[] | null;

@@ -5,6 +5,7 @@ Implements conversation history windowing to stay within token/message limits.
 When limits are exceeded, the older half is summarised via a cheap LLM call
 and replaced with a single summary message.
 """
+
 from __future__ import annotations
 
 from app.config import settings

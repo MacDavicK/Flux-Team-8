@@ -3,6 +3,7 @@
 
 structlog configuration + correlation ID middleware.
 """
+
 import uuid
 
 import structlog

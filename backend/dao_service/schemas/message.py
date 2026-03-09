@@ -33,7 +33,9 @@ class MessageBase(BaseSchema):
     @classmethod
     def validate_input_modality(cls, value: str) -> str:
         if value not in INPUT_MODALITY_VALUES:
-            raise ValueError(f"input_modality must be one of: {sorted(INPUT_MODALITY_VALUES)}")
+            raise ValueError(
+                f"input_modality must be one of: {sorted(INPUT_MODALITY_VALUES)}"
+            )
         return value
 
 

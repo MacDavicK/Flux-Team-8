@@ -7,6 +7,7 @@ PATCH  /api/v1/goals/{goal_id}/abandon — Abandon goal and cancel its pending t
 PATCH  /api/v1/goals/{goal_id}/modify  — Modify goal via LangGraph agent.
 GET    /api/v1/goals/{goal_id}/tasks   — List tasks belonging to a goal.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -127,40 +128,59 @@ async def get_goals_progress(
         tasks_missed = row["tasks_missed"] or 0
         tasks_rescheduled = row["tasks_rescheduled"] or 0
         days_elapsed = max(row["days_elapsed"] or 0, 1)
-        days_total = row["days_total"] or (row["target_weeks"] * 7) if row["target_weeks"] else 42
+        days_total = (
+            row["days_total"] or (row["target_weeks"] * 7)
+            if row["target_weeks"]
+            else 42
+        )
 
-        completion_pct = round((tasks_done / tasks_total * 100), 1) if tasks_total else 0.0
+        completion_pct = (
+            round((tasks_done / tasks_total * 100), 1) if tasks_total else 0.0
+        )
         pace = days_elapsed / days_total if days_total else 1
-        velocity = round((tasks_done / tasks_total) / pace, 2) if tasks_total and pace else 0.0
+        velocity = (
+            round((tasks_done / tasks_total) / pace, 2) if tasks_total and pace else 0.0
+        )
         on_track = velocity >= 0.9
 
         if tasks_done and pace:
-            days_to_completion = (tasks_total / (tasks_done / days_elapsed)) if tasks_done else None
+            days_to_completion = (
+                (tasks_total / (tasks_done / days_elapsed)) if tasks_done else None
+            )
             if days_to_completion and row["activated_at"]:
                 from datetime import timedelta as _td
-                projected = (row["activated_at"] + _td(days=days_to_completion)).date().isoformat()
+
+                projected = (
+                    (row["activated_at"] + _td(days=days_to_completion))
+                    .date()
+                    .isoformat()
+                )
             else:
                 projected = None
         else:
             projected = None
 
-        result.append({
-            "goal_id": str(row["id"]),
-            "title": row["title"],
-            "status": row["status"],
-            "target_weeks": row["target_weeks"],
-            "activated_at": row["activated_at"].isoformat() if row["activated_at"] else None,
-            "days_elapsed": days_elapsed,
-            "days_total": days_total,
-            "tasks_done": tasks_done,
-            "tasks_total": tasks_total,
-            "tasks_missed": tasks_missed,
-            "tasks_rescheduled": tasks_rescheduled,
-            "completion_pct": completion_pct,
-            "velocity": velocity,
-            "projected_completion_date": projected,
-            "on_track": on_track,
-        })
+        result.append(
+            {
+                "goal_id": str(row["id"]),
+                "title": row["title"],
+                "status": row["status"],
+                "target_weeks": row["target_weeks"],
+                "activated_at": row["activated_at"].isoformat()
+                if row["activated_at"]
+                else None,
+                "days_elapsed": days_elapsed,
+                "days_total": days_total,
+                "tasks_done": tasks_done,
+                "tasks_total": tasks_total,
+                "tasks_missed": tasks_missed,
+                "tasks_rescheduled": tasks_rescheduled,
+                "completion_pct": completion_pct,
+                "velocity": velocity,
+                "projected_completion_date": projected,
+                "on_track": on_track,
+            }
+        )
 
     return result
 
@@ -284,6 +304,7 @@ async def get_goal_tasks(
 # ─────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────
+
 
 async def _fetch_goal_or_404(goal_id: str, user_id: str):
     try:

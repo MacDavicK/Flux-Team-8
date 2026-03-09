@@ -5,11 +5,12 @@ Tests:
   - Retries on malformed JSON
   - Raises ValueError after max_retries exhausted
 """
+
 from __future__ import annotations
 
 import pytest
 from pydantic import BaseModel
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 
 class _Simple(BaseModel):
@@ -30,6 +31,7 @@ async def test_retry_on_malformed_json():
 
     with patch("app.services.llm.llm_call", side_effect=_side_effect):
         from app.services.llm import validated_llm_call
+
         result = await validated_llm_call(
             model="test-model",
             system_prompt="test",
@@ -44,11 +46,13 @@ async def test_retry_on_malformed_json():
 @pytest.mark.asyncio
 async def test_raises_after_max_retries_exhausted():
     """validated_llm_call raises ValueError when all retries produce invalid JSON."""
+
     async def _always_bad(*args, **kwargs):
         return "still not json"
 
     with patch("app.services.llm.llm_call", side_effect=_always_bad):
         from app.services.llm import validated_llm_call
+
         with pytest.raises((ValueError, Exception)):
             await validated_llm_call(
                 model="test-model",

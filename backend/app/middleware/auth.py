@@ -3,6 +3,7 @@
 
 FastAPI dependency for JWT authentication via Supabase.
 """
+
 import logging
 import os
 import uuid

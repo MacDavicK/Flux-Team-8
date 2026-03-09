@@ -4,8 +4,8 @@ import { ChatBubble } from "~/components/chat/ChatBubble";
 import { MarkdownMessage } from "~/components/chat/MarkdownMessage";
 import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
-import { chatService } from "~/services/ChatService";
 import type { HistoryMessage } from "~/services/ChatService";
+import { chatService } from "~/services/ChatService";
 import type { ChatMessage } from "~/types";
 import { MessageVariant } from "~/types/message";
 
@@ -31,7 +31,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, scrollToBottom]);
+  }, [scrollToBottom]);
 
   // Initialise: resume last conversation or start fresh onboarding
   useEffect(() => {
@@ -46,7 +46,14 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
         .then(({ conversation_id: cid, message, options }) => {
           if (cid) conversationIdRef.current = cid;
           if (message) {
-            setMessages([{ id: "onboarding-0", type: MessageVariant.AI, content: message, options }]);
+            setMessages([
+              {
+                id: "onboarding-0",
+                type: MessageVariant.AI,
+                content: message,
+                options,
+              },
+            ]);
           }
         })
         .catch(() => {})
@@ -58,7 +65,9 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
         if (conversation_id) conversationIdRef.current = conversation_id;
 
         const uiMessages: ChatMessage[] = history
-          .filter((m: HistoryMessage) => m.role === "user" || m.role === "assistant")
+          .filter(
+            (m: HistoryMessage) => m.role === "user" || m.role === "assistant",
+          )
           .map((m: HistoryMessage, i: number) => ({
             id: `history-${i}`,
             type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
@@ -113,7 +122,10 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
     scrollToBottom();
 
     try {
-      const result = await chatService.sendMessage(text, conversationIdRef.current);
+      const result = await chatService.sendMessage(
+        text,
+        conversationIdRef.current,
+      );
 
       if (!conversationIdRef.current && result.conversation_id) {
         conversationIdRef.current = result.conversation_id;
@@ -141,7 +153,8 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         type: MessageVariant.AI,
-        content: "Sorry, I had trouble understanding that. Could you try again?",
+        content:
+          "Sorry, I had trouble understanding that. Could you try again?",
       };
       setMessages((prev) => [...prev, errorMessage]);
     }
@@ -159,19 +172,23 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
               transition={{ delay: index * 0.05 }}
-              className={message.type === MessageVariant.USER ? "flex justify-end" : ""}
+              className={
+                message.type === MessageVariant.USER ? "flex justify-end" : ""
+              }
             >
               <ChatBubble variant={message.type} animate={false}>
                 {message.content}
               </ChatBubble>
-              {message.type === MessageVariant.AI && message.options && message.options.length > 0 && (
-                <OnboardingOptions
-                  options={message.options}
-                  onSelect={handleSendMessage}
-                  disabled={isThinking || isInitializing}
-                  phoneNumber={onboardingPhone}
-                />
-              )}
+              {message.type === MessageVariant.AI &&
+                message.options &&
+                message.options.length > 0 && (
+                  <OnboardingOptions
+                    options={message.options}
+                    onSelect={handleSendMessage}
+                    disabled={isThinking || isInitializing}
+                    phoneNumber={onboardingPhone}
+                  />
+                )}
             </motion.div>
           ))}
         </AnimatePresence>

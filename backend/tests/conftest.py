@@ -1,6 +1,7 @@
 """
 21.3 — Shared pytest fixtures for Flux backend tests.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock
@@ -12,10 +13,13 @@ import pytest
 # 21.3.3 — AsyncMock helpers for LLM call and Twilio client
 # ─────────────────────────────────────────────────────────────────
 
+
 @pytest.fixture
 def mock_llm_call(monkeypatch):
     """Patch llm_call and validated_llm_call to return controllable values."""
-    mock = AsyncMock(return_value='{"intent": "CLARIFY", "payload": {}, "clarification_question": "What goal?"}')
+    mock = AsyncMock(
+        return_value='{"intent": "CLARIFY", "payload": {}, "clarification_question": "What goal?"}'
+    )
     monkeypatch.setattr("app.services.llm.llm_call", mock)
     monkeypatch.setattr("app.services.llm.validated_llm_call", AsyncMock())
     return mock
@@ -27,8 +31,12 @@ def mock_twilio(monkeypatch):
     mock_client = MagicMock()
     mock_client.messages.create.return_value = MagicMock(sid="SM_test_123")
     mock_client.calls.create.return_value = MagicMock(sid="CA_test_456")
-    mock_client.verify.v2.services.return_value.verifications.create.return_value = MagicMock(status="pending")
-    mock_client.verify.v2.services.return_value.verification_checks.create.return_value = MagicMock(status="approved")
+    mock_client.verify.v2.services.return_value.verifications.create.return_value = (
+        MagicMock(status="pending")
+    )
+    mock_client.verify.v2.services.return_value.verification_checks.create.return_value = MagicMock(
+        status="approved"
+    )
     monkeypatch.setattr("app.services.twilio_service._client", mock_client)
     return mock_client
 

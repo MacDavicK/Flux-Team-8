@@ -104,10 +104,12 @@ async def mark_task_complete(task_id: str, user: dict = Depends(get_current_user
     result = (
         _db()
         .table("tasks")
-        .update({
-            "status": "done",
-            "completed_at": datetime.now(timezone.utc).isoformat(),
-        })
+        .update(
+            {
+                "status": "done",
+                "completed_at": datetime.now(timezone.utc).isoformat(),
+            }
+        )
         .eq("id", task_id)
         .eq("user_id", user_id)
         .execute()

@@ -8,6 +8,7 @@ These notes are persisted in the patterns table using pattern_type='user_prefere
 and are injected into goal_planner and pattern_observer context so future plans
 avoid conflicts and acknowledge existing habits.
 """
+
 from __future__ import annotations
 
 import json

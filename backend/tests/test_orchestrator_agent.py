@@ -6,27 +6,21 @@ from app.models.schemas import OrchestratorIntent, OrchestratorMessageRequest
 
 def test_deterministic_route_start_goal_default():
     agent = OrchestratorAgent(use_langgraph=False)
-    decision = agent.decide(
-        OrchestratorMessageRequest(message="I want to lose weight")
-    )
+    decision = agent.decide(OrchestratorMessageRequest(message="I want to lose weight"))
     assert decision.intent == OrchestratorIntent.START_GOAL
     assert decision.route == "goals.start"
 
 
 def test_deterministic_route_list_tasks_phrase():
     agent = OrchestratorAgent(use_langgraph=False)
-    decision = agent.decide(
-        OrchestratorMessageRequest(message="show tasks for today")
-    )
+    decision = agent.decide(OrchestratorMessageRequest(message="show tasks for today"))
     assert decision.intent == OrchestratorIntent.LIST_TASKS
     assert decision.route == "scheduler.tasks"
 
 
 def test_langgraph_flagged_mode_keeps_same_routing():
     agent = OrchestratorAgent(use_langgraph=True)
-    decision = agent.decide(
-        OrchestratorMessageRequest(message="show tasks for today")
-    )
+    decision = agent.decide(OrchestratorMessageRequest(message="show tasks for today"))
     assert decision.intent == OrchestratorIntent.LIST_TASKS
     assert decision.route == "scheduler.tasks"
 

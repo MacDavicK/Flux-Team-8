@@ -59,7 +59,7 @@ _STEP_OPTIONS: dict[str, Optional[list[OnboardingOption]]] = {
             label="Specify",
             value=None,
             zod_validator=(
-                'z.string().regex(/^(0?[1-9]|1[0-2]):[0-5][0-9]\\s?(AM|PM)$/i, '
+                "z.string().regex(/^(0?[1-9]|1[0-2]):[0-5][0-9]\\s?(AM|PM)$/i, "
                 '"Enter a time like 7:30 AM")'
             ),
         ),
@@ -76,16 +76,24 @@ _STEP_OPTIONS: dict[str, Optional[list[OnboardingOption]]] = {
             label="Specify",
             value=None,
             zod_validator=(
-                'z.string().regex(/^(0?[1-9]|1[0-2]):[0-5][0-9]\\s?(AM|PM)$/i, '
+                "z.string().regex(/^(0?[1-9]|1[0-2]):[0-5][0-9]\\s?(AM|PM)$/i, "
                 '"Enter a time like 11:30 PM")'
             ),
         ),
     ],
     "work_hours": [
-        OnboardingOption(label="9 AM – 5 PM, Mon–Fri", value="9 AM to 5 PM, Monday to Friday"),
-        OnboardingOption(label="10 AM – 6 PM, Mon–Fri", value="10 AM to 6 PM, Monday to Friday"),
-        OnboardingOption(label="Flexible / remote", value="Flexible hours, mostly weekdays"),
-        OnboardingOption(label="I don't work set hours", value="I don't work set hours"),
+        OnboardingOption(
+            label="9 AM – 5 PM, Mon–Fri", value="9 AM to 5 PM, Monday to Friday"
+        ),
+        OnboardingOption(
+            label="10 AM – 6 PM, Mon–Fri", value="10 AM to 6 PM, Monday to Friday"
+        ),
+        OnboardingOption(
+            label="Flexible / remote", value="Flexible hours, mostly weekdays"
+        ),
+        OnboardingOption(
+            label="I don't work set hours", value="I don't work set hours"
+        ),
         OnboardingOption(
             label="Specify",
             value=None,
@@ -102,7 +110,7 @@ _STEP_OPTIONS: dict[str, Optional[list[OnboardingOption]]] = {
             label="Specify",
             value=None,
             zod_validator=(
-                'z.string().regex(/^\\+[1-9]\\d{1,14}$/, '
+                "z.string().regex(/^\\+[1-9]\\d{1,14}$/, "
                 '"Enter your number in international format, e.g. +15551234567")'
             ),
         ),
@@ -130,14 +138,14 @@ _STEP_OPTIONS: dict[str, Optional[list[OnboardingOption]]] = {
 # ─────────────────────────────────────────────────────────────────
 
 _STEPS: list[tuple[str, str]] = [
-    ("name",             "name"),
-    ("wake_time",        "_wake_collected"),
-    ("sleep_time",       "_sleep_collected"),
-    ("work_hours",       "work_hours"),
-    ("chronotype",       "chronotype"),
-    ("phone_number",     "_phone_collected"),
+    ("name", "name"),
+    ("wake_time", "_wake_collected"),
+    ("sleep_time", "_sleep_collected"),
+    ("work_hours", "work_hours"),
+    ("chronotype", "chronotype"),
+    ("phone_number", "_phone_collected"),
     ("otp_verification", "_otp_done"),
-    ("whatsapp_opt_in",  "_whatsapp_answered"),
+    ("whatsapp_opt_in", "_whatsapp_answered"),
 ]
 
 # ─────────────────────────────────────────────────────────────────
@@ -166,7 +174,9 @@ def _parse_time_to_24h(value: str) -> str:
     if len(value) <= 5 and ":" in value and value.replace(":", "").isdigit():
         return value
 
-    m = re.match(r"^(0?[1-9]|1[0-2]):([0-5][0-9])\s?(AM|PM)$", value.strip(), re.IGNORECASE)
+    m = re.match(
+        r"^(0?[1-9]|1[0-2]):([0-5][0-9])\s?(AM|PM)$", value.strip(), re.IGNORECASE
+    )
     if m:
         hour, minute, period = int(m.group(1)), int(m.group(2)), m.group(3).upper()
         if period == "AM":
@@ -284,9 +294,8 @@ async def _complete_onboarding(
 
     # 9.6.7 — Clear intent so orchestrator handles the next message normally
     return {
-        "conversation_history": history + [
-            {"role": "assistant", "content": first_goal_prompt}
-        ],
+        "conversation_history": history
+        + [{"role": "assistant", "content": first_goal_prompt}],
         "user_profile": final_profile,
         "intent": None,
     }
@@ -331,6 +340,7 @@ async def onboarding_node(state: AgentState) -> dict:
             phone = profile.get("phone_number", "")
             try:
                 from app.services.twilio_service import confirm_otp  # noqa: PLC0415
+
                 verified = await confirm_otp(phone, user_msg.strip())
             except Exception:
                 verified = False
@@ -343,8 +353,11 @@ async def onboarding_node(state: AgentState) -> dict:
                     profile["_otp_skipped"] = True
                     profile["_otp_done"] = True  # marks step complete without verifying
                     next_step = _current_step(profile)
-                    canned = "No worries — you can verify your number later in settings."
+                    canned = (
+                        "No worries — you can verify your number later in settings."
+                    )
                     import json as _json
+
                     await db.execute(
                         "UPDATE users SET profile = $1::jsonb, updated_at = now() WHERE id = $2",
                         _json.dumps(profile),
@@ -353,24 +366,36 @@ async def onboarding_node(state: AgentState) -> dict:
                     if next_step is not None:
                         next_question = _get_question(next_step, profile)
                         next_options = _STEP_OPTIONS.get(next_step)
-                        updated_history = history + [{"role": "assistant", "content": f"{canned} {next_question}"}]
+                        updated_history = history + [
+                            {
+                                "role": "assistant",
+                                "content": f"{canned} {next_question}",
+                            }
+                        ]
                         return {
                             "conversation_history": updated_history,
                             "user_profile": profile,
                             "intent": "ONBOARDING",
-                            "options": [o.model_dump() for o in next_options] if next_options else None,
+                            "options": [o.model_dump() for o in next_options]
+                            if next_options
+                            else None,
                         }
                     else:
-                        updated_history = history + [{"role": "assistant", "content": canned}]
-                        return await _complete_onboarding(user_id, profile, updated_history)
+                        updated_history = history + [
+                            {"role": "assistant", "content": canned}
+                        ]
+                        return await _complete_onboarding(
+                            user_id, profile, updated_history
+                        )
 
                 remaining = 3 - attempts
-                error_msg = (
-                    f"That code doesn't look right. You have {remaining} attempt{'s' if remaining != 1 else ''} left."
-                )
+                error_msg = f"That code doesn't look right. You have {remaining} attempt{'s' if remaining != 1 else ''} left."
                 options = _STEP_OPTIONS.get(step)
-                updated_history = history + [{"role": "assistant", "content": error_msg}]
+                updated_history = history + [
+                    {"role": "assistant", "content": error_msg}
+                ]
                 import json as _json
+
                 await db.execute(
                     "UPDATE users SET profile = $1::jsonb, updated_at = now() WHERE id = $2",
                     _json.dumps(profile),
@@ -401,6 +426,7 @@ async def onboarding_node(state: AgentState) -> dict:
 
             # Persist partial profile to DB so send_message can reload it next turn
             import json as _json
+
             await db.execute(
                 "UPDATE users SET profile = $1::jsonb, updated_at = now() WHERE id = $2",
                 _json.dumps(profile),
@@ -412,6 +438,7 @@ async def onboarding_node(state: AgentState) -> dict:
                 phone = profile.get("phone_number", "")
                 try:
                     from app.services.twilio_service import send_otp  # noqa: PLC0415
+
                     await send_otp(phone)
                 except Exception:
                     pass  # User can verify via POST /account/phone/verify/send later
@@ -427,7 +454,9 @@ async def onboarding_node(state: AgentState) -> dict:
                 "conversation_history": updated_history,
                 "user_profile": profile,
                 "intent": "ONBOARDING",
-                "options": [o.model_dump() for o in next_options] if next_options else None,
+                "options": [o.model_dump() for o in next_options]
+                if next_options
+                else None,
             }
 
         # Step did not advance — re-ask (shouldn't happen with validated frontend input)
@@ -455,9 +484,7 @@ async def onboarding_node(state: AgentState) -> dict:
 
     options = _STEP_OPTIONS.get(step)
     return {
-        "conversation_history": history + [
-            {"role": "assistant", "content": content}
-        ],
+        "conversation_history": history + [{"role": "assistant", "content": content}],
         "user_profile": profile,
         "intent": "ONBOARDING",
         "options": [o.model_dump() for o in options] if options else None,

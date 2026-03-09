@@ -8,6 +8,7 @@ Requires:
   - SUPABASE_URL and SUPABASE_KEY in .env
   - A test user (auto-created if not exists)
 """
+
 import os
 import httpx
 import asyncio
@@ -50,14 +51,12 @@ def log(name: str, passed: bool, detail: str = ""):
 
 async def run_tests():
     async with httpx.AsyncClient(timeout=30) as c:
-
         print("\n=== PHASE 1: Connectivity ===\n")
 
         # T1: Root health
         try:
             r = await c.get(f"{BASE}/health")
-            log("GET /health", r.status_code == 200,
-                f"status={r.status_code}")
+            log("GET /health", r.status_code == 200, f"status={r.status_code}")
         except Exception as e:
             log("GET /health", False, str(e))
 
@@ -65,9 +64,11 @@ async def run_tests():
         try:
             r = await c.get(f"{API}/health")
             data = r.json()
-            log("GET /api/v1/health",
+            log(
+                "GET /api/v1/health",
                 r.status_code == 200 and "status" in data,
-                f"status={r.status_code}, body={data}")
+                f"status={r.status_code}, body={data}",
+            )
         except Exception as e:
             log("GET /api/v1/health", False, str(e))
 
@@ -81,21 +82,19 @@ async def run_tests():
             r = await c.post(
                 f"{SUPABASE_URL}/auth/v1/token?grant_type=password",
                 json={"email": TEST_EMAIL, "password": TEST_PASSWORD},
-                headers={"apikey": SUPABASE_ANON_KEY}
+                headers={"apikey": SUPABASE_ANON_KEY},
             )
             if r.status_code != 200:
                 # Try sign up
                 r = await c.post(
                     f"{SUPABASE_URL}/auth/v1/signup",
                     json={"email": TEST_EMAIL, "password": TEST_PASSWORD},
-                    headers={"apikey": SUPABASE_ANON_KEY}
+                    headers={"apikey": SUPABASE_ANON_KEY},
                 )
             data = r.json()
             token = data.get("access_token")
             user_id = data.get("user", {}).get("id")
-            log("Auth (sign in/up)",
-                token is not None,
-                f"user_id={user_id}")
+            log("Auth (sign in/up)", token is not None, f"user_id={user_id}")
         except Exception as e:
             log("Auth", False, str(e))
             print("\n⛔ Cannot continue without auth. Exiting.")
@@ -110,10 +109,11 @@ async def run_tests():
             r = await c.get(f"{API}/account/me", headers=headers)
             data = r.json()
             has_onboarded = "onboarded" in data
-            log("GET /account/me",
+            log(
+                "GET /account/me",
                 r.status_code == 200 and has_onboarded,
-                f"onboarded={data.get('onboarded')}, "
-                f"keys={list(data.keys())[:5]}")
+                f"onboarded={data.get('onboarded')}, keys={list(data.keys())[:5]}",
+            )
             is_onboarded = data.get("onboarded", False)
         except Exception as e:
             log("GET /account/me", False, str(e))
@@ -134,19 +134,19 @@ async def run_tests():
             for msg, desc in onboarding_messages:
                 try:
                     r = await c.post(
-                        f"{API}/chat/message",
-                        json={"message": msg},
-                        headers=headers
+                        f"{API}/chat/message", json={"message": msg}, headers=headers
                     )
                     data = r.json()
                     state = data.get("state", "?")
                     progress = data.get("progress", "?")
                     is_complete = data.get("is_complete", False)
                     has_sources = "sources" in data
-                    log(f"Onboarding: {desc}",
+                    log(
+                        f"Onboarding: {desc}",
                         r.status_code == 200 and has_sources,
                         f"state={state}, progress={progress}, "
-                        f"is_complete={is_complete}")
+                        f"is_complete={is_complete}",
+                    )
                     if is_complete:
                         break
                     # Small delay for rate limiting
@@ -158,9 +158,11 @@ async def run_tests():
             try:
                 r = await c.get(f"{API}/account/me", headers=headers)
                 data = r.json()
-                log("Post-onboarding: onboarded=true",
-                    data.get("onboarded") == True,
-                    f"onboarded={data.get('onboarded')}")
+                log(
+                    "Post-onboarding: onboarded=true",
+                    data.get("onboarded"),
+                    f"onboarded={data.get('onboarded')}",
+                )
             except Exception as e:
                 log("Post-onboarding check", False, str(e))
         else:
@@ -173,30 +175,32 @@ async def run_tests():
             r = await c.post(
                 f"{API}/chat/message",
                 json={"message": "I want to lose 5kg in 6 weeks"},
-                headers=headers
+                headers=headers,
             )
             data = r.json()
             has_message = "message" in data and len(data["message"]) > 0
             has_sources = "sources" in data
-            log("Goal chat: start",
+            log(
+                "Goal chat: start",
                 r.status_code == 200 and has_message and has_sources,
                 f"state={data.get('state')}, "
                 f"sources_count={len(data.get('sources', []))}, "
-                f"msg_preview={data.get('message', '')[:80]}...")
+                f"msg_preview={data.get('message', '')[:80]}...",
+            )
         except Exception as e:
             log("Goal chat: start", False, str(e))
 
         # T5b: Reset conversation
         try:
             r = await c.post(
-                f"{API}/chat/message",
-                json={"message": "new goal"},
-                headers=headers
+                f"{API}/chat/message", json={"message": "new goal"}, headers=headers
             )
             data = r.json()
-            log("Goal chat: reset",
+            log(
+                "Goal chat: reset",
                 r.status_code == 200 and "sources" in data,
-                f"msg={data.get('message', '')[:60]}")
+                f"msg={data.get('message', '')[:60]}",
+            )
         except Exception as e:
             log("Goal chat: reset", False, str(e))
 
@@ -207,9 +211,11 @@ async def run_tests():
             r = await c.get(f"{API}/tasks/today", headers=headers)
             data = r.json()
             # Might be empty for test user — that's OK
-            log("GET /tasks/today",
+            log(
+                "GET /tasks/today",
                 r.status_code == 200,
-                f"task_count={len(data) if isinstance(data, list) else data}")
+                f"task_count={len(data) if isinstance(data, list) else data}",
+            )
         except Exception as e:
             log("GET /tasks/today", False, str(e))
 
@@ -221,12 +227,14 @@ async def run_tests():
             r = await c.post(
                 f"{API}/scheduler/suggest",
                 json={"event_id": "00000000-0000-0000-0000-000000000000"},
-                headers=headers
+                headers=headers,
             )
             # 400 or 404 is acceptable (no such task), 500 is a fail
-            log("POST /scheduler/suggest (fake id)",
+            log(
+                "POST /scheduler/suggest (fake id)",
                 r.status_code != 500,
-                f"status={r.status_code}")
+                f"status={r.status_code}",
+            )
         except Exception as e:
             log("POST /scheduler/suggest", False, str(e))
 
@@ -238,24 +246,26 @@ async def run_tests():
             data = r.json()
             has_streak = "streak_days" in data
             has_heatmap = "heatmap" in data
-            log("GET /analytics/overview",
+            log(
+                "GET /analytics/overview",
                 r.status_code == 200 and has_streak,
                 f"streak_days={data.get('streak_days')}, "
                 f"has_heatmap={has_heatmap}, "
-                f"heatmap_count={len(data.get('heatmap', []))}")
+                f"heatmap_count={len(data.get('heatmap', []))}",
+            )
         except Exception as e:
             log("GET /analytics/overview", False, str(e))
 
         # T8b: Weekly
         try:
-            r = await c.get(
-                f"{API}/analytics/weekly?weeks=12", headers=headers
-            )
+            r = await c.get(f"{API}/analytics/weekly?weeks=12", headers=headers)
             data = r.json()
-            log("GET /analytics/weekly?weeks=12",
+            log(
+                "GET /analytics/weekly?weeks=12",
                 r.status_code == 200,
                 f"type={type(data).__name__}, "
-                f"keys={list(data.keys()) if isinstance(data, dict) else 'list'}")
+                f"keys={list(data.keys()) if isinstance(data, dict) else 'list'}",
+            )
         except Exception as e:
             log("GET /analytics/weekly", False, str(e))
 
@@ -263,21 +273,23 @@ async def run_tests():
         try:
             r = await c.get(f"{API}/analytics/goals", headers=headers)
             data = r.json()
-            log("GET /analytics/goals",
+            log(
+                "GET /analytics/goals",
                 r.status_code == 200,
-                f"type={type(data).__name__}")
+                f"type={type(data).__name__}",
+            )
         except Exception as e:
             log("GET /analytics/goals", False, str(e))
 
         # T8d: Missed by category
         try:
-            r = await c.get(
-                f"{API}/analytics/missed-by-category", headers=headers
-            )
+            r = await c.get(f"{API}/analytics/missed-by-category", headers=headers)
             data = r.json()
-            log("GET /analytics/missed-by-category",
+            log(
+                "GET /analytics/missed-by-category",
                 r.status_code == 200,
-                f"type={type(data).__name__}")
+                f"type={type(data).__name__}",
+            )
         except Exception as e:
             log("GET /analytics/missed-by-category", False, str(e))
 
@@ -285,13 +297,17 @@ async def run_tests():
         try:
             r = await c.get(f"{API}/analytics/heatmap", headers=headers)
             if r.status_code == 404:
-                log("GET /analytics/heatmap",
+                log(
+                    "GET /analytics/heatmap",
                     True,
-                    "404 — expected (heatmap is in /overview)")
+                    "404 — expected (heatmap is in /overview)",
+                )
             else:
-                log("GET /analytics/heatmap",
+                log(
+                    "GET /analytics/heatmap",
                     r.status_code == 200,
-                    f"status={r.status_code}")
+                    f"status={r.status_code}",
+                )
         except Exception as e:
             log("GET /analytics/heatmap", False, str(e))
 
@@ -300,7 +316,7 @@ async def run_tests():
         for origin in [
             "http://localhost:5173",
             "http://localhost:3000",
-            "http://localhost:3001"
+            "http://localhost:3001",
         ]:
             try:
                 r = await c.options(
@@ -308,14 +324,14 @@ async def run_tests():
                     headers={
                         "Origin": origin,
                         "Access-Control-Request-Method": "GET",
-                    }
+                    },
                 )
-                allowed = r.headers.get(
-                    "access-control-allow-origin", ""
-                )
-                log(f"CORS: {origin}",
+                allowed = r.headers.get("access-control-allow-origin", "")
+                log(
+                    f"CORS: {origin}",
                     origin in allowed or allowed == "*",
-                    f"allowed={allowed}")
+                    f"allowed={allowed}",
+                )
             except Exception as e:
                 log(f"CORS: {origin}", False, str(e))
 
@@ -330,7 +346,7 @@ async def run_tests():
     print(f"  📊 Total:  {len(results)}")
 
     if failed > 0:
-        print(f"\n  Failed tests:")
+        print("\n  Failed tests:")
         for name, p, detail in results:
             if not p:
                 print(f"    ❌ {name}: {detail}")

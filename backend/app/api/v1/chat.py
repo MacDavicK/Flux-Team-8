@@ -5,6 +5,7 @@ POST /api/v1/chat/message        — Send a message; runs the LangGraph agent an
 GET  /api/v1/chat/history        — Fetch paginated conversation history for a conversation.
 GET  /api/v1/chat/conversations  — List all conversations for the current user.
 """
+
 from __future__ import annotations
 
 import itertools
@@ -190,7 +191,11 @@ async def send_message(
     pending_classifier_output: dict | None = None
     for row in reversed(rows):
         if row["role"] == "assistant" and row["metadata"]:
-            meta = json.loads(row["metadata"]) if isinstance(row["metadata"], str) else dict(row["metadata"])
+            meta = (
+                json.loads(row["metadata"])
+                if isinstance(row["metadata"], str)
+                else dict(row["metadata"])
+            )
             plan = meta.get("proposed_plan")
             if plan:
                 plan_approval = plan.get("plan", {}).get("approval_status")
@@ -300,7 +305,7 @@ async def send_message(
     conv_title: str | None = None
     if result.get("intent") == "GOAL" and result.get("goal_draft"):
         # Walk history to find the user message that triggered this goal turn
-        for msg in (result.get("conversation_history") or []):
+        for msg in result.get("conversation_history") or []:
             if msg.get("role") == "user":
                 raw = (msg.get("content") or "").strip()
                 if raw:
@@ -463,18 +468,20 @@ async def start_onboarding(
 
     return ChatMessageResponse(
         conversation_id=str(conv_id),
-        message=greeting or "Hi there! I'm Flux, your AI life coach. What should I call you?",
+        message=greeting
+        or "Hi there! I'm Flux, your AI life coach. What should I call you?",
         agent_node="ONBOARDING",
         options=result.get("options"),
     )
-
 
 
 @router.get("/history", response_model=ChatHistoryResponse)
 @limiter.limit("30/minute")
 async def get_history(
     request: Request,
-    conversation_id: str | None = Query(None, description="UUID of the conversation; omit to get the most recent one"),
+    conversation_id: str | None = Query(
+        None, description="UUID of the conversation; omit to get the most recent one"
+    ),
     limit: int = Query(50, ge=1, le=200),
     current_user=Depends(get_current_user),
 ) -> ChatHistoryResponse:
@@ -545,7 +552,10 @@ async def get_history(
 @limiter.limit("30/minute")
 async def list_conversations(
     request: Request,
-    cursor: str | None = Query(None, description="ISO8601 last_message_at of the last item for keyset pagination"),
+    cursor: str | None = Query(
+        None,
+        description="ISO8601 last_message_at of the last item for keyset pagination",
+    ),
     current_user=Depends(get_current_user),
 ) -> ConversationListResponse:
     """Return 10 conversations per page, newest first, with keyset pagination.
@@ -613,7 +623,9 @@ async def list_conversations(
     next_cursor: str | None = None
     if has_more and page:
         last = page[-1]
-        next_cursor = last["last_message_at"].isoformat() if last["last_message_at"] else None
+        next_cursor = (
+            last["last_message_at"].isoformat() if last["last_message_at"] else None
+        )
 
     conversations = [
         ConversationSummary(

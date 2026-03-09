@@ -2,8 +2,8 @@ import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { useState } from "react";
 import { BottomNav } from "~/components/navigation/BottomNav";
-import { ProfileHeader } from "~/components/reflection/ProfileHeader";
 import { ProfilePreferences } from "~/components/profile/ProfilePreferences";
+import { ProfileHeader } from "~/components/reflection/ProfileHeader";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { useAuth } from "~/contexts/AuthContext";
@@ -48,7 +48,9 @@ function ProfilePage() {
   const { account: initialAccount } = Route.useLoaderData();
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [account, setAccount] = useState<AccountMe>(initialAccount as AccountMe);
+  const [account, setAccount] = useState<AccountMe>(
+    initialAccount as AccountMe,
+  );
   const [isSaving, setIsSaving] = useState(false);
 
   const displayName =

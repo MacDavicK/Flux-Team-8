@@ -30,7 +30,9 @@ function validate(value: string, zodStr: string): string | null {
   if (maxMatch && value.length > Number(maxMatch[1])) return maxMatch[2];
 
   // .regex(/pattern/flags, "msg")
-  const regexMatch = zodStr.match(/\.regex\(\/(.+?)\/([gimsuy]*),\s*"([^"]+)"\)/);
+  const regexMatch = zodStr.match(
+    /\.regex\(\/(.+?)\/([gimsuy]*),\s*"([^"]+)"\)/,
+  );
   if (regexMatch) {
     const re = new RegExp(regexMatch[1], regexMatch[2]);
     if (!re.test(value)) return regexMatch[3];
@@ -54,20 +56,22 @@ function OtpInput({ phoneNumber, onSubmit, disabled }: OtpInputProps) {
   const [attempts, setAttempts] = useState(0);
   const [cooldown, setCooldown] = useState(OTP_RESEND_COOLDOWN);
   const [isResending, setIsResending] = useState(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(
+    undefined,
+  );
 
   // Start cooldown timer on mount (OTP was just sent by the backend)
   useEffect(() => {
     timerRef.current = setInterval(() => {
       setCooldown((s) => {
         if (s <= 1) {
-          clearInterval(timerRef.current!);
+          clearInterval(timerRef.current);
           return 0;
         }
         return s - 1;
       });
     }, 1000);
-    return () => clearInterval(timerRef.current!);
+    return () => clearInterval(timerRef.current);
   }, []);
 
   function handleChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -103,7 +107,7 @@ function OtpInput({ phoneNumber, onSubmit, disabled }: OtpInputProps) {
       timerRef.current = setInterval(() => {
         setCooldown((s) => {
           if (s <= 1) {
-            clearInterval(timerRef.current!);
+            clearInterval(timerRef.current);
             return 0;
           }
           return s - 1;
@@ -131,7 +135,6 @@ function OtpInput({ phoneNumber, onSubmit, disabled }: OtpInputProps) {
           placeholder="000000"
           maxLength={6}
           disabled={disabled || attempts >= OTP_MAX_ATTEMPTS}
-          autoFocus
           className={cn(
             "w-36 px-3 py-2 text-sm rounded-xl border bg-white/90 text-charcoal text-center tracking-widest font-mono",
             "placeholder:text-river/40 outline-none transition-colors",
@@ -144,7 +147,9 @@ function OtpInput({ phoneNumber, onSubmit, disabled }: OtpInputProps) {
         <button
           type="button"
           onClick={handleSubmit}
-          disabled={disabled || code.length !== 6 || attempts >= OTP_MAX_ATTEMPTS}
+          disabled={
+            disabled || code.length !== 6 || attempts >= OTP_MAX_ATTEMPTS
+          }
           className={cn(
             "px-3 py-2 rounded-xl text-sm font-medium transition-colors",
             "bg-terracotta text-white",
@@ -184,7 +189,12 @@ function OtpInput({ phoneNumber, onSubmit, disabled }: OtpInputProps) {
   );
 }
 
-export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "" }: OnboardingOptionsProps) {
+export function OnboardingOptions({
+  options,
+  onSelect,
+  disabled,
+  phoneNumber = "",
+}: OnboardingOptionsProps) {
   const [specifyStep, setSpecifyStep] = useState<OnboardingOption | null>(null);
   const [specifyValue, setSpecifyValue] = useState("");
   const [specifyError, setSpecifyError] = useState<string | null>(null);
@@ -194,11 +204,19 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
   // OTP step: render the dedicated OTP widget
   const otpOption = options.find((o) => o.input_type === "otp");
   if (otpOption) {
-    return <OtpInput phoneNumber={phoneNumber} onSubmit={onSelect} disabled={disabled} />;
+    return (
+      <OtpInput
+        phoneNumber={phoneNumber}
+        onSubmit={onSelect}
+        disabled={disabled}
+      />
+    );
   }
 
   const datetimeOption = options.find((o) => o.input_type === "datetime");
-  const specifyOption = options.find((o) => o.value === null && o.input_type !== "datetime");
+  const specifyOption = options.find(
+    (o) => o.value === null && o.input_type !== "datetime",
+  );
   const regularOptions = options.filter((o) => o.value !== null);
 
   function handleOptionClick(option: OnboardingOption) {
@@ -256,7 +274,10 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
 
   function handleDatetimeKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === "Enter") handleDatetimeSubmit();
-    if (e.key === "Escape") { setDatetimeStep(false); setDatetimeValue(""); }
+    if (e.key === "Escape") {
+      setDatetimeStep(false);
+      setDatetimeValue("");
+    }
   }
 
   // Compute min for datetime-local input: now rounded up to the next minute
@@ -307,7 +328,10 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
           <motion.button
             key="datetime"
             type="button"
-            onClick={() => { setDatetimeStep(true); setDatetimeValue(""); }}
+            onClick={() => {
+              setDatetimeStep(true);
+              setDatetimeValue("");
+            }}
             disabled={disabled}
             whileTap={{ scale: 0.96 }}
             className={cn(
@@ -333,16 +357,23 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
           >
             <div className="flex gap-2 items-center pt-1">
               <input
-                type={specifyStep?.zod_validator?.includes("\\+[1-9]") ? "tel" : "text"}
+                type={
+                  specifyStep?.zod_validator?.includes("\\+[1-9]")
+                    ? "tel"
+                    : "text"
+                }
                 value={specifyValue}
                 onChange={(e) => {
                   setSpecifyValue(e.target.value);
                   setSpecifyError(null);
                 }}
                 onKeyDown={handleSpecifyKeyDown}
-                placeholder={specifyStep?.zod_validator?.includes("\\+[1-9]") ? "+1 555 123 4567" : "Type your answer…"}
+                placeholder={
+                  specifyStep?.zod_validator?.includes("\\+[1-9]")
+                    ? "+1 555 123 4567"
+                    : "Type your answer…"
+                }
                 disabled={disabled}
-                autoFocus
                 className={cn(
                   "flex-1 px-3 py-2 text-sm rounded-xl border bg-white/90 text-charcoal",
                   "placeholder:text-river/50 outline-none transition-colors",
@@ -388,7 +419,6 @@ export function OnboardingOptions({ options, onSelect, disabled, phoneNumber = "
                 onChange={(e) => setDatetimeValue(e.target.value)}
                 onKeyDown={handleDatetimeKeyDown}
                 disabled={disabled}
-                autoFocus
                 className={cn(
                   "flex-1 px-3 py-2 text-sm rounded-xl border bg-white/90 text-charcoal",
                   "outline-none transition-colors border-charcoal/20 focus:border-sage",

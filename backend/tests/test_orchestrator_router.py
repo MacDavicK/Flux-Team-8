@@ -48,15 +48,23 @@ def patch_orchestrator_delegates(monkeypatch):
         message="Task skipped.",
     )
 
-    monkeypatch.setattr(orch_router, "start_goal", AsyncMock(return_value=fake_goal_start))
-    monkeypatch.setattr(orch_router, "respond_to_goal", AsyncMock(return_value=fake_goal_continue))
+    monkeypatch.setattr(
+        orch_router, "start_goal", AsyncMock(return_value=fake_goal_start)
+    )
+    monkeypatch.setattr(
+        orch_router, "respond_to_goal", AsyncMock(return_value=fake_goal_continue)
+    )
     monkeypatch.setattr(
         orch_router,
         "list_tasks_for_timeline",
         AsyncMock(return_value={"tasks": [{"id": "task-1"}, {"id": "task-2"}]}),
     )
-    monkeypatch.setattr(orch_router, "suggest_reschedule", AsyncMock(return_value=fake_suggest))
-    monkeypatch.setattr(orch_router, "apply_reschedule", AsyncMock(return_value=fake_apply))
+    monkeypatch.setattr(
+        orch_router, "suggest_reschedule", AsyncMock(return_value=fake_suggest)
+    )
+    monkeypatch.setattr(
+        orch_router, "apply_reschedule", AsyncMock(return_value=fake_apply)
+    )
 
     monkeypatch.setattr(
         orch_router,
@@ -76,7 +84,12 @@ def patch_orchestrator_delegates(monkeypatch):
             return_value=type(
                 "VoiceSaveResp",
                 (),
-                {"model_dump": lambda self, mode="json": {"message_id": "m-1", "status": "saved"}},
+                {
+                    "model_dump": lambda self, mode="json": {
+                        "message_id": "m-1",
+                        "status": "saved",
+                    }
+                },
             )()
         ),
     )
@@ -87,7 +100,12 @@ def patch_orchestrator_delegates(monkeypatch):
             return_value=type(
                 "VoiceGetResp",
                 (),
-                {"model_dump": lambda self, mode="json": {"session_id": "voice-s-1", "messages": []}},
+                {
+                    "model_dump": lambda self, mode="json": {
+                        "session_id": "voice-s-1",
+                        "messages": [],
+                    }
+                },
             )()
         ),
     )
@@ -98,7 +116,12 @@ def patch_orchestrator_delegates(monkeypatch):
             return_value=type(
                 "VoiceIntentResp",
                 (),
-                {"model_dump": lambda self, mode="json": {"function_call_id": "fc-1", "result": "ok"}},
+                {
+                    "model_dump": lambda self, mode="json": {
+                        "function_call_id": "fc-1",
+                        "result": "ok",
+                    }
+                },
             )()
         ),
     )
@@ -109,10 +132,16 @@ def patch_orchestrator_delegates(monkeypatch):
             return_value=type(
                 "VoiceCloseResp",
                 (),
-                {"model_dump": lambda self, mode="json": {"session_id": "voice-s-1", "status": "closed"}},
+                {
+                    "model_dump": lambda self, mode="json": {
+                        "session_id": "voice-s-1",
+                        "status": "closed",
+                    }
+                },
             )()
         ),
     )
+
 
 class TestOrchestratorRouter:
     def test_orchestrator_mode_endpoint(self, app_client):
@@ -190,7 +219,9 @@ class TestOrchestratorRouter:
         assert data["intent"] == "SUGGEST_RESCHEDULE"
         assert data["route"] == "scheduler.suggest"
 
-    def test_apply_skip_with_explicit_action(self, app_client, patch_orchestrator_delegates):
+    def test_apply_skip_with_explicit_action(
+        self, app_client, patch_orchestrator_delegates
+    ):
         fake_id = "11111111-1111-1111-1111-111111111111"
         resp = app_client.post(
             "/orchestrator/message",
@@ -206,7 +237,9 @@ class TestOrchestratorRouter:
         assert data["route"] == "scheduler.apply"
         assert data["scheduler_payload"]["new_state"] == "missed"
 
-    def test_apply_reschedule_with_time_window(self, app_client, patch_orchestrator_delegates):
+    def test_apply_reschedule_with_time_window(
+        self, app_client, patch_orchestrator_delegates
+    ):
         fake_id = "11111111-1111-1111-1111-111111111111"
         new_start = datetime.now(timezone.utc) + timedelta(hours=2)
         new_end = new_start + timedelta(hours=1)

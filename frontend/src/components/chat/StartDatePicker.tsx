@@ -42,8 +42,18 @@ function isSameDay(a: Date, b: Date): boolean {
 }
 
 const MONTH_NAMES = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December",
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 
 const DAY_LABELS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
@@ -98,12 +108,18 @@ export function StartDatePicker({ onSelect, disabled }: StartDatePickerProps) {
   }
 
   function prevMonth() {
-    const prev = new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1, 1);
+    const prev = new Date(
+      calendarMonth.getFullYear(),
+      calendarMonth.getMonth() - 1,
+      1,
+    );
     if (prev >= startOfMonth(today)) setCalendarMonth(prev);
   }
 
   function nextMonth() {
-    setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1));
+    setCalendarMonth(
+      new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1, 1),
+    );
   }
 
   const canGoPrev =
@@ -150,7 +166,8 @@ export function StartDatePicker({ onSelect, disabled }: StartDatePickerProps) {
             <ChevronLeft className="w-4 h-4 text-river" />
           </button>
           <span className="text-sm font-medium text-charcoal">
-            {MONTH_NAMES[calendarMonth.getMonth()]} {calendarMonth.getFullYear()}
+            {MONTH_NAMES[calendarMonth.getMonth()]}{" "}
+            {calendarMonth.getFullYear()}
           </span>
           <button
             type="button"
@@ -181,25 +198,33 @@ export function StartDatePicker({ onSelect, disabled }: StartDatePickerProps) {
             transition={{ duration: 0.15 }}
             className="grid grid-cols-7 gap-y-1"
           >
-            {cells.map((day, i) => {
-              const isCurrentMonth = day.getMonth() === calendarMonth.getMonth();
+            {cells.map((day) => {
+              const isCurrentMonth =
+                day.getMonth() === calendarMonth.getMonth();
               const isPast = day < today;
               const isToday = isSameDay(day, today);
               const isSelected = isSameDay(day, selected);
 
               return (
                 <button
-                  key={i}
+                  key={day.toISOString()}
                   type="button"
                   onClick={() => handleDayClick(day)}
                   disabled={isPast || !isCurrentMonth || disabled}
                   className={cn(
                     "h-8 w-full flex items-center justify-center rounded-full text-sm transition-colors",
                     !isCurrentMonth && "opacity-0 pointer-events-none",
-                    isPast && isCurrentMonth && "text-river/30 cursor-not-allowed",
-                    isToday && !isSelected && "font-semibold text-sage ring-1 ring-sage/40",
+                    isPast &&
+                      isCurrentMonth &&
+                      "text-river/30 cursor-not-allowed",
+                    isToday &&
+                      !isSelected &&
+                      "font-semibold text-sage ring-1 ring-sage/40",
                     isSelected && "bg-sage text-white font-semibold",
-                    !isSelected && !isPast && isCurrentMonth && "text-charcoal hover:bg-sage/10",
+                    !isSelected &&
+                      !isPast &&
+                      isCurrentMonth &&
+                      "text-charcoal hover:bg-sage/10",
                     "disabled:cursor-not-allowed",
                   )}
                 >
@@ -214,7 +239,10 @@ export function StartDatePicker({ onSelect, disabled }: StartDatePickerProps) {
       {/* Selected date label + confirm */}
       <div className="flex items-center justify-between pt-1 border-t border-black/5">
         <span className="text-sm text-river">
-          Starting <span className="text-charcoal font-medium">{formatDisplay(selected)}</span>
+          Starting{" "}
+          <span className="text-charcoal font-medium">
+            {formatDisplay(selected)}
+          </span>
         </span>
         <motion.button
           type="button"

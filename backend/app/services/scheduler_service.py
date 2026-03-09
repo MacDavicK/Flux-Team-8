@@ -22,13 +22,7 @@ def _db():
 
 def get_task_by_id(task_id: str) -> Optional[dict]:
     """Fetch a single task by ID. Returns None if not found."""
-    result = (
-        _db().table("tasks")
-        .select("*")
-        .eq("id", task_id)
-        .maybe_single()
-        .execute()
-    )
+    result = _db().table("tasks").select("*").eq("id", task_id).maybe_single().execute()
     if result is None:
         return None
     return result.data if result.data is not None else None
@@ -37,7 +31,8 @@ def get_task_by_id(task_id: str) -> Optional[dict]:
 def get_user_profile(user_id: str) -> Optional[dict]:
     """Fetch user preferences (sleep window, work hours, etc.). Returns None if not found."""
     result = (
-        _db().table("users")
+        _db()
+        .table("users")
         .select("id, profile, notification_preferences")
         .eq("id", user_id)
         .maybe_single()
@@ -58,7 +53,8 @@ def get_tasks_for_timeline(
     Includes tasks with start_time in [from_ts, to_ts]; ignores missed/completed.
     """
     query = (
-        _db().table("tasks")
+        _db()
+        .table("tasks")
         .select("*")
         .eq("user_id", user_id)
         .in_("state", ["scheduled", "drifted"])
@@ -81,7 +77,8 @@ def get_tasks_in_range(
     Excludes the drifted task itself from conflict detection.
     """
     query = (
-        _db().table("tasks")
+        _db()
+        .table("tasks")
         .select("*")
         .eq("user_id", user_id)
         .in_("state", ["scheduled", "drifted"])
@@ -102,12 +99,15 @@ def update_task_reschedule(
 ) -> dict:
     """Reschedule a task: update times and set state back to 'scheduled'."""
     result = (
-        _db().table("tasks")
-        .update({
-            "start_time": new_start.isoformat(),
-            "end_time": new_end.isoformat(),
-            "state": "scheduled",
-        })
+        _db()
+        .table("tasks")
+        .update(
+            {
+                "start_time": new_start.isoformat(),
+                "end_time": new_end.isoformat(),
+                "state": "scheduled",
+            }
+        )
         .eq("id", task_id)
         .execute()
     )
@@ -117,9 +117,6 @@ def update_task_reschedule(
 def mark_task_missed(task_id: str) -> dict:
     """Mark a task as missed (skip today)."""
     result = (
-        _db().table("tasks")
-        .update({"state": "missed"})
-        .eq("id", task_id)
-        .execute()
+        _db().table("tasks").update({"state": "missed"}).eq("id", task_id).execute()
     )
     return result.data[0] if result.data else {}

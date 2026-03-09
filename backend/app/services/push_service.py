@@ -3,6 +3,7 @@
 
 Sends Web Push notifications using pywebpush + VAPID keys.
 """
+
 from __future__ import annotations
 
 import json
@@ -35,9 +36,9 @@ async def dispatch_push(task: dict, user_push_subscription: dict) -> bool:
         "task_id": task_id,
         "task_name": title,
         "actions": [
-            {"action": "done",       "title": "✓ Done"},
+            {"action": "done", "title": "✓ Done"},
             {"action": "reschedule", "title": "⏰ Reschedule"},
-            {"action": "missed",     "title": "✗ Missed"},
+            {"action": "missed", "title": "✗ Missed"},
         ],
         "scheduled_at": str(scheduled_at),
     }
@@ -64,7 +65,9 @@ async def dispatch_push(task: dict, user_push_subscription: dict) -> bool:
             "Web push failed for task %s: %s — response: %s",
             task_id,
             exc,
-            exc.response.text[:200] if getattr(exc, "response", None) and exc.response.text else "",
+            exc.response.text[:200]
+            if getattr(exc, "response", None) and exc.response.text
+            else "",
             exc_info=False,
         )
         return False

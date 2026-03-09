@@ -2,7 +2,9 @@ import { apiFetch } from "~/lib/apiClient";
 
 class TasksService {
   async getTasks(date?: string): Promise<{ [key: string]: unknown }[]> {
-    const url = date ? `/api/v1/tasks?date=${encodeURIComponent(date)}` : "/api/v1/tasks";
+    const url = date
+      ? `/api/v1/tasks?date=${encodeURIComponent(date)}`
+      : "/api/v1/tasks";
     const response = await apiFetch(url);
 
     if (!response.ok) {
@@ -26,7 +28,9 @@ class TasksService {
     return response.json();
   }
 
-  async addTodo(title: string): Promise<{ task_id: string; title: string; status: string }> {
+  async addTodo(
+    title: string,
+  ): Promise<{ task_id: string; title: string; status: string }> {
     const response = await apiFetch("/api/v1/tasks/todo", {
       method: "POST",
       body: JSON.stringify({ title }),
@@ -39,7 +43,9 @@ class TasksService {
     return response.json();
   }
 
-  async missedTask(taskId: string): Promise<{ task_id: string; status: string }> {
+  async missedTask(
+    taskId: string,
+  ): Promise<{ task_id: string; status: string }> {
     const response = await apiFetch(`/api/v1/tasks/${taskId}/missed`, {
       method: "PATCH",
     });
@@ -51,16 +57,25 @@ class TasksService {
     return response.json();
   }
 
-  async confirmReschedule(taskId: string, scheduledAt: string): Promise<{ original_task_id: string; new_task_id: string; status: string; scheduled_at: string }> {
-    const response = await apiFetch(`/api/v1/tasks/${taskId}/reschedule-confirm`, {
-      method: "PATCH",
-      body: JSON.stringify({ scheduled_at: scheduledAt }),
-    });
+  async confirmReschedule(
+    taskId: string,
+    scheduledAt: string,
+  ): Promise<{
+    original_task_id: string;
+    new_task_id: string;
+    status: string;
+    scheduled_at: string;
+  }> {
+    const response = await apiFetch(
+      `/api/v1/tasks/${taskId}/reschedule-confirm`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ scheduled_at: scheduledAt }),
+      },
+    );
     if (!response.ok) throw new Error("Failed to confirm reschedule");
     return response.json();
   }
-
-
 }
 
 export const tasksService = new TasksService();

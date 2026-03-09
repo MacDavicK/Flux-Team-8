@@ -38,7 +38,9 @@ _agent = SchedulerAgent()
 
 @router.get("/tasks")
 async def list_tasks_for_timeline(
-    user_id: str | None = Query(default=None, description="User ID (default: demo user)"),
+    user_id: str | None = Query(
+        default=None, description="User ID (default: demo user)"
+    ),
 ):
     """
     List tasks for the timeline: today and tomorrow, scheduled or drifted.

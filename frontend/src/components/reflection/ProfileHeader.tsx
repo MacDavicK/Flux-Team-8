@@ -1,6 +1,6 @@
+import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { SlidersHorizontal } from "lucide-react";
-import { Link } from "@tanstack/react-router";
 import { cn } from "~/utils/cn";
 
 interface ProfileHeaderProps {
@@ -9,7 +9,11 @@ interface ProfileHeaderProps {
   className?: string;
 }
 
-export function ProfileHeader({ name, avatarUrl, className }: ProfileHeaderProps) {
+export function ProfileHeader({
+  name,
+  avatarUrl,
+  className,
+}: ProfileHeaderProps) {
   return (
     <motion.div
       className={cn("flex items-center gap-3 px-5 pt-8 pb-4", className)}
@@ -28,7 +32,11 @@ export function ProfileHeader({ name, avatarUrl, className }: ProfileHeaderProps
         }}
       >
         {avatarUrl ? (
-          <img src={avatarUrl} alt={name} className="w-full h-full object-cover" />
+          <img
+            src={avatarUrl}
+            alt={name}
+            className="w-full h-full object-cover"
+          />
         ) : (
           <div className="w-full h-full flex items-center justify-center text-white text-lg font-bold">
             {name.charAt(0).toUpperCase()}
@@ -38,7 +46,9 @@ export function ProfileHeader({ name, avatarUrl, className }: ProfileHeaderProps
 
       {/* Name */}
       <div className="flex-1 min-w-0">
-        <h1 className="text-display text-xl italic text-charcoal truncate">{name}</h1>
+        <h1 className="text-display text-xl italic text-charcoal truncate">
+          {name}
+        </h1>
       </div>
 
       {/* Preferences shortcut */}

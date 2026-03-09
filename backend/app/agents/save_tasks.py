@@ -170,8 +170,7 @@ async def save_tasks_node(state: AgentState) -> dict:
         if slot.get("task_id")
     }
     slots_by_title: dict[str, dict] = {
-        slot["task_title"]: slot
-        for slot in (scheduler_output.get("slots") or [])
+        slot["task_title"]: slot for slot in (scheduler_output.get("slots") or [])
     }
 
     # ── Step 3: Insert each proposed task ────────────────────────────────
@@ -179,20 +178,21 @@ async def save_tasks_node(state: AgentState) -> dict:
 
     for task in proposed_tasks:
         title: str = task.get("title", "")
-        task_goal_id = task.get("goal_id") or goal_id   # standalone → None
+        task_goal_id = task.get("goal_id") or goal_id  # standalone → None
         duration_minutes: int = task.get("duration_minutes") or 30
         recurrence_rule: Optional[str] = task.get("recurrence_rule")
         trigger_type: str = task.get("trigger_type") or "time"
         location_trigger: Optional[str] = task.get("location_trigger")
         shared_with_goal_ids: list = task.get("shared_with_goal_ids") or []
-        week_range: list[int] = task.get("week_range") or []
 
         # Determine scheduled_at: task dict wins, scheduler slot is fallback,
         # then suggested_time anchored to goal_start_date / today.
         # Match by task_id first (stable), fall back to title.
         scheduled_at_utc: Optional[str] = task.get("scheduled_at")
         task_id_key: Optional[str] = task.get("task_id")
-        slot = (slots_by_id.get(task_id_key) if task_id_key else None) or slots_by_title.get(title)
+        slot = (
+            slots_by_id.get(task_id_key) if task_id_key else None
+        ) or slots_by_title.get(title)
         if slot:
             if not scheduled_at_utc:
                 scheduled_at_utc = slot.get("scheduled_at")
@@ -204,8 +204,14 @@ async def save_tasks_node(state: AgentState) -> dict:
             suggested_time: Optional[str] = task.get("suggested_time")  # e.g. "07:00"
             if suggested_time:
                 try:
-                    anchor_date: str = state.get("goal_start_date") or pendulum.now(user_tz).to_date_string()
-                    dt_local = pendulum.parse(f"{anchor_date}T{suggested_time}:00", tz=pendulum.timezone(user_tz))
+                    anchor_date: str = (
+                        state.get("goal_start_date")
+                        or pendulum.now(user_tz).to_date_string()
+                    )
+                    dt_local = pendulum.parse(
+                        f"{anchor_date}T{suggested_time}:00",
+                        tz=pendulum.timezone(user_tz),
+                    )
                     scheduled_at_utc = dt_local.in_timezone("UTC").isoformat()
                 except Exception:
                     pass
@@ -235,11 +241,16 @@ async def save_tasks_node(state: AgentState) -> dict:
                         scheduled_at_utc = next_utc if next_utc else scheduled_at_utc
                     else:
                         scheduled_days: list[str] = task.get("scheduled_days") or []
-                        scheduled_days_norm = [d.strip().title() for d in scheduled_days]
+                        scheduled_days_norm = [
+                            d.strip().title() for d in scheduled_days
+                        ]
                         candidate = dt_scheduled
                         for _ in range(14):  # safety cap: never loop more than 2 weeks
                             candidate = candidate.add(days=1)
-                            if not scheduled_days_norm or candidate.format("dddd") in scheduled_days_norm:
+                            if (
+                                not scheduled_days_norm
+                                or candidate.format("dddd") in scheduled_days_norm
+                            ):
                                 break
                         scheduled_at_utc = candidate.in_timezone("UTC").isoformat()
             except Exception:
@@ -268,22 +279,26 @@ async def save_tasks_node(state: AgentState) -> dict:
             # All recurring tasks: insert only the first occurrence.
             # The notifier/task-completion handler advances to the next occurrence
             # (via the recurrence_rule) when the current one is done/missed/rescheduled.
-            await _insert_task({
-                **base_row,
-                "scheduled_at": scheduled_at_utc,
-                "recurrence_rule": recurrence_rule,
-                "escalation_policy": escalation_policy,
-            })
+            await _insert_task(
+                {
+                    **base_row,
+                    "scheduled_at": scheduled_at_utc,
+                    "recurrence_rule": recurrence_rule,
+                    "escalation_policy": escalation_policy,
+                }
+            )
             rows_inserted += 1
 
         else:
             # One-off task (or no recurrence) — single insert
-            await _insert_task({
-                **base_row,
-                "scheduled_at": scheduled_at_utc,
-                "recurrence_rule": recurrence_rule,
-                "escalation_policy": escalation_policy,
-            })
+            await _insert_task(
+                {
+                    **base_row,
+                    "scheduled_at": scheduled_at_utc,
+                    "recurrence_rule": recurrence_rule,
+                    "escalation_policy": escalation_policy,
+                }
+            )
             rows_inserted += 1
 
     # ── Step 4: Flag milestone completion in patterns (NEXT_MILESTONE flow) ──

@@ -116,30 +116,26 @@ async def task_handler_node(state: AgentState) -> dict:
         fallback = (
             "Sorry, I had trouble parsing those details. "
             "Could you try again? For example: "
-            "\"Remind me to take my meds every morning at 8am.\""
+            '"Remind me to take my meds every morning at 8am."'
         )
         return {
-            "conversation_history": history + [
-                {"role": "assistant", "content": fallback}
-            ],
+            "conversation_history": history
+            + [{"role": "assistant", "content": fallback}],
         }
 
     # No specific time extracted
     if not result.scheduled_at_local and not result.recurrence_rule:
         if not already_asked:
             # Ask once for a specific time
-            ask_msg = (
-                f"When would you like to do this — do you have a specific time in mind? {_ASK_TIME_MARKER}"
-            )
+            ask_msg = f"When would you like to do this — do you have a specific time in mind? {_ASK_TIME_MARKER}"
             return {
-                "conversation_history": history + [
-                    {"role": "assistant", "content": ask_msg}
-                ],
+                "conversation_history": history
+                + [{"role": "assistant", "content": ask_msg}],
             }
         else:
             # User was vague — save as a to-do with no scheduled_at
             todo_reply = (
-                f"Got it! I've added \"{result.title}\" to your to-do list. "
+                f'Got it! I\'ve added "{result.title}" to your to-do list. '
                 "You can find it on your home screen whenever you're ready."
             )
             proposed_task = {
@@ -157,9 +153,8 @@ async def task_handler_node(state: AgentState) -> dict:
             return {
                 "proposed_tasks": [proposed_task],
                 "approval_status": "approved",
-                "conversation_history": history + [
-                    {"role": "assistant", "content": todo_reply}
-                ],
+                "conversation_history": history
+                + [{"role": "assistant", "content": todo_reply}],
             }
 
     # Convert local scheduled_at to UTC.
@@ -167,7 +162,9 @@ async def task_handler_node(state: AgentState) -> dict:
     # rrule_expander has a valid dtstart and the poll query can match rows.
     scheduled_at_utc: Optional[str] = None
     start_local_str = result.scheduled_at_local or (
-        pendulum.now(user_tz).set(microsecond=0).isoformat() if result.recurrence_rule else None
+        pendulum.now(user_tz).set(microsecond=0).isoformat()
+        if result.recurrence_rule
+        else None
     )
     if start_local_str:
         try:
@@ -193,8 +190,7 @@ async def task_handler_node(state: AgentState) -> dict:
 
     return {
         "proposed_tasks": [proposed_task],
-        "approval_status": "approved",   # NEW_TASK has no negotiation loop; save immediately
-        "conversation_history": history + [
-            {"role": "assistant", "content": result.reply}
-        ],
+        "approval_status": "approved",  # NEW_TASK has no negotiation loop; save immediately
+        "conversation_history": history
+        + [{"role": "assistant", "content": result.reply}],
     }

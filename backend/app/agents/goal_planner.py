@@ -117,7 +117,9 @@ async def goal_planner_node(state: AgentState) -> dict:
     if intent == "NEXT_MILESTONE":
         # milestone_order may come from orchestrator state or goal_draft
         _draft: dict = goal_draft  # plain dict — avoid TypedDict narrowing issues
-        milestone_order: int | None = state.get("milestone_order") or _draft.get("milestone_order")
+        milestone_order: int | None = state.get("milestone_order") or _draft.get(
+            "milestone_order"
+        )
         parent_goal_id: str | None = _draft.get("goal_id")
 
         # If no explicit order, resolve: find the lowest pipeline_order still pending
@@ -196,8 +198,7 @@ async def goal_planner_node(state: AgentState) -> dict:
         f"scheduler_output: {json.dumps(scheduler_output)}\n"
         f"pattern_output: {json.dumps(pattern_output)}\n"
         f"goal_draft: {json.dumps(goal_draft)}\n"
-        f"user_preference_notes: {json.dumps(user_notes)}\n"
-        + milestone_context_block
+        f"user_preference_notes: {json.dumps(user_notes)}\n" + milestone_context_block
     )
 
     # 9.2.3 — Call validated LLM with GoalPlannerOutput, max_tokens=4096
@@ -240,8 +241,14 @@ async def goal_planner_node(state: AgentState) -> dict:
 
     # 9.2.4 — Handle multi-sprint goals (new GOAL flow only)
     # For NEXT_MILESTONE the roadmap already exists in DB — skip re-insertion.
-    if intent != "NEXT_MILESTONE" and not result.goal_feasible_in_6_weeks and result.milestone_roadmap:
-        pipeline_goals = [mg for mg in result.milestone_roadmap if mg.pipeline_order > 1]
+    if (
+        intent != "NEXT_MILESTONE"
+        and not result.goal_feasible_in_6_weeks
+        and result.milestone_roadmap
+    ):
+        pipeline_goals = [
+            mg for mg in result.milestone_roadmap if mg.pipeline_order > 1
+        ]
         for mg in pipeline_goals:
             await db.execute(
                 """

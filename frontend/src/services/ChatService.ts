@@ -4,7 +4,7 @@ import type { ChatMessageResponse, GoalClarifierAnswer } from "~/types";
 const API_BASE =
   (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env
     ?.VITE_API_URL || "http://localhost:8002";
-const DEMO_USER_ID = "a1000000-0000-0000-0000-000000000001";
+const _DEMO_USER_ID = "a1000000-0000-0000-0000-000000000001";
 
 export interface HistoryMessage {
   id: string;
@@ -80,7 +80,11 @@ class ChatService {
   async sendMessage(
     message: string,
     conversationId?: string,
-    options?: { intent?: string; task_id?: string; answers?: GoalClarifierAnswer[] },
+    options?: {
+      intent?: string;
+      task_id?: string;
+      answers?: GoalClarifierAnswer[];
+    },
   ): Promise<ChatMessageResponse> {
     const response = await fetch(`${API_BASE}/orchestrator/message`, {
       method: "POST",
@@ -102,7 +106,7 @@ class ChatService {
       conversation_id?: string | null;
       message: string;
       route?: string;
-      proposed_plan?: { [key: string]: unknown }[] | null;
+      proposed_plan?: Record<string, unknown> | null;
       requires_user_action?: boolean;
       suggested_action?: string | null;
     };

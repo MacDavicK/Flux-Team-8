@@ -1,16 +1,18 @@
 """
 21.1.1 — Unit tests for orchestrator_node.
 """
+
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, patch, MagicMock
+from unittest.mock import AsyncMock, patch
 
 
 def _make_state(conversation_history=None):
     return {
         "user_id": "test-user-id",
-        "conversation_history": conversation_history or [{"role": "user", "content": "I want to run a 5K"}],
+        "conversation_history": conversation_history
+        or [{"role": "user", "content": "I want to run a 5K"}],
         "intent": None,
         "user_profile": {"timezone": "UTC"},
         "goal_draft": None,
@@ -26,7 +28,9 @@ def _make_state(conversation_history=None):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("expected_intent", ["GOAL", "NEW_TASK", "CLARIFY", "RESCHEDULE_TASK", "MODIFY_GOAL"])
+@pytest.mark.parametrize(
+    "expected_intent", ["GOAL", "NEW_TASK", "CLARIFY", "RESCHEDULE_TASK", "MODIFY_GOAL"]
+)
 async def test_intent_classification(expected_intent):
     """Orchestrator correctly returns each intent type from validated_llm_call."""
     from app.models.agent_outputs import OrchestratorOutput
@@ -39,13 +43,20 @@ async def test_intent_classification(expected_intent):
         goal_id=None,
     )
 
-    with patch("app.agents.orchestrator.db") as mock_db, \
-         patch("app.agents.orchestrator.check_token_budget", AsyncMock(return_value="ok")), \
-         patch("app.agents.orchestrator.validated_llm_call", AsyncMock(return_value=mock_output)):
-
+    with (
+        patch("app.agents.orchestrator.db") as mock_db,
+        patch(
+            "app.agents.orchestrator.check_token_budget", AsyncMock(return_value="ok")
+        ),
+        patch(
+            "app.agents.orchestrator.validated_llm_call",
+            AsyncMock(return_value=mock_output),
+        ),
+    ):
         mock_db.fetchrow = AsyncMock(return_value={"onboarded": True})
 
         from app.agents.orchestrator import orchestrator_node
+
         result = await orchestrator_node(_make_state())
 
     assert result["intent"] == expected_intent
@@ -58,6 +69,7 @@ async def test_overrides_intent_to_onboarding_when_not_onboarded():
         mock_db.fetchrow = AsyncMock(return_value={"onboarded": False})
 
         from app.agents.orchestrator import orchestrator_node
+
         result = await orchestrator_node(_make_state())
 
     assert result["intent"] == "ONBOARDING"

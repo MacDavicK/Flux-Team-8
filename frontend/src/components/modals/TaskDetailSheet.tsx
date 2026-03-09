@@ -1,7 +1,7 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { Calendar, CheckCircle2, Clock, X } from "lucide-react";
-import { cn } from "~/utils/cn";
 import type { TimelineEvent } from "~/types";
+import { cn } from "~/utils/cn";
 
 interface TaskDetailSheetProps {
   task: TimelineEvent | null;
@@ -15,7 +15,7 @@ export function TaskDetailSheet({
   task,
   onClose,
   onComplete,
-  onMissed,
+  onMissed: _onMissed,
   onReschedule,
 }: TaskDetailSheetProps) {
   if (!task) return null;
@@ -23,11 +23,7 @@ export function TaskDetailSheet({
   const isMissed = task.status === "missed";
   const isDone = task.status === "done" || task.status === "completed";
 
-  const statusLabel = isMissed
-    ? "Missed"
-    : isDone
-      ? "Completed"
-      : "Upcoming";
+  const statusLabel = isMissed ? "Missed" : isDone ? "Completed" : "Upcoming";
 
   const statusColor = isMissed
     ? "text-red-400"
@@ -61,7 +57,12 @@ export function TaskDetailSheet({
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div className="flex-1 pr-4">
-                  <p className={cn("text-xs font-semibold uppercase tracking-widest mb-1", statusColor)}>
+                  <p
+                    className={cn(
+                      "text-xs font-semibold uppercase tracking-widest mb-1",
+                      statusColor,
+                    )}
+                  >
                     {statusLabel}
                   </p>
                   <h2 className="text-xl font-bold text-charcoal leading-snug">
@@ -105,7 +106,10 @@ export function TaskDetailSheet({
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => { onComplete(task.id); onClose(); }}
+                    onClick={() => {
+                      onComplete(task.id);
+                      onClose();
+                    }}
                     className="w-full glass-bubble flex items-center justify-center gap-2 py-3.5 rounded-2xl text-charcoal font-medium"
                   >
                     <CheckCircle2 className="w-5 h-5 text-river" />
@@ -118,7 +122,10 @@ export function TaskDetailSheet({
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => { onComplete(task.id); onClose(); }}
+                    onClick={() => {
+                      onComplete(task.id);
+                      onClose();
+                    }}
                     className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl font-medium text-white bg-green-500/80"
                   >
                     <CheckCircle2 className="w-5 h-5" />
@@ -131,7 +138,10 @@ export function TaskDetailSheet({
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}
-                    onClick={() => { onReschedule(task.id, task.title); onClose(); }}
+                    onClick={() => {
+                      onReschedule(task.id, task.title);
+                      onClose();
+                    }}
                     className="w-full glass-bubble flex items-center justify-center gap-2 py-3.5 rounded-2xl text-terracotta font-medium"
                   >
                     <Calendar className="w-5 h-5" />

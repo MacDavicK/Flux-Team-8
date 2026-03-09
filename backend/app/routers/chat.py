@@ -51,10 +51,13 @@ def _plan_to_list(plan: list | None) -> list[dict] | None:
 
 
 class ChatMessageRequest(BaseModel):
-    message: str = Field(default="", description="User message; empty string for resume.")
+    message: str = Field(
+        default="", description="User message; empty string for resume."
+    )
 
 
 # ── POST /api/v1/chat/message ─────────────────────────────────
+
 
 @router.post("/chat/message")
 async def chat_message(
@@ -87,7 +90,13 @@ async def chat_message(
         }
 
     # Onboarded: route to GoalPlannerAgent
-    _NEW_GOAL_KEYWORDS = ("new goal", "start over", "reset", "another goal", "new conversation")
+    _NEW_GOAL_KEYWORDS = (
+        "new goal",
+        "start over",
+        "reset",
+        "another goal",
+        "new conversation",
+    )
     if message.lower().strip() in _NEW_GOAL_KEYWORDS or any(
         message.lower().startswith(kw) for kw in _NEW_GOAL_KEYWORDS
     ):
@@ -112,7 +121,9 @@ async def chat_message(
         except Exception as e:
             logger.error("Goal agent start_conversation failed: %s", e, exc_info=True)
             _goal_agents.pop(user_id, None)
-            raise HTTPException(status_code=500, detail="Failed to start goal conversation")
+            raise HTTPException(
+                status_code=500, detail="Failed to start goal conversation"
+            )
     else:
         try:
             result = await agent.process_message(message)
@@ -120,8 +131,14 @@ async def chat_message(
             logger.error("Goal agent process_message failed: %s", e, exc_info=True)
             raise HTTPException(status_code=500, detail="Failed to process message")
 
-    state_value = result["state"].value if isinstance(result["state"], ConversationState) else result["state"]
-    sources = _goal_sources_to_list(result.get("sources")) if result.get("sources") else []
+    state_value = (
+        result["state"].value
+        if isinstance(result["state"], ConversationState)
+        else result["state"]
+    )
+    sources = (
+        _goal_sources_to_list(result.get("sources")) if result.get("sources") else []
+    )
 
     if result["state"] == ConversationState.CONFIRMED and agent.plan:
         try:
@@ -147,6 +164,7 @@ async def chat_message(
 
 
 # ── GET /api/v1/account/me ─────────────────────────────────────
+
 
 @router.get("/account/me")
 async def get_me(user: dict = Depends(get_current_user)):

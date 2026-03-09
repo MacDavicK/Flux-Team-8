@@ -20,7 +20,9 @@ async def dao_service_client():
     from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
     from sqlalchemy.pool import NullPool
 
-    TEST_DATABASE_URL = "postgresql+asyncpg://postgres:postgres@localhost:54322/postgres"
+    TEST_DATABASE_URL = (
+        "postgresql+asyncpg://postgres:postgres@localhost:54322/postgres"
+    )
     engine = create_async_engine(TEST_DATABASE_URL, echo=False, poolclass=NullPool)
 
     async def override_get_db():
@@ -84,11 +86,16 @@ async def conv_agent_client(dao_service_client):
     except ImportError:
         # If main app can't import (missing deps), skip
         import pytest
+
         pytest.skip("Main app dependencies not available")
 
     with (
-        patch("app.conv_agent.voice_service.get_dao_client", return_value=test_dao_client),
-        patch("app.conv_agent.intent_handler.get_dao_client", return_value=test_dao_client),
+        patch(
+            "app.conv_agent.voice_service.get_dao_client", return_value=test_dao_client
+        ),
+        patch(
+            "app.conv_agent.intent_handler.get_dao_client", return_value=test_dao_client
+        ),
     ):
         transport = ASGITransport(app=main_app)
         async with AsyncClient(transport=transport, base_url="http://test") as client:

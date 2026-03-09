@@ -1,6 +1,7 @@
 """
 Flux API — FastAPI application entry point. Tasks 18.1–18.7.
 """
+
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
@@ -46,6 +47,7 @@ async def _rate_limit_handler(request, exc: RateLimitExceeded) -> JSONResponse:
 
 # ── 18.7  Lifespan ────────────────────────────────────────────────────────────
 
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_pool()
@@ -90,17 +92,18 @@ app.add_middleware(
 # ── 18.5  Routers ─────────────────────────────────────────────────────────────
 
 _PREFIX = "/api/v1"
-app.include_router(chat_router,      prefix=_PREFIX)
-app.include_router(goals_router,     prefix=_PREFIX)
-app.include_router(tasks_router,     prefix=_PREFIX)
+app.include_router(chat_router, prefix=_PREFIX)
+app.include_router(goals_router, prefix=_PREFIX)
+app.include_router(tasks_router, prefix=_PREFIX)
 app.include_router(analytics_router, prefix=_PREFIX)
-app.include_router(patterns_router,  prefix=_PREFIX)
-app.include_router(account_router,   prefix=_PREFIX)
-app.include_router(webhooks_router,  prefix=_PREFIX)
+app.include_router(patterns_router, prefix=_PREFIX)
+app.include_router(account_router, prefix=_PREFIX)
+app.include_router(webhooks_router, prefix=_PREFIX)
 app.include_router(echoconfig_router)
 
 
 # ── 18.6  Custom OpenAPI with BearerAuth ──────────────────────────────────────
+
 
 def custom_openapi() -> dict[str, Any]:
     if app.openapi_schema:

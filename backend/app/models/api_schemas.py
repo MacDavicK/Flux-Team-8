@@ -1,6 +1,7 @@
 """
 19. API Request/Response Schemas (app/models/api_schemas.py) — §11
 """
+
 from datetime import datetime
 from typing import Any, Optional
 
@@ -11,18 +12,21 @@ from pydantic import BaseModel
 # 19.1 — Chat
 # ─────────────────────────────────────────────────────────────────
 
+
 class GoalClarifierAnswer(BaseModel):
-    question_id: str   # matches ClarifierQuestion.id
-    question: str      # original question text (for context in conversation history)
-    answer: str        # user's answer (selected option or custom input)
+    question_id: str  # matches ClarifierQuestion.id
+    question: str  # original question text (for context in conversation history)
+    answer: str  # user's answer (selected option or custom input)
 
 
 class ChatMessageRequest(BaseModel):
     message: str
     conversation_id: Optional[str] = None
-    intent: Optional[str] = None      # Pre-set intent — skips orchestrator LLM call
-    task_id: Optional[str] = None     # Required when intent == "RESCHEDULE_TASK"
-    answers: Optional[list[GoalClarifierAnswer]] = None  # Structured answers for GOAL_CLARIFY
+    intent: Optional[str] = None  # Pre-set intent — skips orchestrator LLM call
+    task_id: Optional[str] = None  # Required when intent == "RESCHEDULE_TASK"
+    answers: Optional[list[GoalClarifierAnswer]] = (
+        None  # Structured answers for GOAL_CLARIFY
+    )
 
 
 class OnboardingStartRequest(BaseModel):
@@ -32,7 +36,9 @@ class OnboardingStartRequest(BaseModel):
 class OnboardingOptionSchema(BaseModel):
     label: str
     value: Optional[str] = None  # None = "Specify" — frontend opens a text input
-    zod_validator: Optional[str] = None  # Zod schema string for validating the Specify input
+    zod_validator: Optional[str] = (
+        None  # Zod schema string for validating the Specify input
+    )
     input_type: Optional[str] = None  # "otp" renders the OTP verification widget
 
 
@@ -59,6 +65,7 @@ class ChatMessageResponse(BaseModel):
 # 19.3 — Chat history
 # ─────────────────────────────────────────────────────────────────
 
+
 class MessageSchema(BaseModel):
     id: str
     role: str
@@ -77,8 +84,8 @@ class ConversationSummary(BaseModel):
     id: str
     last_message_at: Optional[datetime] = None
     created_at: datetime
-    title: Optional[str] = None       # set once a goal is identified
-    preview: Optional[str] = None     # first user message, truncated
+    title: Optional[str] = None  # set once a goal is identified
+    preview: Optional[str] = None  # first user message, truncated
 
 
 class ConversationListResponse(BaseModel):
@@ -90,6 +97,7 @@ class ConversationListResponse(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 19.4 — Goals
 # ─────────────────────────────────────────────────────────────────
+
 
 class GoalResponse(BaseModel):
     id: str
@@ -110,6 +118,7 @@ class GoalListResponse(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 19.5 — Tasks
 # ─────────────────────────────────────────────────────────────────
+
 
 class TaskResponse(BaseModel):
     id: str
@@ -132,6 +141,7 @@ class TaskListResponse(BaseModel):
 # 19.6 — Analytics
 # ─────────────────────────────────────────────────────────────────
 
+
 class AnalyticsOverviewResponse(BaseModel):
     streak_days: int
     today_completion_pct: float
@@ -152,6 +162,7 @@ class MissedByCatResponse(BaseModel):
 # 19.7 — Patterns
 # ─────────────────────────────────────────────────────────────────
 
+
 class PatternResponse(BaseModel):
     id: str
     pattern_type: str
@@ -170,6 +181,7 @@ class PatternPatchRequest(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 19.8 — Account
 # ─────────────────────────────────────────────────────────────────
+
 
 class AccountMeResponse(BaseModel):
     id: str
@@ -192,6 +204,7 @@ class AccountPatchRequest(BaseModel):
 # 19.9 — Phone verify
 # ─────────────────────────────────────────────────────────────────
 
+
 class PhoneVerifySendRequest(BaseModel):
     phone_number: str
 
@@ -205,6 +218,7 @@ class PhoneVerifyConfirmRequest(BaseModel):
 # 19.10 — Reschedule
 # ─────────────────────────────────────────────────────────────────
 
+
 class RescheduleRequest(BaseModel):
     message: str
 
@@ -217,6 +231,7 @@ class RescheduleConfirmRequest(BaseModel):
 # 19.12 — To-do (unscheduled task)
 # ─────────────────────────────────────────────────────────────────
 
+
 class TodoCreateRequest(BaseModel):
     title: str
     description: Optional[str] = None
@@ -226,6 +241,7 @@ class TodoCreateRequest(BaseModel):
 # 19.11 — Goal modify
 # ─────────────────────────────────────────────────────────────────
 
+
 class GoalModifyRequest(BaseModel):
     message: str
 
@@ -234,6 +250,7 @@ class GoalModifyRequest(BaseModel):
 # 19.13 — Push subscription
 # ─────────────────────────────────────────────────────────────────
 
+
 class PushSubscriptionRequest(BaseModel):
     subscription: dict  # Full PushSubscriptionJSON object from the browser
 
@@ -241,6 +258,7 @@ class PushSubscriptionRequest(BaseModel):
 # ─────────────────────────────────────────────────────────────────
 # 19.14 — Escalation policy
 # ─────────────────────────────────────────────────────────────────
+
 
 class EscalationPolicyUpdate(BaseModel):
     escalation_policy: str  # "silent" | "standard" | "aggressive"

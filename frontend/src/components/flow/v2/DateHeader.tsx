@@ -26,7 +26,12 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
-export function DateHeader({ date, greeting, selectedDate, onDateChange }: DateHeaderProps) {
+export function DateHeader({
+  date: _date,
+  greeting,
+  selectedDate,
+  onDateChange,
+}: DateHeaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
 
   const activeDate = selectedDate ?? todayString();
@@ -53,6 +58,7 @@ export function DateHeader({ date, greeting, selectedDate, onDateChange }: DateH
         )}
         <div className="flex items-center gap-2">
           <button
+            type="button"
             onClick={() => go(-1)}
             className="w-7 h-7 flex items-center justify-center rounded-full text-charcoal/50 hover:text-charcoal hover:bg-charcoal/10 active:scale-95 transition-all duration-150"
             aria-label="Previous day"
@@ -61,6 +67,7 @@ export function DateHeader({ date, greeting, selectedDate, onDateChange }: DateH
           </button>
 
           <button
+            type="button"
             onClick={() => inputRef.current?.showPicker()}
             className="text-display italic text-4xl text-charcoal leading-tight hover:text-river transition-colors duration-150"
             aria-label="Pick a date"
@@ -69,6 +76,7 @@ export function DateHeader({ date, greeting, selectedDate, onDateChange }: DateH
           </button>
 
           <button
+            type="button"
             onClick={() => go(1)}
             className="w-7 h-7 flex items-center justify-center rounded-full text-charcoal/50 hover:text-charcoal hover:bg-charcoal/10 active:scale-95 transition-all duration-150"
             aria-label="Next day"
@@ -94,6 +102,7 @@ export function DateHeader({ date, greeting, selectedDate, onDateChange }: DateH
 
         {!isToday && (
           <button
+            type="button"
             onClick={() => onDateChange?.(null)}
             className="text-xs text-river mt-1 hover:underline"
           >

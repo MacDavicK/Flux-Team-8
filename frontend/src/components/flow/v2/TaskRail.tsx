@@ -66,93 +66,93 @@ function AddTaskModal({ onClose, onSubmit }: AddTaskModalProps) {
 
   return (
     <AnimatePresence>
-      <>
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-charcoal/30 z-[70]"
-          style={{ backdropFilter: "blur(8px)" }}
-        />
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-charcoal/30 z-[70]"
+        style={{ backdropFilter: "blur(8px)" }}
+      />
 
-        {/* Sheet */}
-        <motion.div
-          initial={{ y: "100%" }}
-          animate={{ y: 0 }}
-          exit={{ y: "100%" }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed bottom-0 left-0 right-0 z-[70]"
-        >
-          <div className="glass-card rounded-b-none p-6 pb-safe">
-            {/* Header */}
-            <div className="flex items-center justify-between mb-5">
-              <p className="text-river text-sm font-semibold uppercase tracking-widest">
-                New Task
-              </p>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-2 rounded-full hover:bg-charcoal/10 transition-colors"
-              >
-                <X className="w-5 h-5 text-charcoal" />
-              </button>
-            </div>
-
-            {/* Input */}
-            <div
-              className={cn(
-                "glass-bubble p-4 border-2 transition-colors",
-                error ? "border-terracotta/60" : "border-transparent focus-within:border-sage/40",
-              )}
+      {/* Sheet */}
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed bottom-0 left-0 right-0 z-[70]"
+      >
+        <div className="glass-card rounded-b-none p-6 pb-safe">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-5">
+            <p className="text-river text-sm font-semibold uppercase tracking-widest">
+              New Task
+            </p>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-charcoal/10 transition-colors"
             >
-              <input
-                ref={inputRef}
-                value={value}
-                onChange={handleChange}
-                onKeyDown={handleKeyDown}
-                placeholder="What needs to get done?"
-                maxLength={MAX_TITLE_LENGTH + 1}
-                className="w-full bg-transparent text-sm font-medium text-charcoal placeholder-river/40 outline-none leading-relaxed"
-              />
-            </div>
+              <X className="w-5 h-5 text-charcoal" />
+            </button>
+          </div>
 
-            {/* Footer row: char count + error + submit */}
-            <div className="flex items-start justify-between mt-3">
-              <div className="flex-1 pr-4">
-                {error && (
-                  <p className="text-xs text-terracotta font-medium">{error}</p>
+          {/* Input */}
+          <div
+            className={cn(
+              "glass-bubble p-4 border-2 transition-colors",
+              error
+                ? "border-terracotta/60"
+                : "border-transparent focus-within:border-sage/40",
+            )}
+          >
+            <input
+              ref={inputRef}
+              value={value}
+              onChange={handleChange}
+              onKeyDown={handleKeyDown}
+              placeholder="What needs to get done?"
+              maxLength={MAX_TITLE_LENGTH + 1}
+              className="w-full bg-transparent text-sm font-medium text-charcoal placeholder-river/40 outline-none leading-relaxed"
+            />
+          </div>
+
+          {/* Footer row: char count + error + submit */}
+          <div className="flex items-start justify-between mt-3">
+            <div className="flex-1 pr-4">
+              {error && (
+                <p className="text-xs text-terracotta font-medium">{error}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span
+                className={cn(
+                  "text-xs font-medium",
+                  isOverLimit ? "text-terracotta" : "text-river/50",
                 )}
-              </div>
-              <div className="flex items-center gap-3 shrink-0">
-                <span
-                  className={cn(
-                    "text-xs font-medium",
-                    isOverLimit ? "text-terracotta" : "text-river/50",
-                  )}
-                >
-                  {remaining}
-                </span>
-                <motion.button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={isOverLimit || value.trim().length === 0}
-                  whileTap={{ scale: 0.95 }}
-                  className={cn(
-                    "px-5 py-2 rounded-full text-sm font-semibold transition-colors",
-                    isOverLimit || value.trim().length === 0
-                      ? "bg-river/20 text-river/40 cursor-not-allowed"
-                      : "bg-sage text-white hover:bg-sage/90",
-                  )}
-                >
-                  Add Task
-                </motion.button>
-              </div>
+              >
+                {remaining}
+              </span>
+              <motion.button
+                type="button"
+                onClick={handleSubmit}
+                disabled={isOverLimit || value.trim().length === 0}
+                whileTap={{ scale: 0.95 }}
+                className={cn(
+                  "px-5 py-2 rounded-full text-sm font-semibold transition-colors",
+                  isOverLimit || value.trim().length === 0
+                    ? "bg-river/20 text-river/40 cursor-not-allowed"
+                    : "bg-sage text-white hover:bg-sage/90",
+                )}
+              >
+                Add Task
+              </motion.button>
             </div>
           </div>
-        </motion.div>
-      </>
+        </div>
+      </motion.div>
     </AnimatePresence>
   );
 }
@@ -192,95 +192,95 @@ function AllTasksModal({ tasks, onClose, onComplete }: AllTasksModalProps) {
 
   return (
     <AnimatePresence>
-      <>
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 bg-charcoal/30 z-[70]"
-          style={{ backdropFilter: "blur(8px)" }}
-        />
+      {/* Backdrop */}
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 bg-charcoal/30 z-[70]"
+        style={{ backdropFilter: "blur(8px)" }}
+      />
 
-        {/* Sheet */}
-        <motion.div
-          initial={{ y: "100%" }}
-          animate={{ y: 0 }}
-          exit={{ y: "100%" }}
-          transition={{ type: "spring", stiffness: 300, damping: 30 }}
-          className="fixed bottom-0 left-0 right-0 z-[70] max-h-[75vh] flex flex-col"
-        >
-          <div className="glass-card rounded-b-none flex flex-col overflow-hidden">
-            {/* Header */}
-            <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
-              <div>
-                <p className="text-river text-sm font-semibold uppercase tracking-widest">
-                  All Tasks
-                </p>
-                <p className="text-xs text-river/50 mt-0.5">
-                  {incomplete.length} pending · {completed.length} done
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={onClose}
-                className="p-2 rounded-full hover:bg-charcoal/10 transition-colors"
-              >
-                <X className="w-5 h-5 text-charcoal" />
-              </button>
+      {/* Sheet */}
+      <motion.div
+        initial={{ y: "100%" }}
+        animate={{ y: 0 }}
+        exit={{ y: "100%" }}
+        transition={{ type: "spring", stiffness: 300, damping: 30 }}
+        className="fixed bottom-0 left-0 right-0 z-[70] max-h-[75vh] flex flex-col"
+      >
+        <div className="glass-card rounded-b-none flex flex-col overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-6 pt-6 pb-4 shrink-0">
+            <div>
+              <p className="text-river text-sm font-semibold uppercase tracking-widest">
+                All Tasks
+              </p>
+              <p className="text-xs text-river/50 mt-0.5">
+                {incomplete.length} pending · {completed.length} done
+              </p>
             </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-full hover:bg-charcoal/10 transition-colors"
+            >
+              <X className="w-5 h-5 text-charcoal" />
+            </button>
+          </div>
 
-            {/* List */}
-            <div className="overflow-y-auto flex-1 px-6 pb-safe">
-              {ordered.length === 0 ? (
-                <p className="text-sm text-river/50 text-center py-8">No tasks yet.</p>
-              ) : (
-                <div className="space-y-2 pb-6">
-                  {visible.map((task) => (
-                    <motion.div
-                      key={task.id}
-                      layout
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
+          {/* List */}
+          <div className="overflow-y-auto flex-1 px-6 pb-safe">
+            {ordered.length === 0 ? (
+              <p className="text-sm text-river/50 text-center py-8">
+                No tasks yet.
+              </p>
+            ) : (
+              <div className="space-y-2 pb-6">
+                {visible.map((task) => (
+                  <motion.div
+                    key={task.id}
+                    layout
+                    initial={{ opacity: 0, y: 8 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn(
+                      "flex items-center gap-3 glass-bubble px-4 py-3 rounded-2xl",
+                      task.completed && "opacity-60",
+                    )}
+                  >
+                    <button
+                      type="button"
+                      aria-label={task.completed ? "Completed" : "Mark as done"}
+                      onClick={() => !task.completed && onComplete?.(task.id)}
+                      className="shrink-0"
+                    >
+                      <div
+                        className={cn(
+                          "w-5 h-5 rounded-full border-2 transition-colors",
+                          task.completed
+                            ? "bg-sage border-sage"
+                            : "border-river hover:border-sage",
+                        )}
+                      />
+                    </button>
+                    <span
                       className={cn(
-                        "flex items-center gap-3 glass-bubble px-4 py-3 rounded-2xl",
-                        task.completed && "opacity-60",
+                        "text-sm font-medium text-charcoal leading-tight flex-1",
+                        task.completed && "line-through",
                       )}
                     >
-                      <button
-                        type="button"
-                        aria-label={task.completed ? "Completed" : "Mark as done"}
-                        onClick={() => !task.completed && onComplete?.(task.id)}
-                        className="shrink-0"
-                      >
-                        <div
-                          className={cn(
-                            "w-5 h-5 rounded-full border-2 transition-colors",
-                            task.completed
-                              ? "bg-sage border-sage"
-                              : "border-river hover:border-sage",
-                          )}
-                        />
-                      </button>
-                      <span
-                        className={cn(
-                          "text-sm font-medium text-charcoal leading-tight flex-1",
-                          task.completed && "line-through",
-                        )}
-                      >
-                        {task.title}
-                      </span>
-                    </motion.div>
-                  ))}
-                  {/* Infinite scroll sentinel */}
-                  <div ref={sentinelRef} className="h-4" />
-                </div>
-              )}
-            </div>
+                      {task.title}
+                    </span>
+                  </motion.div>
+                ))}
+                {/* Infinite scroll sentinel */}
+                <div ref={sentinelRef} className="h-4" />
+              </div>
+            )}
           </div>
-        </motion.div>
-      </>
+        </div>
+      </motion.div>
     </AnimatePresence>
   );
 }
@@ -352,7 +352,9 @@ export function TaskRail({ tasks, onComplete, onAddTodo }: TaskRailProps) {
 
           {railTasks.length === 0 && (
             <div className="flex items-center justify-center w-full h-20 mt-2">
-              <p className="text-xs text-river/40 font-medium">No pending tasks</p>
+              <p className="text-xs text-river/40 font-medium">
+                No pending tasks
+              </p>
             </div>
           )}
         </div>

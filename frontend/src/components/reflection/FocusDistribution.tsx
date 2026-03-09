@@ -24,7 +24,10 @@ const CATEGORY_COLORS: Record<string, string> = {
 
 const DEFAULT_COLOR = "#A0A89C";
 
-export function FocusDistribution({ categories = [], className }: FocusDistributionProps) {
+export function FocusDistribution({
+  categories = [],
+  className,
+}: FocusDistributionProps) {
   if (categories.length === 0) return null;
 
   return (
@@ -77,7 +80,9 @@ export function FocusDistribution({ categories = [], className }: FocusDistribut
                 className="w-3 h-3 rounded-full"
                 style={{ backgroundColor: category.color }}
               />
-              <span className="text-charcoal text-sm capitalize">{category.name}</span>
+              <span className="text-charcoal text-sm capitalize">
+                {category.name}
+              </span>
               <span className="text-river text-xs">
                 ({Math.round(category.percent)}%)
               </span>

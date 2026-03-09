@@ -1,10 +1,14 @@
 import { createFileRoute, redirect } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { CheckCircle2, Clock, Flame } from "lucide-react";
-import { BottomNav } from "~/components/navigation/BottomNav";
 import { GoalProgressCard } from "~/components/flow/v2/GoalProgressCard";
+import { BottomNav } from "~/components/navigation/BottomNav";
 import { EnergyAura } from "~/components/reflection/EnergyAura";
-import { CATEGORY_COLORS, DEFAULT_COLOR, FocusDistribution } from "~/components/reflection/FocusDistribution";
+import {
+  CATEGORY_COLORS,
+  DEFAULT_COLOR,
+  FocusDistribution,
+} from "~/components/reflection/FocusDistribution";
 import { ProfileHeader } from "~/components/reflection/ProfileHeader";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
@@ -37,9 +41,15 @@ export const Route = createFileRoute("/reflection")({
     const headers = { Authorization: `Bearer ${token}` };
 
     const [overview, weekly, missed] = await Promise.all([
-      fetch(`${backendUrl}/api/v1/analytics/overview`, { headers }).then((r) => r.ok ? r.json() : {}),
-      fetch(`${backendUrl}/api/v1/analytics/weekly`, { headers }).then((r) => r.ok ? r.json() : []),
-      fetch(`${backendUrl}/api/v1/analytics/missed-by-cat`, { headers }).then((r) => r.ok ? r.json() : []),
+      fetch(`${backendUrl}/api/v1/analytics/overview`, { headers }).then((r) =>
+        r.ok ? r.json() : {},
+      ),
+      fetch(`${backendUrl}/api/v1/analytics/weekly`, { headers }).then((r) =>
+        r.ok ? r.json() : [],
+      ),
+      fetch(`${backendUrl}/api/v1/analytics/missed-by-cat`, { headers }).then(
+        (r) => (r.ok ? r.json() : []),
+      ),
     ]);
 
     const o = overview as {
@@ -52,35 +62,53 @@ export const Route = createFileRoute("/reflection")({
 
     const energyData = (weekly as { week?: string; completed?: number }[]).map(
       (w, i) => ({
-        date: new Date(Date.now() - (6 - i) * 24 * 60 * 60 * 1000).toISOString(),
+        date: new Date(
+          Date.now() - (6 - i) * 24 * 60 * 60 * 1000,
+        ).toISOString(),
         intensity: Math.min(1, (w.completed ?? 0) / 6),
       }),
     );
 
     const byCategory = missed as { category?: string; missed_count?: number }[];
-    const totalMissed = byCategory.reduce((s, c) => s + (c.missed_count ?? 0), 0) || 1;
+    const totalMissed =
+      byCategory.reduce((s, c) => s + (c.missed_count ?? 0), 0) || 1;
     const focusCategories = byCategory
       .filter((c) => c.category)
       .map((c) => ({
-        name: c.category!,
+        name: c.category ?? "",
         count: c.missed_count ?? 0,
         percent: Math.round(((c.missed_count ?? 0) / totalMissed) * 100),
-        color: CATEGORY_COLORS[c.category!] ?? DEFAULT_COLOR,
+        color: CATEGORY_COLORS[c.category ?? ""] ?? DEFAULT_COLOR,
       }));
 
     const data = {
-      profile: user ? { id: user.id, name: user.name ?? "User", email: user.email } : null,
+      profile: user
+        ? { id: user.id, name: user.name ?? "User", email: user.email }
+        : null,
       stats: {
         title: o.week_label ?? "This Week",
         items: [
-          { icon: "check" as const, value: String(o.tasks_completed ?? 0), label: "Done" },
-          { icon: "clock" as const, value: `${o.focus_hours ?? 0}h`, label: "Focus" },
-          { icon: "flame" as const, value: String(o.streak_days ?? 0), label: "Streak" },
+          {
+            icon: "check" as const,
+            value: String(o.tasks_completed ?? 0),
+            label: "Done",
+          },
+          {
+            icon: "clock" as const,
+            value: `${o.focus_hours ?? 0}h`,
+            label: "Focus",
+          },
+          {
+            icon: "flame" as const,
+            value: String(o.streak_days ?? 0),
+            label: "Streak",
+          },
         ],
       },
       insight: {
         title: "This Week's Insight",
-        text: o.insight ?? "Keep up the great work! You're building strong habits.",
+        text:
+          o.insight ?? "Keep up the great work! You're building strong habits.",
       },
       energyData,
       focusCategories,
@@ -92,7 +120,8 @@ export const Route = createFileRoute("/reflection")({
 });
 
 function ReflectionPage() {
-  const { profile, stats, insight, energyData, focusCategories } = Route.useLoaderData();
+  const { profile, stats, insight, energyData, focusCategories } =
+    Route.useLoaderData();
 
   if (!profile) {
     return <LoadingState />;
@@ -107,7 +136,9 @@ function ReflectionPage() {
       <GoalProgressCard />
 
       <main className="px-5 space-y-6">
-        <h2 className="text-display text-2xl italic text-charcoal">Your reflection</h2>
+        <h2 className="text-display text-2xl italic text-charcoal">
+          Your reflection
+        </h2>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -156,12 +187,9 @@ function ReflectionPage() {
             <h3 className="text-display italic text-lg text-charcoal mb-2">
               {insight.title}
             </h3>
-            <p className="text-river text-sm leading-relaxed">
-              {insight.text}
-            </p>
+            <p className="text-river text-sm leading-relaxed">{insight.text}</p>
           </div>
         </motion.div>
-
       </main>
 
       <BottomNav />

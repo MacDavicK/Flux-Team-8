@@ -28,10 +28,10 @@ from app.services import scheduler_service
 logger = logging.getLogger(__name__)
 
 # Default schedule boundaries (used when user has no profile/preferences)
-_DEFAULT_SLEEP_START = time(23, 0)   # 11 PM
-_DEFAULT_SLEEP_END = time(7, 0)      # 7 AM
-_DEFAULT_WORK_START = time(9, 0)     # 9 AM
-_DEFAULT_WORK_END = time(18, 0)      # 6 PM
+_DEFAULT_SLEEP_START = time(23, 0)  # 11 PM
+_DEFAULT_SLEEP_END = time(7, 0)  # 7 AM
+_DEFAULT_WORK_START = time(9, 0)  # 9 AM
+_DEFAULT_WORK_END = time(18, 0)  # 6 PM
 _DEFAULT_WORK_DAYS = {"Mon", "Tue", "Wed", "Thu", "Fri"}
 
 # LLM rationale prompt (used when scheduler_use_llm_rationale=True)
@@ -146,12 +146,14 @@ class SchedulerAgent:
             )
             if today_slots:
                 slot = today_slots[0]
-                suggestions.append(RescheduleSuggestion(
-                    new_start=slot["start"],
-                    new_end=slot["end"],
-                    label=self._format_label(slot["start"], is_today=True),
-                    rationale=self._template_rationale(slot, is_today=True),
-                ))
+                suggestions.append(
+                    RescheduleSuggestion(
+                        new_start=slot["start"],
+                        new_end=slot["end"],
+                        label=self._format_label(slot["start"], is_today=True),
+                        rationale=self._template_rationale(slot, is_today=True),
+                    )
+                )
 
         # -- Tomorrow slots (search within tomorrow only, not day-after-tomorrow) --
         tomorrow_search_start = tomorrow_start.replace(
@@ -175,12 +177,14 @@ class SchedulerAgent:
         )
         if tomorrow_slots:
             slot = tomorrow_slots[0]
-            suggestions.append(RescheduleSuggestion(
-                new_start=slot["start"],
-                new_end=slot["end"],
-                label=self._format_label(slot["start"], is_today=False),
-                rationale=self._template_rationale(slot, is_today=False),
-            ))
+            suggestions.append(
+                RescheduleSuggestion(
+                    new_start=slot["start"],
+                    new_end=slot["end"],
+                    label=self._format_label(slot["start"], is_today=False),
+                    rationale=self._template_rationale(slot, is_today=False),
+                )
+            )
 
         # 7. Build response
         task_title = task.get("title", "Task")
@@ -217,8 +221,7 @@ class SchedulerAgent:
                     slot_start=suggestion.new_start,
                     slot_end=suggestion.new_end,
                     is_today=(
-                        suggestion.new_start.date()
-                        == datetime.now(timezone.utc).date()
+                        suggestion.new_start.date() == datetime.now(timezone.utc).date()
                     ),
                 )
                 suggestion.rationale = llm_rationale
@@ -282,8 +285,7 @@ class SchedulerAgent:
             # Score the slot
             day_name = slot_start.strftime("%a")
             is_work_time = (
-                day_name in work_days
-                and work_start <= slot_start.time() < work_end
+                day_name in work_days and work_start <= slot_start.time() < work_end
             )
 
             score = 0
@@ -298,17 +300,20 @@ class SchedulerAgent:
                 and abs(
                     self._time_to_minutes(slot_start.time())
                     - self._time_to_minutes(prefer_original_time)
-                ) <= 30
+                )
+                <= 30
             ):
                 score += 20
                 reason = "same time as originally planned"
 
-            candidates.append({
-                "start": slot_start,
-                "end": slot_end,
-                "score": score,
-                "reason": reason,
-            })
+            candidates.append(
+                {
+                    "start": slot_start,
+                    "end": slot_end,
+                    "score": score,
+                    "reason": reason,
+                }
+            )
 
             cursor += increment
 
@@ -329,8 +334,10 @@ class SchedulerAgent:
 
     @staticmethod
     def _is_during_sleep(
-        start: datetime, end: datetime,
-        sleep_start: time, sleep_end: time,
+        start: datetime,
+        end: datetime,
+        sleep_start: time,
+        sleep_end: time,
     ) -> bool:
         s = start.time()
         if sleep_start > sleep_end:
@@ -340,7 +347,8 @@ class SchedulerAgent:
 
     @staticmethod
     def _overlaps_any(
-        start: datetime, end: datetime,
+        start: datetime,
+        end: datetime,
         occupied: list[tuple[datetime, datetime]],
     ) -> bool:
         for occ_start, occ_end in occupied:

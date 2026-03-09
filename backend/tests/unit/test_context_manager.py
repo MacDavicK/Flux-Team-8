@@ -1,6 +1,7 @@
 """
 21.1.7 — Unit tests for window_conversation_history.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -23,6 +24,7 @@ async def test_no_windowing_below_limits():
         mock_settings.max_conversation_messages = 20
         mock_settings.max_conversation_tokens = 8000
         from app.services.context_manager import window_conversation_history
+
         result = await window_conversation_history(history, "user-1")
     assert result == history
 
@@ -34,14 +36,20 @@ async def test_summarization_triggers_at_message_limit():
 
     mock_summary = "Summary of earlier messages."
 
-    with patch("app.services.context_manager.settings") as mock_settings, \
-         patch("app.services.context_manager.llm_call", AsyncMock(return_value=mock_summary)), \
-         patch("app.services.context_manager.db"):
+    with (
+        patch("app.services.context_manager.settings") as mock_settings,
+        patch(
+            "app.services.context_manager.llm_call",
+            AsyncMock(return_value=mock_summary),
+        ),
+        patch("app.services.context_manager.db"),
+    ):
         mock_settings.max_conversation_messages = 20
         mock_settings.max_conversation_tokens = 8000
 
         from importlib import reload
         import app.services.context_manager as cm_module
+
         reload(cm_module)
 
         result = await cm_module.window_conversation_history(history, "user-1")
@@ -57,14 +65,20 @@ async def test_summary_is_prepended_correctly():
     history = _make_history(30)
     mock_summary = "Condensed context."
 
-    with patch("app.services.context_manager.settings") as mock_settings, \
-         patch("app.services.context_manager.llm_call", AsyncMock(return_value=mock_summary)), \
-         patch("app.services.context_manager.db"):
+    with (
+        patch("app.services.context_manager.settings") as mock_settings,
+        patch(
+            "app.services.context_manager.llm_call",
+            AsyncMock(return_value=mock_summary),
+        ),
+        patch("app.services.context_manager.db"),
+    ):
         mock_settings.max_conversation_messages = 20
         mock_settings.max_conversation_tokens = 8000
 
         from importlib import reload
         import app.services.context_manager as cm_module
+
         reload(cm_module)
 
         result = await cm_module.window_conversation_history(history, "user-1")

@@ -35,7 +35,11 @@ class DaoMessage:
         return MessageDTO.model_validate(db_obj) if db_obj else None
 
     async def get_by_conversation(
-        self, db: DatabaseSession, conversation_id: UUID, skip: int = 0, limit: int = 500
+        self,
+        db: DatabaseSession,
+        conversation_id: UUID,
+        skip: int = 0,
+        limit: int = 500,
     ) -> List[MessageDTO]:
         """Fetch messages for a conversation, ordered chronologically."""
         session: SQLAlchemyAsyncSession = db
@@ -49,10 +53,17 @@ class DaoMessage:
         result = await session.execute(stmt)
         return [MessageDTO.model_validate(r) for r in result.scalars().all()]
 
-    async def get_multi(self, db: DatabaseSession, skip: int = 0, limit: int = 100) -> List[MessageDTO]:
+    async def get_multi(
+        self, db: DatabaseSession, skip: int = 0, limit: int = 100
+    ) -> List[MessageDTO]:
         """Fetch messages with pagination."""
         session: SQLAlchemyAsyncSession = db
-        stmt = select(Message).offset(skip).limit(limit).order_by(Message.created_at.desc())
+        stmt = (
+            select(Message)
+            .offset(skip)
+            .limit(limit)
+            .order_by(Message.created_at.desc())
+        )
         result = await session.execute(stmt)
         return [MessageDTO.model_validate(r) for r in result.scalars().all()]
 
@@ -63,10 +74,14 @@ class DaoMessage:
         result = await session.execute(stmt)
         return result.scalar_one()
 
-    async def count_by_conversation(self, db: DatabaseSession, conversation_id: UUID) -> int:
+    async def count_by_conversation(
+        self, db: DatabaseSession, conversation_id: UUID
+    ) -> int:
         """Count messages for a specific conversation."""
         session: SQLAlchemyAsyncSession = db
-        stmt = select(func.count(Message.id)).where(Message.conversation_id == conversation_id)
+        stmt = select(func.count(Message.id)).where(
+            Message.conversation_id == conversation_id
+        )
         result = await session.execute(stmt)
         return result.scalar_one()
 

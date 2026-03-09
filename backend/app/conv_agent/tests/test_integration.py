@@ -117,9 +117,7 @@ async def test_close_session_updates_supabase(conv_agent_client, test_user):
             json={"session_id": session_id, "role": "user", "content": content},
         )
 
-    close_resp = await conv_agent_client.delete(
-        f"/api/v1/voice/session/{session_id}"
-    )
+    close_resp = await conv_agent_client.delete(f"/api/v1/voice/session/{session_id}")
     assert close_resp.status_code == 200
     data = close_resp.json()
     assert data["status"] == "closed"

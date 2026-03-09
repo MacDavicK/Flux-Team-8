@@ -1,4 +1,4 @@
-import { motion, AnimatePresence } from "framer-motion";
+import { AnimatePresence, motion } from "framer-motion";
 import { Check, Pencil, X } from "lucide-react";
 import { useState } from "react";
 import { cn } from "~/utils/cn";
@@ -70,7 +70,6 @@ export function EditField({
             className="flex items-center gap-2"
           >
             <input
-              autoFocus
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => {
@@ -117,7 +116,8 @@ export function EditField({
               "w-full flex items-center justify-between",
               "glass-bubble px-4 py-2.5 text-left",
               "transition-all duration-200",
-              !disabled && "hover:bg-white/30 active:scale-[0.98] cursor-pointer",
+              !disabled &&
+                "hover:bg-white/30 active:scale-[0.98] cursor-pointer",
               disabled && "opacity-60 cursor-default",
             )}
           >

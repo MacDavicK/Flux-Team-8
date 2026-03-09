@@ -35,7 +35,9 @@ export function TasksView({ tasks, onConfirm }: TasksViewProps) {
           >
             <p className="text-sm font-semibold text-charcoal">{task.title}</p>
             {task.description && (
-              <p className="text-xs text-river/65 mt-0.5 leading-relaxed">{task.description}</p>
+              <p className="text-xs text-river/65 mt-0.5 leading-relaxed">
+                {task.description}
+              </p>
             )}
             <div className="flex flex-wrap gap-2 mt-2">
               {task.scheduled_days.length > 0 && (

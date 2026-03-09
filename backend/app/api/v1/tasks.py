@@ -7,6 +7,7 @@ PATCH /api/v1/tasks/{task_id}/complete         — Mark task done; check goal co
 PATCH /api/v1/tasks/{task_id}/missed           — Mark task missed; fire pattern observer async.
 PATCH /api/v1/tasks/{task_id}/reschedule-confirm — Confirm a reschedule slot.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -18,7 +19,12 @@ from fastapi import APIRouter, Depends, HTTPException
 
 from app.agents.graph import compiled_graph
 from app.middleware.auth import get_current_user
-from app.models.api_schemas import EscalationPolicyUpdate, OnboardingOptionSchema, RescheduleConfirmRequest, TodoCreateRequest
+from app.models.api_schemas import (
+    EscalationPolicyUpdate,
+    OnboardingOptionSchema,
+    RescheduleConfirmRequest,
+    TodoCreateRequest,
+)
 from app.services.recurrence import advance_recurring_task
 from app.services.supabase import db
 
@@ -45,17 +51,23 @@ async def get_tasks(
 
     try:
         import zoneinfo
+
         user_tz = zoneinfo.ZoneInfo(tz_name)
     except Exception:
         import zoneinfo
+
         user_tz = zoneinfo.ZoneInfo("UTC")
 
     if date:
         try:
             parsed = datetime.strptime(date, "%Y-%m-%d")
-            start_of_today = datetime(parsed.year, parsed.month, parsed.day, tzinfo=user_tz)
+            start_of_today = datetime(
+                parsed.year, parsed.month, parsed.day, tzinfo=user_tz
+            )
         except ValueError:
-            raise HTTPException(status_code=422, detail="Invalid date format; expected YYYY-MM-DD")
+            raise HTTPException(
+                status_code=422, detail="Invalid date format; expected YYYY-MM-DD"
+            )
     else:
         now_user = datetime.now(user_tz)
         start_of_today = now_user.replace(hour=0, minute=0, second=0, microsecond=0)
@@ -102,7 +114,9 @@ async def get_tasks(
             user_uuid,
         )
 
-    return [_serialize_task(row) for row in scheduled_rows] + [_serialize_task(row) for row in todo_rows]
+    return [_serialize_task(row) for row in scheduled_rows] + [
+        _serialize_task(row) for row in todo_rows
+    ]
 
 
 @router.post("/todo")
@@ -235,7 +249,9 @@ async def update_escalation_policy(
     """17.3.6 — Update the escalation policy for a task (silent | standard | aggressive)."""
     valid = {"silent", "standard", "aggressive"}
     if body.escalation_policy not in valid:
-        raise HTTPException(status_code=422, detail=f"escalation_policy must be one of {sorted(valid)}")
+        raise HTTPException(
+            status_code=422, detail=f"escalation_policy must be one of {sorted(valid)}"
+        )
 
     user_id = str(current_user["sub"])
     user_uuid = uuid.UUID(user_id)
@@ -278,9 +294,13 @@ async def reschedule_confirm(
     task_uuid = uuid.UUID(task_id)
 
     try:
-        scheduled_at_dt = datetime.fromisoformat(body.scheduled_at.replace("Z", "+00:00"))
+        scheduled_at_dt = datetime.fromisoformat(
+            body.scheduled_at.replace("Z", "+00:00")
+        )
     except ValueError:
-        raise HTTPException(status_code=422, detail="Invalid scheduled_at format; expected ISO 8601")
+        raise HTTPException(
+            status_code=422, detail="Invalid scheduled_at format; expected ISO 8601"
+        )
 
     if task["goal_id"] is None:
         # Silent task (no goal) — mutate in place; no new row needed.
@@ -394,7 +414,9 @@ async def _compute_simple_reschedule_slots(
         cand_end = candidate.add(minutes=duration)
         for b_start, b_end in busy_intervals:
             # 15-minute buffer
-            if candidate < b_end.add(minutes=15) and cand_end > b_start.subtract(minutes=15):
+            if candidate < b_end.add(minutes=15) and cand_end > b_start.subtract(
+                minutes=15
+            ):
                 return True
         return False
 
@@ -406,20 +428,24 @@ async def _compute_simple_reschedule_slots(
     end_of_today = now_local.end_of("day")
     while candidate <= end_of_today and len(slots) < 5:
         if not _overlaps(candidate):
-            slots.append({
-                "scheduled_at": candidate.in_timezone("UTC").isoformat(),
-                "label": candidate.format("ddd, MMM D [at] h:mm A"),
-            })
+            slots.append(
+                {
+                    "scheduled_at": candidate.in_timezone("UTC").isoformat(),
+                    "label": candidate.format("ddd, MMM D [at] h:mm A"),
+                }
+            )
         candidate = candidate.add(hours=1)
 
     # --- Tomorrow, same time ---
     tomorrow_same = tomorrow_local.replace(
         hour=original_hour, minute=original_minute, second=0, microsecond=0
     )
-    slots.append({
-        "scheduled_at": tomorrow_same.in_timezone("UTC").isoformat(),
-        "label": f"Tomorrow at {tomorrow_same.format('h:mm A')}",
-    })
+    slots.append(
+        {
+            "scheduled_at": tomorrow_same.in_timezone("UTC").isoformat(),
+            "label": f"Tomorrow at {tomorrow_same.format('h:mm A')}",
+        }
+    )
 
     return slots
 
@@ -444,16 +470,20 @@ def _build_slot_options(
         except Exception:
             label = raw_at
 
-        options.append(OnboardingOptionSchema(
-            label=label,
-            value=raw_at,  # ISO UTC — backend uses this to update scheduled_at
-        ))
+        options.append(
+            OnboardingOptionSchema(
+                label=label,
+                value=raw_at,  # ISO UTC — backend uses this to update scheduled_at
+            )
+        )
 
-    options.append(OnboardingOptionSchema(
-        label="Pick a date & time",
-        value=None,
-        input_type="datetime",
-    ))
+    options.append(
+        OnboardingOptionSchema(
+            label="Pick a date & time",
+            value=None,
+            input_type="datetime",
+        )
+    )
 
     return options
 
@@ -461,6 +491,7 @@ def _build_slot_options(
 # ─────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────
+
 
 async def _fetch_task_or_404(task_id: str, user_id: str) -> dict:
     try:

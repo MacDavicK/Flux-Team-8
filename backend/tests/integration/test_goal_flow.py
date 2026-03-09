@@ -3,6 +3,7 @@
 
 Submit goal → plan returned → approve → tasks written to DB.
 """
+
 from __future__ import annotations
 
 import uuid
@@ -15,10 +16,12 @@ from fastapi.testclient import TestClient
 def chat_client():
     from fastapi import FastAPI
     from app.api.v1.chat import router
+
     app = FastAPI()
     app.include_router(router)
 
     from app.middleware.auth import get_current_user
+
     mock_user = MagicMock()
     mock_user.id = "test-user-uuid"
     app.dependency_overrides[get_current_user] = lambda: mock_user
@@ -46,14 +49,20 @@ async def test_goal_submission_returns_plan(chat_client):
         },
     }
 
-    with patch("app.api.v1.chat.db") as mock_db, \
-         patch("app.api.v1.chat.compiled_graph") as mock_graph, \
-         patch("app.api.v1.chat.window_conversation_history", AsyncMock(side_effect=lambda h, uid, cid=None: h)):
-
-        mock_db.fetchrow = AsyncMock(side_effect=[
-            {"id": conv_id, "langgraph_thread_id": thread_id},
-            {"profile": {}, "timezone": "UTC"},
-        ])
+    with (
+        patch("app.api.v1.chat.db") as mock_db,
+        patch("app.api.v1.chat.compiled_graph") as mock_graph,
+        patch(
+            "app.api.v1.chat.window_conversation_history",
+            AsyncMock(side_effect=lambda h, uid, cid=None: h),
+        ),
+    ):
+        mock_db.fetchrow = AsyncMock(
+            side_effect=[
+                {"id": conv_id, "langgraph_thread_id": thread_id},
+                {"profile": {}, "timezone": "UTC"},
+            ]
+        )
         mock_db.fetch = AsyncMock(return_value=[])
         mock_db.execute = AsyncMock(return_value="OK")
         mock_graph.ainvoke = AsyncMock(return_value=mock_graph_result)
@@ -90,18 +99,34 @@ async def test_goal_approval_triggers_task_writes(chat_client):
         "saved_task_ids": [str(task1_id), str(task2_id)],
     }
 
-    with patch("app.api.v1.chat.db") as mock_db, \
-         patch("app.api.v1.chat.compiled_graph") as mock_graph, \
-         patch("app.api.v1.chat.window_conversation_history", AsyncMock(side_effect=lambda h, uid, cid=None: h)):
-
-        mock_db.fetchrow = AsyncMock(side_effect=[
-            {"id": conv_id, "langgraph_thread_id": thread_id},
-            {"profile": {}, "timezone": "UTC"},
-        ])
-        mock_db.fetch = AsyncMock(return_value=[
-            {"role": "user", "content": "I want to run a 5k", "created_at": "2024-01-01T00:00:00Z"},
-            {"role": "assistant", "content": "Here's a plan...", "created_at": "2024-01-01T00:00:01Z"},
-        ])
+    with (
+        patch("app.api.v1.chat.db") as mock_db,
+        patch("app.api.v1.chat.compiled_graph") as mock_graph,
+        patch(
+            "app.api.v1.chat.window_conversation_history",
+            AsyncMock(side_effect=lambda h, uid, cid=None: h),
+        ),
+    ):
+        mock_db.fetchrow = AsyncMock(
+            side_effect=[
+                {"id": conv_id, "langgraph_thread_id": thread_id},
+                {"profile": {}, "timezone": "UTC"},
+            ]
+        )
+        mock_db.fetch = AsyncMock(
+            return_value=[
+                {
+                    "role": "user",
+                    "content": "I want to run a 5k",
+                    "created_at": "2024-01-01T00:00:00Z",
+                },
+                {
+                    "role": "assistant",
+                    "content": "Here's a plan...",
+                    "created_at": "2024-01-01T00:00:01Z",
+                },
+            ]
+        )
         mock_db.execute = AsyncMock(return_value="OK")
         mock_graph.ainvoke = AsyncMock(return_value=mock_graph_result)
 
@@ -133,22 +158,31 @@ async def test_goal_flow_reuses_existing_conversation(chat_client):
         "goal_draft": None,
     }
 
-    with patch("app.api.v1.chat.db") as mock_db, \
-         patch("app.api.v1.chat.compiled_graph") as mock_graph, \
-         patch("app.api.v1.chat.window_conversation_history", AsyncMock(side_effect=lambda h, uid, cid=None: h)):
-
+    with (
+        patch("app.api.v1.chat.db") as mock_db,
+        patch("app.api.v1.chat.compiled_graph") as mock_graph,
+        patch(
+            "app.api.v1.chat.window_conversation_history",
+            AsyncMock(side_effect=lambda h, uid, cid=None: h),
+        ),
+    ):
         # fetchrow returns the existing conversation (not a new insert)
-        mock_db.fetchrow = AsyncMock(side_effect=[
-            {"id": conv_id, "langgraph_thread_id": thread_id},
-            {"profile": {}, "timezone": "UTC"},
-        ])
+        mock_db.fetchrow = AsyncMock(
+            side_effect=[
+                {"id": conv_id, "langgraph_thread_id": thread_id},
+                {"profile": {}, "timezone": "UTC"},
+            ]
+        )
         mock_db.fetch = AsyncMock(return_value=[])
         mock_db.execute = AsyncMock(return_value="OK")
         mock_graph.ainvoke = AsyncMock(return_value=mock_graph_result)
 
         response = chat_client.post(
             "/chat/message",
-            json={"message": "Can you adjust my schedule?", "conversation_id": str(conv_id)},
+            json={
+                "message": "Can you adjust my schedule?",
+                "conversation_id": str(conv_id),
+            },
         )
 
     assert response.status_code == 200

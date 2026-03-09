@@ -101,13 +101,16 @@ def test_app_starts_when_scrum_router_raises_value_error(monkeypatch):
     That ValueError propagated through the old 'except ImportError' block,
     crashing the entire app startup.
     """
+
     # Inject a fake scrum module that raises ValueError on import (simulates
     # PushNotificationService requiring VAPID keys that aren't configured).
     def make_bad_module(name: str) -> types.ModuleType:
-        mod = types.ModuleType(name)
+        types.ModuleType(name)
         raise ValueError(f"VAPID keys not configured (simulated in {name})")
 
-    original_import = __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
+    original_import = (
+        __builtins__.__import__ if hasattr(__builtins__, "__import__") else __import__
+    )
 
     def patched_import(name, *args, **kwargs):
         if name in (
@@ -122,11 +125,15 @@ def test_app_starts_when_scrum_router_raises_value_error(monkeypatch):
     sys.modules.pop("app.main", None)
 
     import builtins
+
     monkeypatch.setattr(builtins, "__import__", patched_import)
 
     # Should not raise — the app must start gracefully.
     try:
         import app.main as main_module  # noqa: F401
-        assert hasattr(main_module, "app"), "app.main must expose a FastAPI 'app' object"
+
+        assert hasattr(main_module, "app"), (
+            "app.main must expose a FastAPI 'app' object"
+        )
     finally:
         sys.modules.pop("app.main", None)

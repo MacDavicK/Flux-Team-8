@@ -1,7 +1,10 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { useState } from "react";
 import { X } from "lucide-react";
-import type { GoalClarifierAnswer, GoalClarifierQuestion } from "~/types/message";
+import { useState } from "react";
+import type {
+  GoalClarifierAnswer,
+  GoalClarifierQuestion,
+} from "~/types/message";
 import { cn } from "~/utils/cn";
 
 interface GoalClarifierViewProps {
@@ -15,7 +18,12 @@ interface GoalClarifierViewProps {
  * Bottom sheet that steps through goal clarifier questions one-by-one.
  * Collects all answers locally, then calls onSubmit with the full batch.
  */
-export function GoalClarifierView({ questions, onSubmit, onDismiss, disabled }: GoalClarifierViewProps) {
+export function GoalClarifierView({
+  questions,
+  onSubmit,
+  onDismiss,
+  disabled,
+}: GoalClarifierViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<GoalClarifierAnswer[]>([]);
   const [customValue, setCustomValue] = useState("");
@@ -156,9 +164,12 @@ export function GoalClarifierView({ questions, onSubmit, onDismiss, disabled }: 
                     onKeyDown={(e) => {
                       if (e.key === "Enter") handleCustomSubmit();
                     }}
-                    placeholder={current.options.length > 0 ? "Or type your own…" : "Type your answer…"}
+                    placeholder={
+                      current.options.length > 0
+                        ? "Or type your own…"
+                        : "Type your answer…"
+                    }
                     disabled={disabled}
-                    autoFocus={current.options.length === 0}
                     className={cn(
                       "flex-1 px-3 py-2.5 text-sm rounded-xl border bg-white text-charcoal",
                       "placeholder:text-river/50 outline-none transition-colors",

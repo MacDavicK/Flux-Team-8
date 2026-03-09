@@ -1,4 +1,5 @@
 """Webhooks API endpoints — §17.7"""
+
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -25,7 +26,9 @@ async def validate_twilio_signature(request: Request) -> dict:
 
 
 @router.post("/twilio/whatsapp")
-async def twilio_whatsapp_webhook(params: dict = Depends(validate_twilio_signature)) -> Response:
+async def twilio_whatsapp_webhook(
+    params: dict = Depends(validate_twilio_signature),
+) -> Response:
     """17.7.2 — Parse WhatsApp reply and update task status."""
     body_text = (params.get("Body") or "").strip().lower()
     sender_phone = params.get("WaId") or params.get("From", "").replace("whatsapp:", "")
@@ -63,7 +66,10 @@ async def twilio_whatsapp_webhook(params: dict = Depends(validate_twilio_signatu
     response_label: str
 
     if body_text in ("1", "done"):
-        await db.execute("UPDATE tasks SET status = 'done', completed_at = now() WHERE id = $1", task_id)
+        await db.execute(
+            "UPDATE tasks SET status = 'done', completed_at = now() WHERE id = $1",
+            task_id,
+        )
         response_label = "done"
         twiml.message("Great work! Task marked as done.")
     elif body_text in ("2", "reschedule"):
@@ -79,14 +85,17 @@ async def twilio_whatsapp_webhook(params: dict = Depends(validate_twilio_signatu
 
     await db.execute(
         "UPDATE notification_log SET response = $2, responded_at = now() WHERE external_id = $1 AND channel = 'whatsapp'",
-        message_sid, response_label,
+        message_sid,
+        response_label,
     )
 
     return Response(content=str(twiml), media_type="application/xml")
 
 
 @router.post("/twilio/voice")
-async def twilio_voice_webhook(task_id: str = Query(...), params: dict = Depends(validate_twilio_signature)) -> Response:
+async def twilio_voice_webhook(
+    task_id: str = Query(...), params: dict = Depends(validate_twilio_signature)
+) -> Response:
     """17.7.3 — Parse DTMF digits and update task status."""
     digits = (params.get("Digits") or "").strip()
     call_sid = params.get("CallSid", "")
@@ -105,7 +114,10 @@ async def twilio_voice_webhook(task_id: str = Query(...), params: dict = Depends
 
     response_label: str
     if digits == "1":
-        await db.execute("UPDATE tasks SET status = 'done', completed_at = now() WHERE id = $1", task_id)
+        await db.execute(
+            "UPDATE tasks SET status = 'done', completed_at = now() WHERE id = $1",
+            task_id,
+        )
         response_label = "done"
     elif digits == "2":
         response_label = "reschedule"
@@ -117,7 +129,8 @@ async def twilio_voice_webhook(task_id: str = Query(...), params: dict = Depends
 
     await db.execute(
         "UPDATE notification_log SET response = $2, responded_at = now() WHERE external_id = $1 AND channel = 'call'",
-        call_sid, response_label,
+        call_sid,
+        response_label,
     )
 
     twiml.say("Thank you. Goodbye.")

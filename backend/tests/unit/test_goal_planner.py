@@ -1,6 +1,7 @@
 """
 21.1.2 — Unit tests for goal_planner_node.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -10,14 +11,21 @@ from unittest.mock import AsyncMock, patch
 def _make_state():
     return {
         "user_id": "test-user-id",
-        "conversation_history": [{"role": "user", "content": "I want to run a 5K in 6 weeks"}],
+        "conversation_history": [
+            {"role": "user", "content": "I want to run a 5K in 6 weeks"}
+        ],
         "intent": "GOAL",
         "user_profile": {"timezone": "UTC"},
         "goal_draft": {"title": "Run a 5K"},
         "proposed_tasks": None,
         "classifier_output": {"tags": ["fitness", "health"]},
         "scheduler_output": {"slots": [], "conflicts": []},
-        "pattern_output": {"best_times": ["07:00"], "avoid_slots": [], "category_performance": [], "general_notes": ""},
+        "pattern_output": {
+            "best_times": ["07:00"],
+            "avoid_slots": [],
+            "category_performance": [],
+            "general_notes": "",
+        },
         "approval_status": None,
         "error": None,
         "token_usage": {},
@@ -47,18 +55,29 @@ async def test_goal_planner_returns_plan_summary():
         approval_status="pending",
     )
 
-    with patch("app.agents.goal_planner.validated_llm_call", AsyncMock(return_value=mock_output)), \
-         patch("app.agents.goal_planner.check_token_budget", AsyncMock(return_value="ok")), \
-         patch("app.agents.goal_planner.db"):
-
+    with (
+        patch(
+            "app.agents.goal_planner.validated_llm_call",
+            AsyncMock(return_value=mock_output),
+        ),
+        patch(
+            "app.agents.goal_planner.check_token_budget", AsyncMock(return_value="ok")
+        ),
+        patch("app.agents.goal_planner.db"),
+    ):
         from app.agents.goal_planner import goal_planner_node
+
         result = await goal_planner_node(_make_state())
 
     assert result["approval_status"] == "pending"
     # The plan summary should appear in conversation history
     history = result.get("conversation_history", [])
     assistant_msgs = [m for m in history if m.get("role") == "assistant"]
-    assert any("running" in m.get("content", "").lower() or "plan" in m.get("content", "").lower() for m in assistant_msgs)
+    assert any(
+        "running" in m.get("content", "").lower()
+        or "plan" in m.get("content", "").lower()
+        for m in assistant_msgs
+    )
 
 
 @pytest.mark.asyncio
@@ -69,8 +88,12 @@ async def test_milestone_decomposition_when_not_feasible():
     mock_output = GoalPlannerOutput(
         goal_feasible_in_6_weeks=False,
         milestone_roadmap=[
-            Milestone(title="Phase 1: Foundation", description="Build base", pipeline_order=1),
-            Milestone(title="Phase 2: Build", description="Increase mileage", pipeline_order=2),
+            Milestone(
+                title="Phase 1: Foundation", description="Build base", pipeline_order=1
+            ),
+            Milestone(
+                title="Phase 2: Build", description="Increase mileage", pipeline_order=2
+            ),
         ],
         proposed_tasks=[
             ProposedTask(
@@ -87,13 +110,21 @@ async def test_milestone_decomposition_when_not_feasible():
         approval_status="pending",
     )
 
-    with patch("app.agents.goal_planner.validated_llm_call", AsyncMock(return_value=mock_output)), \
-         patch("app.agents.goal_planner.check_token_budget", AsyncMock(return_value="ok")), \
-         patch("app.agents.goal_planner.db") as mock_db:
+    with (
+        patch(
+            "app.agents.goal_planner.validated_llm_call",
+            AsyncMock(return_value=mock_output),
+        ),
+        patch(
+            "app.agents.goal_planner.check_token_budget", AsyncMock(return_value="ok")
+        ),
+        patch("app.agents.goal_planner.db") as mock_db,
+    ):
         mock_db.execute = AsyncMock()
         mock_db.fetchrow = AsyncMock(return_value=None)
 
         from app.agents.goal_planner import goal_planner_node
+
         result = await goal_planner_node(_make_state())
 
     assert result["approval_status"] == "pending"

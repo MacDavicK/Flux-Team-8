@@ -13,8 +13,12 @@ interface MilestoneRoadmapViewProps {
   milestones: RoadmapMilestone[];
 }
 
-export function MilestoneRoadmapView({ milestones }: MilestoneRoadmapViewProps) {
-  const sorted = [...milestones].sort((a, b) => a.pipeline_order - b.pipeline_order);
+export function MilestoneRoadmapView({
+  milestones,
+}: MilestoneRoadmapViewProps) {
+  const sorted = [...milestones].sort(
+    (a, b) => a.pipeline_order - b.pipeline_order,
+  );
 
   return (
     <div className="space-y-4 my-4">
@@ -24,9 +28,9 @@ export function MilestoneRoadmapView({ milestones }: MilestoneRoadmapViewProps) 
       </div>
 
       <p className="text-sm text-river/70 leading-relaxed">
-        Your goal is ambitious — we've broken it into milestones so each step feels
-        achievable and sustainable. We'll start with the first milestone, and when
-        you're ready, Flux will guide you through the next one.
+        Your goal is ambitious — we've broken it into milestones so each step
+        feels achievable and sustainable. We'll start with the first milestone,
+        and when you're ready, Flux will guide you through the next one.
       </p>
 
       <div className="space-y-3">
@@ -72,15 +76,29 @@ export function MilestoneRoadmapView({ milestones }: MilestoneRoadmapViewProps) 
                       isFirst ? "text-sage" : "text-river/50",
                     )}
                   >
-                    {isFirst ? "Starting here" : `Milestone ${ms.pipeline_order}`}
+                    {isFirst
+                      ? "Starting here"
+                      : `Milestone ${ms.pipeline_order}`}
                   </span>
-                  <span className="text-xs text-river/50">{ms.target_weeks} weeks</span>
+                  <span className="text-xs text-river/50">
+                    {ms.target_weeks} weeks
+                  </span>
                 </div>
-                <p className={cn("text-sm font-semibold", isFirst ? "text-charcoal" : "text-river/60")}>
+                <p
+                  className={cn(
+                    "text-sm font-semibold",
+                    isFirst ? "text-charcoal" : "text-river/60",
+                  )}
+                >
                   {ms.title}
                 </p>
                 {ms.description && (
-                  <p className={cn("text-xs mt-0.5 leading-relaxed", isFirst ? "text-river/70" : "text-river/40")}>
+                  <p
+                    className={cn(
+                      "text-xs mt-0.5 leading-relaxed",
+                      isFirst ? "text-river/70" : "text-river/40",
+                    )}
+                  >
                     {ms.description}
                   </p>
                 )}

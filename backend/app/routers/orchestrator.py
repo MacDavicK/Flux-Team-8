@@ -42,9 +42,7 @@ from app.routers.scheduler import (
 
 router = APIRouter(prefix="/orchestrator", tags=["orchestrator"])
 
-_orchestrator = OrchestratorAgent(
-    use_langgraph=settings.use_langgraph_orchestrator
-)
+_orchestrator = OrchestratorAgent(use_langgraph=settings.use_langgraph_orchestrator)
 
 
 @router.get("/mode")
@@ -82,9 +80,13 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
 
         if decision.intent == OrchestratorIntent.VOICE_SAVE_MESSAGE:
             if not body.session_id:
-                raise HTTPException(status_code=400, detail="session_id required for voice save_message")
+                raise HTTPException(
+                    status_code=400, detail="session_id required for voice save_message"
+                )
             if not body.role:
-                raise HTTPException(status_code=400, detail="role required for voice save_message")
+                raise HTTPException(
+                    status_code=400, detail="role required for voice save_message"
+                )
             payload = await voice_save_message(
                 SaveMessageRequest(
                     session_id=body.session_id,
@@ -103,7 +105,9 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
 
         if decision.intent == OrchestratorIntent.VOICE_GET_MESSAGES:
             if not body.session_id:
-                raise HTTPException(status_code=400, detail="session_id required for voice get_messages")
+                raise HTTPException(
+                    status_code=400, detail="session_id required for voice get_messages"
+                )
             payload = await voice_get_session_messages(body.session_id)
             data = payload.model_dump(mode="json")
             return OrchestratorMessageResponse(
@@ -116,11 +120,20 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
 
         if decision.intent == OrchestratorIntent.VOICE_PROCESS_INTENT:
             if not body.session_id:
-                raise HTTPException(status_code=400, detail="session_id required for voice process_intent")
+                raise HTTPException(
+                    status_code=400,
+                    detail="session_id required for voice process_intent",
+                )
             if not body.function_call_id:
-                raise HTTPException(status_code=400, detail="function_call_id required for voice process_intent")
+                raise HTTPException(
+                    status_code=400,
+                    detail="function_call_id required for voice process_intent",
+                )
             if not body.function_name:
-                raise HTTPException(status_code=400, detail="function_name required for voice process_intent")
+                raise HTTPException(
+                    status_code=400,
+                    detail="function_name required for voice process_intent",
+                )
 
             payload = await voice_process_intent(
                 SubmitIntentRequest(
@@ -141,7 +154,10 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
 
         if decision.intent == OrchestratorIntent.VOICE_CLOSE_SESSION:
             if not body.session_id:
-                raise HTTPException(status_code=400, detail="session_id required for voice close_session")
+                raise HTTPException(
+                    status_code=400,
+                    detail="session_id required for voice close_session",
+                )
             payload = await voice_close_session(body.session_id)
             data = payload.model_dump(mode="json")
             return OrchestratorMessageResponse(
@@ -165,7 +181,8 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
                 goal_id=goal.goal_id,
                 suggested_action=goal.suggested_action,
                 proposed_plan=goal.plan,
-                requires_user_action=goal.state == ConversationState.AWAITING_CONFIRMATION,
+                requires_user_action=goal.state
+                == ConversationState.AWAITING_CONFIRMATION,
             )
 
         if decision.intent == OrchestratorIntent.CONTINUE_GOAL:
@@ -184,7 +201,8 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
                 goal_id=goal.goal_id,
                 suggested_action=goal.suggested_action,
                 proposed_plan=goal.plan,
-                requires_user_action=goal.state == ConversationState.AWAITING_CONFIRMATION,
+                requires_user_action=goal.state
+                == ConversationState.AWAITING_CONFIRMATION,
             )
 
         if decision.intent == OrchestratorIntent.LIST_TASKS:
@@ -202,9 +220,14 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
             )
 
         if decision.intent == OrchestratorIntent.SUGGEST_RESCHEDULE:
-            event_id = body.event_id or _orchestrator.extract_event_id(body.message.lower())
+            event_id = body.event_id or _orchestrator.extract_event_id(
+                body.message.lower()
+            )
             if not event_id:
-                raise HTTPException(status_code=400, detail="event_id required for reschedule suggestions")
+                raise HTTPException(
+                    status_code=400,
+                    detail="event_id required for reschedule suggestions",
+                )
             suggestion = await suggest_reschedule(
                 SchedulerSuggestRequest(event_id=event_id)
             )
@@ -216,9 +239,13 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
             )
 
         if decision.intent == OrchestratorIntent.APPLY_RESCHEDULE:
-            event_id = body.event_id or _orchestrator.extract_event_id(body.message.lower())
+            event_id = body.event_id or _orchestrator.extract_event_id(
+                body.message.lower()
+            )
             if not event_id:
-                raise HTTPException(status_code=400, detail="event_id required for apply action")
+                raise HTTPException(
+                    status_code=400, detail="event_id required for apply action"
+                )
 
             action = body.action
             if not action:
@@ -248,4 +275,6 @@ async def orchestrate_message(body: OrchestratorMessageRequest):
     except HTTPException:
         raise
     except Exception as exc:
-        raise HTTPException(status_code=500, detail=f"Orchestration failed: {exc}") from exc
+        raise HTTPException(
+            status_code=500, detail=f"Orchestration failed: {exc}"
+        ) from exc

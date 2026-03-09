@@ -27,8 +27,8 @@ from app.agents.orchestrator import orchestrator_node
 from app.agents.pattern_observer import pattern_observer_node
 from app.agents.scheduler import scheduler_node
 from app.agents.state import AgentState
-from app.agents.task_handler import task_handler_node   # 11.1
-from app.agents.save_tasks import save_tasks_node       # 11.2
+from app.agents.task_handler import task_handler_node  # 11.1
+from app.agents.save_tasks import save_tasks_node  # 11.2
 from app.agents.goal_modifier import goal_modifier_node  # 11.3
 from app.config import settings
 
@@ -47,12 +47,10 @@ async def chitchat_node(state: AgentState) -> dict:
     reply = (
         "Hi there! I'm Flux, your personal goal and task assistant. "
         "I can help you set goals, break them into actionable tasks, and keep you on track. "
-        "Try telling me something like \"I want to run a 5K\" or \"Remind me to drink water every morning\"."
+        'Try telling me something like "I want to run a 5K" or "Remind me to drink water every morning".'
     )
     return {
-        "conversation_history": history + [
-            {"role": "assistant", "content": reply}
-        ],
+        "conversation_history": history + [{"role": "assistant", "content": reply}],
         "intent": None,
     }
 
@@ -61,12 +59,13 @@ async def clarify_node(state: AgentState) -> dict:
     """
     Asks a clarifying question and loops back to the orchestrator (10.4).
     """
-    question = state.get("clarification_question") or "Could you give me a bit more detail? For example, a specific time or what you'd like to achieve."
+    question = (
+        state.get("clarification_question")
+        or "Could you give me a bit more detail? For example, a specific time or what you'd like to achieve."
+    )
     history = list(state.get("conversation_history") or [])
     return {
-        "conversation_history": history + [
-            {"role": "assistant", "content": question}
-        ],
+        "conversation_history": history + [{"role": "assistant", "content": question}],
         "intent": None,
     }
 
@@ -81,12 +80,20 @@ def route_from_orchestrator(state: AgentState) -> str:
     approval = state.get("approval_status") or ""
 
     # User just approved — ask when they want to start before saving tasks.
-    if approval == "approved" and state.get("proposed_tasks") and not state.get("goal_start_date"):
+    if (
+        approval == "approved"
+        and state.get("proposed_tasks")
+        and not state.get("goal_start_date")
+    ):
         return "ask_start_date"
 
     # User answered the start-date question — re-run scheduler with the new
     # start date, then save tasks.
-    if approval == "approved" and state.get("proposed_tasks") and state.get("goal_start_date"):
+    if (
+        approval == "approved"
+        and state.get("proposed_tasks")
+        and state.get("goal_start_date")
+    ):
         return "reschedule"
 
     intent = state.get("intent") or ""
@@ -100,14 +107,14 @@ def route_from_orchestrator(state: AgentState) -> str:
             return "goal_planner"
 
     return {
-        "ONBOARDING":     "onboarding",
-        "GOAL":           "goal_clarifier",  # always goes through clarifier first
-        "GOAL_CLARIFY":   "goal_clarifier",  # frontend submitted answers batch
-        "NEW_TASK":       "task_handler",
-        "MODIFY_GOAL":    "goal_modifier",
-        "NEXT_MILESTONE": "goal_planner",    # milestone skips clarifier
-        "CHITCHAT":       "chitchat",
-        "CLARIFY":        "clarify",
+        "ONBOARDING": "onboarding",
+        "GOAL": "goal_clarifier",  # always goes through clarifier first
+        "GOAL_CLARIFY": "goal_clarifier",  # frontend submitted answers batch
+        "NEW_TASK": "task_handler",
+        "MODIFY_GOAL": "goal_modifier",
+        "NEXT_MILESTONE": "goal_planner",  # milestone skips clarifier
+        "CHITCHAT": "chitchat",
+        "CLARIFY": "clarify",
     }.get(intent, "chitchat")
 
 
@@ -152,27 +159,36 @@ def route_from_goal_planner(state: AgentState) -> str | list[Send]:
         token_usage = state.get("token_usage") or {}
 
         return [
-            Send("classifier", {
-                "user_id": user_id,
-                "goal_draft": goal_draft,
-                "user_profile": user_profile,
-                "conversation_history": conv_history,
-                "token_usage": token_usage,
-            }),
-            Send("scheduler", {
-                "user_id": user_id,
-                "goal_draft": goal_draft,
-                "user_profile": user_profile,
-                "conversation_history": conv_history,
-                "token_usage": token_usage,
-            }),
-            Send("pattern_observer", {
-                "user_id": user_id,
-                "goal_draft": goal_draft,
-                "user_profile": user_profile,
-                "conversation_history": conv_history,
-                "token_usage": token_usage,
-            }),
+            Send(
+                "classifier",
+                {
+                    "user_id": user_id,
+                    "goal_draft": goal_draft,
+                    "user_profile": user_profile,
+                    "conversation_history": conv_history,
+                    "token_usage": token_usage,
+                },
+            ),
+            Send(
+                "scheduler",
+                {
+                    "user_id": user_id,
+                    "goal_draft": goal_draft,
+                    "user_profile": user_profile,
+                    "conversation_history": conv_history,
+                    "token_usage": token_usage,
+                },
+            ),
+            Send(
+                "pattern_observer",
+                {
+                    "user_id": user_id,
+                    "goal_draft": goal_draft,
+                    "user_profile": user_profile,
+                    "conversation_history": conv_history,
+                    "token_usage": token_usage,
+                },
+            ),
         ]
 
     # 10.8 — Approval check after all sub-agents have reported
@@ -197,22 +213,22 @@ def _build_graph() -> StateGraph:
     graph = StateGraph(AgentState)
 
     # 10.1 — Register all nodes
-    graph.add_node("orchestrator",     orchestrator_node)
-    graph.add_node("chitchat",         chitchat_node)
-    graph.add_node("clarify",          clarify_node)
-    graph.add_node("onboarding",       onboarding_node)
-    graph.add_node("goal_clarifier",   goal_clarifier_node)
-    graph.add_node("goal_planner",     goal_planner_node)
-    graph.add_node("classifier",       classifier_node)
-    graph.add_node("scheduler",        scheduler_node)
+    graph.add_node("orchestrator", orchestrator_node)
+    graph.add_node("chitchat", chitchat_node)
+    graph.add_node("clarify", clarify_node)
+    graph.add_node("onboarding", onboarding_node)
+    graph.add_node("goal_clarifier", goal_clarifier_node)
+    graph.add_node("goal_planner", goal_planner_node)
+    graph.add_node("classifier", classifier_node)
+    graph.add_node("scheduler", scheduler_node)
     graph.add_node("pattern_observer", pattern_observer_node)
-    graph.add_node("task_handler",     task_handler_node)
-    graph.add_node("goal_modifier",    goal_modifier_node)
-    graph.add_node("save_tasks",       save_tasks_node)
-    graph.add_node("ask_start_date",   ask_start_date_node)
+    graph.add_node("task_handler", task_handler_node)
+    graph.add_node("goal_modifier", goal_modifier_node)
+    graph.add_node("save_tasks", save_tasks_node)
+    graph.add_node("ask_start_date", ask_start_date_node)
     # reschedule reuses scheduler_node but runs standalone (not via Send fan-out)
     # so save_tasks gets fresh slots anchored to goal_start_date.
-    graph.add_node("reschedule",       scheduler_node)
+    graph.add_node("reschedule", scheduler_node)
 
     # 10.2 — Entry point
     graph.set_entry_point("orchestrator")
@@ -240,18 +256,18 @@ def _build_graph() -> StateGraph:
     # 10.7 — classifier/scheduler/pattern_observer reconverge to goal_planner
     # 10.8 — goal_planner checks approval after sub-agents complete
     graph.add_conditional_edges("goal_planner", route_from_goal_planner)
-    graph.add_edge("classifier",       "goal_planner")
-    graph.add_edge("scheduler",        "goal_planner")
+    graph.add_edge("classifier", "goal_planner")
+    graph.add_edge("scheduler", "goal_planner")
     graph.add_edge("pattern_observer", "goal_planner")
 
     # 10.9 — Terminal edges
-    graph.add_edge("save_tasks",      END)
-    graph.add_edge("task_handler",    "save_tasks")
-    graph.add_edge("goal_modifier",   "save_tasks")
+    graph.add_edge("save_tasks", END)
+    graph.add_edge("task_handler", "save_tasks")
+    graph.add_edge("goal_modifier", "save_tasks")
     # ask_start_date ends the turn; user's next message re-enters via orchestrator
-    graph.add_edge("ask_start_date",  END)
+    graph.add_edge("ask_start_date", END)
     # reschedule → save_tasks: fresh slots anchored to goal_start_date
-    graph.add_edge("reschedule",      "save_tasks")
+    graph.add_edge("reschedule", "save_tasks")
 
     return graph
 
@@ -263,11 +279,9 @@ def _build_graph() -> StateGraph:
 
 def _psycopg_dsn() -> str:
     """Return plain postgresql:// DSN for psycopg (strips +asyncpg dialect if present)."""
-    return (
-        settings.database_url
-        .replace("postgresql+asyncpg://", "postgresql://")
-        .replace("postgres+asyncpg://", "postgresql://")
-    )
+    return settings.database_url.replace(
+        "postgresql+asyncpg://", "postgresql://"
+    ).replace("postgres+asyncpg://", "postgresql://")
 
 
 @asynccontextmanager

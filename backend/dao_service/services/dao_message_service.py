@@ -21,11 +21,15 @@ class DaoMessageService:
         """Retrieve all messages for a conversation."""
         return await self.message_dao.get_by_conversation(db, conversation_id)
 
-    async def get_message(self, db: DatabaseSession, message_id: UUID) -> Optional[MessageDTO]:
+    async def get_message(
+        self, db: DatabaseSession, message_id: UUID
+    ) -> Optional[MessageDTO]:
         """Retrieve a single message by ID."""
         return await self.message_dao.get_by_id(db, message_id)
 
-    async def create_message(self, db: DatabaseSession, data: MessageCreateDTO) -> MessageDTO:
+    async def create_message(
+        self, db: DatabaseSession, data: MessageCreateDTO
+    ) -> MessageDTO:
         """Create a new message."""
         return await self.message_dao.create(db, data)
 

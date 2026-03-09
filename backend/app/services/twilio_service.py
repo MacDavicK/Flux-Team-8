@@ -3,6 +3,7 @@
 
 WhatsApp + Voice call notifications via Twilio, plus OTP via Twilio Verify.
 """
+
 from __future__ import annotations
 
 from twilio.rest import Client
@@ -116,9 +117,9 @@ async def dispatch_call(task: dict) -> str:
 
 async def send_otp(phone_number: str) -> None:
     """14.2.4 — Send an OTP via Twilio Verify (SMS channel)."""
-    _client.verify.v2.services(
-        settings.twilio_verify_service_sid
-    ).verifications.create(to=phone_number, channel="sms")
+    _client.verify.v2.services(settings.twilio_verify_service_sid).verifications.create(
+        to=phone_number, channel="sms"
+    )
 
 
 async def confirm_otp(phone_number: str, code: str) -> bool:

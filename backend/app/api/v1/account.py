@@ -1,4 +1,5 @@
 """Account API endpoints — §17.6"""
+
 from __future__ import annotations
 
 import json
@@ -7,7 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import limiter
-from app.models.api_schemas import AccountMeResponse, AccountPatchRequest, PhoneVerifyConfirmRequest, PhoneVerifySendRequest, PushSubscriptionRequest
+from app.models.api_schemas import (
+    AccountMeResponse,
+    AccountPatchRequest,
+    PhoneVerifyConfirmRequest,
+    PhoneVerifySendRequest,
+    PushSubscriptionRequest,
+)
 from app.config import settings
 from app.services.supabase import db
 from app.services.twilio_service import confirm_otp, send_otp
@@ -32,7 +39,9 @@ async def get_me(request: Request, user=Depends(get_current_user)) -> AccountMeR
         return v
 
     raw_profile = row["profile"]
-    profile = json.loads(raw_profile) if isinstance(raw_profile, str) else (raw_profile or {})
+    profile = (
+        json.loads(raw_profile) if isinstance(raw_profile, str) else (raw_profile or {})
+    )
 
     return AccountMeResponse(
         id=str(row["id"]),
@@ -48,44 +57,57 @@ async def get_me(request: Request, user=Depends(get_current_user)) -> AccountMeR
 
 @router.patch("/me")
 @limiter.limit("30/minute")
-async def patch_me(body: AccountPatchRequest, request: Request, user=Depends(get_current_user)) -> dict:
+async def patch_me(
+    body: AccountPatchRequest, request: Request, user=Depends(get_current_user)
+) -> dict:
     """17.6.2"""
     user_id = str(user["sub"])
     if body.name is not None:
         await db.execute(
             "UPDATE users SET profile = COALESCE(profile, '{}'::jsonb) || $2::jsonb WHERE id = $1",
-            user_id, json.dumps({"name": body.name}),
+            user_id,
+            json.dumps({"name": body.name}),
         )
     if body.notification_preferences is not None:
         await db.execute(
             "UPDATE users SET notification_preferences = notification_preferences || $2::jsonb WHERE id = $1",
-            user_id, json.dumps(body.notification_preferences),
+            user_id,
+            json.dumps(body.notification_preferences),
         )
     if body.timezone is not None:
-        await db.execute("UPDATE users SET timezone = $2 WHERE id = $1", user_id, body.timezone)
+        await db.execute(
+            "UPDATE users SET timezone = $2 WHERE id = $1", user_id, body.timezone
+        )
     return {"status": "updated"}
 
 
 @router.post("/phone/verify/send")
 @limiter.limit("3/hour")
-async def phone_verify_send(body: PhoneVerifySendRequest, request: Request, user=Depends(get_current_user)) -> dict:
+async def phone_verify_send(
+    body: PhoneVerifySendRequest, request: Request, user=Depends(get_current_user)
+) -> dict:
     """17.6.3"""
     user_id = str(user["sub"])
     await send_otp(body.phone_number)
     await db.execute(
         "UPDATE users SET notification_preferences = notification_preferences || $2::jsonb WHERE id = $1",
-        user_id, json.dumps({"phone_number": body.phone_number}),
+        user_id,
+        json.dumps({"phone_number": body.phone_number}),
     )
     return {"status": "sent"}
 
 
 @router.post("/phone/verify/confirm")
 @limiter.limit("30/minute")
-async def phone_verify_confirm(body: PhoneVerifyConfirmRequest, request: Request, user=Depends(get_current_user)) -> dict:
+async def phone_verify_confirm(
+    body: PhoneVerifyConfirmRequest, request: Request, user=Depends(get_current_user)
+) -> dict:
     """17.6.4"""
     verified = await confirm_otp(body.phone_number, body.code)
     if verified:
-        await db.execute("UPDATE users SET phone_verified = true WHERE id = $1", str(user["sub"]))
+        await db.execute(
+            "UPDATE users SET phone_verified = true WHERE id = $1", str(user["sub"])
+        )
         return {"verified": True}
     raise HTTPException(status_code=400, detail="Invalid code")
 
@@ -97,7 +119,10 @@ async def whatsapp_opt_in(request: Request, user=Depends(get_current_user)) -> d
     user_id = str(user["sub"])
     row = await db.fetchrow("SELECT phone_verified FROM users WHERE id = $1", user_id)
     if row is None or not row["phone_verified"]:
-        raise HTTPException(status_code=400, detail="Phone number must be verified before opting in to WhatsApp.")
+        raise HTTPException(
+            status_code=400,
+            detail="Phone number must be verified before opting in to WhatsApp.",
+        )
     await db.execute(
         "UPDATE users SET whatsapp_opt_in_at = now(), notification_preferences = notification_preferences || '{\"whatsapp_opted_in\": true}'::jsonb WHERE id = $1",
         user_id,
@@ -110,12 +135,21 @@ async def whatsapp_opt_in(request: Request, user=Depends(get_current_user)) -> d
 async def delete_account(request: Request, user=Depends(get_current_user)) -> Response:
     """17.6.6 — GDPR erasure: cascade-delete all user data."""
     user_id = str(user["sub"])
-    await db.execute("DELETE FROM notification_log WHERE task_id IN (SELECT id FROM tasks WHERE user_id = $1)", user_id)
-    await db.execute("DELETE FROM dispatch_log WHERE task_id IN (SELECT id FROM tasks WHERE user_id = $1)", user_id)
+    await db.execute(
+        "DELETE FROM notification_log WHERE task_id IN (SELECT id FROM tasks WHERE user_id = $1)",
+        user_id,
+    )
+    await db.execute(
+        "DELETE FROM dispatch_log WHERE task_id IN (SELECT id FROM tasks WHERE user_id = $1)",
+        user_id,
+    )
     await db.execute("DELETE FROM tasks WHERE user_id = $1", user_id)
     await db.execute("DELETE FROM goals WHERE user_id = $1", user_id)
     await db.execute("DELETE FROM patterns WHERE user_id = $1", user_id)
-    await db.execute("DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)", user_id)
+    await db.execute(
+        "DELETE FROM messages WHERE conversation_id IN (SELECT id FROM conversations WHERE user_id = $1)",
+        user_id,
+    )
     await db.execute("DELETE FROM conversations WHERE user_id = $1", user_id)
     for table in ("checkpoint_blobs", "checkpoints"):
         try:
@@ -134,11 +168,14 @@ async def get_vapid_public_key() -> dict:
 
 @router.post("/push-subscription")
 @limiter.limit("30/minute")
-async def save_push_subscription(body: PushSubscriptionRequest, request: Request, user=Depends(get_current_user)) -> dict:
+async def save_push_subscription(
+    body: PushSubscriptionRequest, request: Request, user=Depends(get_current_user)
+) -> dict:
     """19.13.2 — Save browser Web Push subscription to users table."""
     await db.execute(
         "UPDATE users SET push_subscription = $2::jsonb WHERE id = $1",
-        str(user["sub"]), json.dumps(body.subscription),
+        str(user["sub"]),
+        json.dumps(body.subscription),
     )
     return {"status": "saved"}
 
@@ -161,13 +198,31 @@ async def export_account(request: Request, user=Depends(get_current_user)) -> di
             result.append(d)
         return result
 
-    user_row = await db.fetchrow("SELECT id, email, timezone, onboarded, phone_verified, whatsapp_opt_in_at, profile, notification_preferences, monthly_token_usage FROM users WHERE id = $1", user_id)
-    goals = await db.fetch("SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at", user_id)
-    tasks = await db.fetch("SELECT * FROM tasks WHERE user_id = $1 ORDER BY created_at", user_id)
-    patterns = await db.fetch("SELECT * FROM patterns WHERE user_id = $1 ORDER BY created_at", user_id)
-    conversations = await db.fetch("SELECT * FROM conversations WHERE user_id = $1 ORDER BY created_at", user_id)
+    user_row = await db.fetchrow(
+        "SELECT id, email, timezone, onboarded, phone_verified, whatsapp_opt_in_at, profile, notification_preferences, monthly_token_usage FROM users WHERE id = $1",
+        user_id,
+    )
+    goals = await db.fetch(
+        "SELECT * FROM goals WHERE user_id = $1 ORDER BY created_at", user_id
+    )
+    tasks = await db.fetch(
+        "SELECT * FROM tasks WHERE user_id = $1 ORDER BY created_at", user_id
+    )
+    patterns = await db.fetch(
+        "SELECT * FROM patterns WHERE user_id = $1 ORDER BY created_at", user_id
+    )
+    conversations = await db.fetch(
+        "SELECT * FROM conversations WHERE user_id = $1 ORDER BY created_at", user_id
+    )
     conv_ids = [str(c["id"]) for c in conversations]
-    messages = await db.fetch("SELECT * FROM messages WHERE conversation_id = ANY($1::uuid[]) ORDER BY created_at", conv_ids) if conv_ids else []
+    messages = (
+        await db.fetch(
+            "SELECT * FROM messages WHERE conversation_id = ANY($1::uuid[]) ORDER BY created_at",
+            conv_ids,
+        )
+        if conv_ids
+        else []
+    )
 
     user_dict = {}
     if user_row:

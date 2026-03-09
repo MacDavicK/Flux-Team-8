@@ -11,7 +11,6 @@ Covers:
 """
 
 import pendulum
-import pytest
 
 from app.services.rrule_expander import expand_rrule_to_tasks
 
@@ -120,7 +119,7 @@ class TestExpandRruleToTasksDST:
         06:00 JST → 21:00 UTC (previous calendar day, but same hour offset).
         """
         tz = "Asia/Tokyo"
-        start_local = pendulum.datetime(2026, 4, 6, 6, 0, 0, tz=tz)    # Monday
+        start_local = pendulum.datetime(2026, 4, 6, 6, 0, 0, tz=tz)  # Monday
         end_local = pendulum.datetime(2026, 4, 20, 6, 0, 0, tz=tz)
 
         tasks = expand_rrule_to_tasks(
@@ -136,7 +135,9 @@ class TestExpandRruleToTasksDST:
         for task in tasks:
             dt = pendulum.parse(task["scheduled_at"])
             # pendulum 3 may represent UTC as "+00:00" or "UTC" depending on the input
-            assert dt.offset == 0, f"Expected UTC (offset 0), got timezone_name={dt.timezone_name}"
+            assert dt.offset == 0, (
+                f"Expected UTC (offset 0), got timezone_name={dt.timezone_name}"
+            )
             # 06:00 JST = 21:00 UTC
             assert dt.hour == 21, f"Expected 21:00 UTC for 06:00 JST, got {dt.hour}:00"
 
@@ -147,7 +148,7 @@ class TestExpandRruleToTasksBoundary:
     def test_occurrence_on_end_dt_is_included(self):
         """expand_rrule_to_tasks uses between(..., inc=True) — end_dt occurrence included."""
         tz = "Europe/London"
-        start_local = pendulum.datetime(2026, 1, 5, 9, 0, 0, tz=tz)   # Monday
+        start_local = pendulum.datetime(2026, 1, 5, 9, 0, 0, tz=tz)  # Monday
         # end_dt lands exactly on the third Monday at the same time
         end_local = pendulum.datetime(2026, 1, 19, 9, 0, 0, tz=tz)
 
@@ -184,7 +185,7 @@ class TestExpandRruleToTasksBoundary:
         """FREQ=WEEKLY;BYDAY=MO,WE,FR produces 3 × N occurrences per week."""
         tz = "UTC"
         # Start on Monday of a clean week
-        start_local = pendulum.datetime(2026, 3, 2, 8, 0, 0, tz=tz)   # Monday
+        start_local = pendulum.datetime(2026, 3, 2, 8, 0, 0, tz=tz)  # Monday
         end_local = pendulum.datetime(2026, 3, 15, 23, 59, 59, tz=tz)  # two full weeks
 
         tasks = expand_rrule_to_tasks(
@@ -245,8 +246,8 @@ class TestExpandRruleToTasksOutput:
 
     def test_all_scheduled_at_are_utc_iso8601_strings(self):
         """scheduled_at must be a parseable UTC ISO8601 string on every row."""
-        tz = "America/Los_Angeles"   # UTC-8/UTC-7
-        start_local = pendulum.datetime(2026, 2, 2, 6, 0, 0, tz=tz)   # Monday
+        tz = "America/Los_Angeles"  # UTC-8/UTC-7
+        start_local = pendulum.datetime(2026, 2, 2, 6, 0, 0, tz=tz)  # Monday
         end_local = pendulum.datetime(2026, 2, 23, 6, 0, 0, tz=tz)
 
         tasks = expand_rrule_to_tasks(
@@ -273,7 +274,7 @@ class TestExpandRruleToTasksOutput:
             base_task=_BASE_TASK,
             rrule_string="FREQ=WEEKLY;BYDAY=MO",
             start_dt=dt,
-            end_dt=dt,   # exact match → included (inc=True)
+            end_dt=dt,  # exact match → included (inc=True)
             user_timezone=tz,
         )
         assert len(tasks) == 1

@@ -11,7 +11,7 @@ from uuid import uuid4
 
 from dao_service.dao.impl.sqlalchemy.dao_message import DaoMessage
 from dao_service.models.message_model import Message
-from dao_service.schemas.message import MessageCreateDTO, MessageDTO
+from dao_service.schemas.message import MessageCreateDTO
 
 
 # -- Helpers -----------------------------------------------------------------

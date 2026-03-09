@@ -109,9 +109,8 @@ async def goal_modifier_node(state: AgentState) -> dict:
             "Could you tell me which goal you'd like to change?"
         )
         return {
-            "conversation_history": history + [
-                {"role": "assistant", "content": fallback}
-            ],
+            "conversation_history": history
+            + [{"role": "assistant", "content": fallback}],
         }
 
     # ── Step 2: Fetch goal details ────────────────────────────────────────
@@ -200,9 +199,8 @@ async def goal_modifier_node(state: AgentState) -> dict:
             "Could you describe the change you'd like more specifically?"
         )
         return {
-            "conversation_history": history + [
-                {"role": "assistant", "content": fallback}
-            ],
+            "conversation_history": history
+            + [{"role": "assistant", "content": fallback}],
         }
 
     # ── Step 6: Compose proposed_tasks with goal context ─────────────────
@@ -222,7 +220,6 @@ async def goal_modifier_node(state: AgentState) -> dict:
         "proposed_tasks": proposed,
         "approval_status": "approved",
         "goal_draft": {**goal_draft, "goal_id": goal_id, "plan": result.model_dump()},
-        "conversation_history": history + [
-            {"role": "assistant", "content": result.plan_summary}
-        ],
+        "conversation_history": history
+        + [{"role": "assistant", "content": result.plan_summary}],
     }

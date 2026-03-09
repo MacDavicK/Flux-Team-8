@@ -12,6 +12,7 @@ escalation_policy values:
   standard   — push + WhatsApp; auto-miss after WhatsApp window × 2
   aggressive — push + WhatsApp + call; auto-miss after call window (original behaviour)
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -41,6 +42,7 @@ async def notification_poll() -> None:
 # ─────────────────────────────────────────────────────────────────
 # Step 1 — Push reminders
 # ─────────────────────────────────────────────────────────────────
+
 
 async def _step_push() -> None:
     """15.2.1 — Push reminders for tasks due within reminder_lead_minutes."""
@@ -85,6 +87,7 @@ async def _step_push() -> None:
 # Step 2 — WhatsApp escalation (standard + aggressive only)
 # ─────────────────────────────────────────────────────────────────
 
+
 async def _step_whatsapp() -> None:
     """15.2.3 — WhatsApp for tasks where push sent > escalation_window ago."""
     esc = settings.escalation_window_minutes
@@ -122,6 +125,7 @@ async def _step_whatsapp() -> None:
 # Step 3 — Voice call escalation (aggressive only)
 # ─────────────────────────────────────────────────────────────────
 
+
 async def _step_call() -> None:
     """15.2.5 — Voice call for tasks where whatsapp sent > escalation_window ago."""
     esc = settings.escalation_window_minutes
@@ -158,6 +162,7 @@ async def _step_call() -> None:
 # ─────────────────────────────────────────────────────────────────
 # Step 4 — Auto-miss (policy-aware) + recurring auto-advance
 # ─────────────────────────────────────────────────────────────────
+
 
 async def _step_auto_miss() -> None:
     """
@@ -232,28 +237,35 @@ async def _process_auto_miss(task_id: str, user_id: str) -> None:
 # Dispatch log helpers
 # ─────────────────────────────────────────────────────────────────
 
+
 async def log_dispatch(task_id: str, channel: str) -> None:
     """15.2.8 — Insert dispatch_log row with status='pending'."""
     try:
         await db.execute(
             "INSERT INTO dispatch_log (task_id, channel, status) VALUES ($1, $2, 'pending')",
-            task_id, channel,
+            task_id,
+            channel,
         )
     except Exception as exc:
         logger.warning("log_dispatch failed: %s", exc)
 
 
-async def mark_dispatch_done(task_id: str, channel: str, external_id: str | None = None) -> None:
+async def mark_dispatch_done(
+    task_id: str, channel: str, external_id: str | None = None
+) -> None:
     """15.2.9 — Update dispatch_log to dispatched; insert notification_log."""
     try:
         await db.execute(
             "UPDATE dispatch_log SET status = 'dispatched', dispatched_at = now() WHERE task_id = $1 AND channel = $2 AND status = 'pending'",
-            task_id, channel,
+            task_id,
+            channel,
         )
         if external_id:
             await db.execute(
                 "INSERT INTO notification_log (task_id, channel, external_id) VALUES ($1, $2, $3)",
-                task_id, channel, external_id,
+                task_id,
+                channel,
+                external_id,
             )
     except Exception as exc:
         logger.warning("mark_dispatch_done failed: %s", exc)
@@ -263,7 +275,9 @@ async def _mark_dispatch_failed(task_id: str, channel: str, error: str) -> None:
     try:
         await db.execute(
             "UPDATE dispatch_log SET status = 'failed', error = $3 WHERE task_id = $1 AND channel = $2 AND status = 'pending'",
-            task_id, channel, error,
+            task_id,
+            channel,
+            error,
         )
     except Exception as exc:
         logger.warning("_mark_dispatch_failed failed: %s", exc)
@@ -272,6 +286,7 @@ async def _mark_dispatch_failed(task_id: str, channel: str, error: str) -> None:
 # ─────────────────────────────────────────────────────────────────
 # Pattern miss signal
 # ─────────────────────────────────────────────────────────────────
+
 
 async def check_and_flag_miss_pattern(user_id: str, task_id: str) -> None:
     """15.2.10 — Check for ≥3 consecutive misses in same slot; log if threshold met."""
@@ -297,12 +312,15 @@ async def check_and_flag_miss_pattern(user_id: str, task_id: str) -> None:
             WHERE m.dow = t.dow
               AND ABS(m.hour - t.hour) <= 1
             """,
-            user_id, task_id,
+            user_id,
+            task_id,
         )
         if (result or 0) >= 3:
             logger.info(
                 "Pattern threshold met for user %s task %s: %d consecutive misses",
-                user_id, task_id, result,
+                user_id,
+                task_id,
+                result,
             )
     except Exception as exc:
         logger.debug("check_and_flag_miss_pattern error: %s", exc)

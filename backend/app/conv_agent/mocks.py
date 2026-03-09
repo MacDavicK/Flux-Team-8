@@ -69,7 +69,10 @@ class MockDaoClient:
     # -- Conversations -------------------------------------------------------
 
     async def create_conversation(
-        self, user_id: str, langgraph_thread_id: str, context_type: str = "voice",
+        self,
+        user_id: str,
+        langgraph_thread_id: str,
+        context_type: str = "voice",
         voice_session_id: str | None = None,
     ) -> dict:
         conv_id = str(uuid.uuid4())
@@ -109,7 +112,10 @@ class MockDaoClient:
     # -- Messages ------------------------------------------------------------
 
     async def save_message(
-        self, conversation_id: str, role: str, content: str,
+        self,
+        conversation_id: str,
+        role: str,
+        content: str,
         input_modality: str = "voice",
     ) -> dict:
         msg_id = str(uuid.uuid4())
@@ -127,13 +133,15 @@ class MockDaoClient:
 
     async def get_messages(self, conversation_id: str) -> list[dict]:
         return [
-            copy.deepcopy(m) for m in self._messages.values()
+            copy.deepcopy(m)
+            for m in self._messages.values()
             if m["conversation_id"] == conversation_id
         ]
 
     async def count_messages(self, conversation_id: str) -> int:
         return sum(
-            1 for m in self._messages.values()
+            1
+            for m in self._messages.values()
             if m["conversation_id"] == conversation_id
         )
 
@@ -149,7 +157,8 @@ class MockDaoClient:
         self, user_id: str, start_at: str, end_at: str
     ) -> list[dict]:
         return [
-            copy.deepcopy(t) for t in self._tasks.values()
+            copy.deepcopy(t)
+            for t in self._tasks.values()
             if t.get("user_id") == user_id
         ]
 
@@ -182,7 +191,10 @@ class MockDaoClient:
     # -- Goals ---------------------------------------------------------------
 
     async def create_goal(
-        self, user_id: str, title: str, target_weeks: int = 6,
+        self,
+        user_id: str,
+        title: str,
+        target_weeks: int = 6,
         description: str = "",
     ) -> dict:
         goal_id = str(uuid.uuid4())
@@ -207,6 +219,7 @@ async def mock_deepgram_token() -> str:
 
 
 # -- Legacy Supabase mocks (kept for reference / internal use) ---------------
+
 
 class MockResponse:
     """Mimics the Supabase query response shape."""

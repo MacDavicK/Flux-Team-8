@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 # ── State enum (exact strings for frontend placeholders) ───
 
+
 class OnboardingState(str, Enum):
     ASK_NAME = "ASK_NAME"
     ASK_WAKE_TIME = "ASK_WAKE_TIME"
@@ -66,11 +67,28 @@ def _get_prompt(state: OnboardingState, collected: dict[str, Any]) -> str:
 # ── Time parsing (regex → HH:MM) ─────────────────────────────
 
 _TIME_PATTERNS = [
-    (re.compile(r"(?i)(\d{1,2})\s*:\s*(\d{2})\s*(am|pm)?"), lambda m: _norm_ampm(int(m.group(1)), int(m.group(2)), (m.group(3) or "").lower())),
-    (re.compile(r"(?i)(\d{1,2})\s*(am|pm)\b"), lambda m: _norm_ampm(int(m.group(1)), 0, m.group(2).lower())),
-    (re.compile(r"(?i)(\d{1,2})\s+in\s+the\s+morning"), lambda m: _norm_ampm(int(m.group(1)), 0, "am")),
-    (re.compile(r"(?i)(\d{1,2})\s+in\s+the\s+(evening|night)"), lambda m: _norm_ampm(int(m.group(1)), 0, "pm")),
-    (re.compile(r"(?i)(\d{1,2})\s*:\s*(\d{2})"), lambda m: f"{int(m.group(1)):02d}:{int(m.group(2)):02d}"),
+    (
+        re.compile(r"(?i)(\d{1,2})\s*:\s*(\d{2})\s*(am|pm)?"),
+        lambda m: _norm_ampm(
+            int(m.group(1)), int(m.group(2)), (m.group(3) or "").lower()
+        ),
+    ),
+    (
+        re.compile(r"(?i)(\d{1,2})\s*(am|pm)\b"),
+        lambda m: _norm_ampm(int(m.group(1)), 0, m.group(2).lower()),
+    ),
+    (
+        re.compile(r"(?i)(\d{1,2})\s+in\s+the\s+morning"),
+        lambda m: _norm_ampm(int(m.group(1)), 0, "am"),
+    ),
+    (
+        re.compile(r"(?i)(\d{1,2})\s+in\s+the\s+(evening|night)"),
+        lambda m: _norm_ampm(int(m.group(1)), 0, "pm"),
+    ),
+    (
+        re.compile(r"(?i)(\d{1,2})\s*:\s*(\d{2})"),
+        lambda m: f"{int(m.group(1)):02d}:{int(m.group(2)):02d}",
+    ),
     (re.compile(r"(?i)^(\d{1,2})\s*$"), lambda m: f"{int(m.group(1)):02d}:00"),
 ]
 
@@ -109,10 +127,22 @@ def _parse_work_schedule(user_input: str) -> dict[str, Any] | None:
     if not s or _NO_WORK.match(s):
         return None
     # Regex: 9-5, 9am to 6pm, 9:00-18:00
-    m = re.search(r"(\d{1,2})(?:\s*:\s*(\d{2}))?\s*(am|pm)?\s*(?:-|to)\s*(\d{1,2})(?:\s*:\s*(\d{2}))?\s*(am|pm)?", s, re.I)
+    m = re.search(
+        r"(\d{1,2})(?:\s*:\s*(\d{2}))?\s*(am|pm)?\s*(?:-|to)\s*(\d{1,2})(?:\s*:\s*(\d{2}))?\s*(am|pm)?",
+        s,
+        re.I,
+    )
     if m:
-        h1, min1, ap1 = int(m.group(1)), int(m.group(2) or 0), (m.group(3) or "").lower()
-        h2, min2, ap2 = int(m.group(4)), int(m.group(5) or 0), (m.group(6) or "").lower()
+        h1, min1, ap1 = (
+            int(m.group(1)),
+            int(m.group(2) or 0),
+            (m.group(3) or "").lower(),
+        )
+        h2, min2, ap2 = (
+            int(m.group(4)),
+            int(m.group(5) or 0),
+            (m.group(6) or "").lower(),
+        )
         start = _norm_ampm(h1, min1, ap1 or "am")
         end = _norm_ampm(h2, min2, ap2 or "pm")
         return {"start": start, "end": end, "days": ["Mon", "Tue", "Wed", "Thu", "Fri"]}
@@ -120,6 +150,7 @@ def _parse_work_schedule(user_input: str) -> dict[str, Any] | None:
 
 
 # ── Chronotype keywords ──────────────────────────────────────
+
 
 def _parse_chronotype(user_input: str) -> str:
     s = (user_input or "").lower().strip()
@@ -140,17 +171,23 @@ _COMMITMENTS_NONE = re.compile(r"^(none|no|nothing|nope|no commitments)$", re.I)
 
 
 def _parse_commitments_none(user_input: str) -> bool:
-    return bool((user_input or "").strip() and _COMMITMENTS_NONE.match((user_input or "").strip()))
+    return bool(
+        (user_input or "").strip()
+        and _COMMITMENTS_NONE.match((user_input or "").strip())
+    )
 
 
 # ── OnboardingAgent ──────────────────────────────────────────
+
 
 class OnboardingAgent:
     def __init__(self) -> None:
         self._state = OnboardingState.ASK_NAME
         self._collected: dict[str, Any] = {}
         self._client: AsyncOpenAI | None = None
-        self._model = getattr(settings, "onboarding_model", None) or settings.goal_planner_model
+        self._model = (
+            getattr(settings, "onboarding_model", None) or settings.goal_planner_model
+        )
 
     @property
     def current_state(self) -> OnboardingState:
@@ -237,12 +274,16 @@ class OnboardingAgent:
                 result = []
                 for item in arr if isinstance(arr, list) else []:
                     if isinstance(item, dict) and item.get("title"):
-                        result.append({
-                            "title": str(item["title"]),
-                            "days": [str(d) for d in item.get("days", [])],
-                            "time": str(item.get("time", "09:00")),
-                            "duration_minutes": int(item.get("duration_minutes", 60)),
-                        })
+                        result.append(
+                            {
+                                "title": str(item["title"]),
+                                "days": [str(d) for d in item.get("days", [])],
+                                "time": str(item.get("time", "09:00")),
+                                "duration_minutes": int(
+                                    item.get("duration_minutes", 60)
+                                ),
+                            }
+                        )
                 return result
         except Exception:
             pass
@@ -356,7 +397,9 @@ class OnboardingAgent:
             if _parse_commitments_none(message):
                 self._collected["existing_commitments"] = []
             else:
-                self._collected["existing_commitments"] = await self._parse_commitments_llm(message)
+                self._collected[
+                    "existing_commitments"
+                ] = await self._parse_commitments_llm(message)
             self._state = OnboardingState.COMPLETE
             prompt = _get_prompt(self._state, self._collected)
             profile = self._build_profile()

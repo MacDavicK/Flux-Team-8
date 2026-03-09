@@ -29,7 +29,9 @@ def anyio_backend():
 async def test_create_session_endpoint():
     """POST /api/v1/voice/session should return 200 with session_id, deepgram_token, config."""
     with patch_conv_agent():
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
             resp = await client.post(
                 "/api/v1/voice/session",
                 json={"user_id": "mock-user-id"},
@@ -45,7 +47,9 @@ async def test_create_session_endpoint():
 async def test_save_message_endpoint():
     """POST /api/v1/voice/messages should return 200 with message_id."""
     with patch_conv_agent():
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
             # First create a session
             session_resp = await client.post(
                 "/api/v1/voice/session",
@@ -70,7 +74,9 @@ async def test_save_message_endpoint():
 async def test_get_messages_endpoint():
     """GET /api/v1/voice/sessions/{id}/messages should return 200 with messages list."""
     with patch_conv_agent():
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
             # Create a session
             session_resp = await client.post(
                 "/api/v1/voice/session",
@@ -89,7 +95,9 @@ async def test_get_messages_endpoint():
 async def test_process_intent_endpoint():
     """POST /api/v1/voice/intents with a goal intent should return 200 with result."""
     with patch_conv_agent():
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
             # Create a session
             session_resp = await client.post(
                 "/api/v1/voice/session",
@@ -124,7 +132,9 @@ async def test_process_intent_response_includes_function_call_id():
     back to the right Deepgram call. If this field is missing the agent goes silent.
     """
     with patch_conv_agent():
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
             session_resp = await client.post(
                 "/api/v1/voice/session",
                 json={"user_id": "mock-user-id"},
@@ -160,7 +170,9 @@ async def test_process_intent_missing_function_name_returns_422():
     and sending null to this endpoint, causing a silent 422 and no agent response.
     """
     with patch_conv_agent():
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
             resp = await client.post(
                 "/api/v1/voice/intents",
                 json={
@@ -186,7 +198,9 @@ async def test_process_intent_missing_function_call_id_returns_422():
     event.id which doesn't exist at the top level in V1 format).
     """
     with patch_conv_agent():
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
             resp = await client.post(
                 "/api/v1/voice/intents",
                 json={
@@ -206,7 +220,9 @@ async def test_process_intent_missing_function_call_id_returns_422():
 async def test_close_session_endpoint():
     """DELETE /api/v1/voice/session/{id} should return 200 with status 'closed'."""
     with patch_conv_agent():
-        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        async with AsyncClient(
+            transport=ASGITransport(app=app), base_url="http://test"
+        ) as client:
             # Create a session
             session_resp = await client.post(
                 "/api/v1/voice/session",

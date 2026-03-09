@@ -1,8 +1,22 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { Bell, CheckCircle2, Clock, LogOut, MessageCircle, Moon, Phone, Sun, Sunrise } from "lucide-react";
+import {
+  Bell,
+  CheckCircle2,
+  Clock,
+  LogOut,
+  MessageCircle,
+  Moon,
+  Phone,
+  Sun,
+  Sunrise,
+} from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "~/lib/apiClient";
-import { getPermissionState, registerAndSubscribe, unsubscribe as unsubscribePush } from "~/lib/pushNotifications";
+import {
+  getPermissionState,
+  registerAndSubscribe,
+  unsubscribe as unsubscribePush,
+} from "~/lib/pushNotifications";
 import type { AccountMe, AccountPatchRequest } from "~/types";
 import { cn } from "~/utils/cn";
 import { EditField } from "./EditField";
@@ -33,7 +47,10 @@ interface PhoneVerificationFlowProps {
   initialPhone?: string;
 }
 
-function PhoneVerificationFlow({ onVerified, initialPhone = "" }: PhoneVerificationFlowProps) {
+function PhoneVerificationFlow({
+  onVerified,
+  initialPhone = "",
+}: PhoneVerificationFlowProps) {
   const [step, setStep] = useState<"phone" | "otp">("phone");
   const [phone, setPhone] = useState(initialPhone);
   const [phoneError, setPhoneError] = useState<string | null>(null);
@@ -43,24 +60,31 @@ function PhoneVerificationFlow({ onVerified, initialPhone = "" }: PhoneVerificat
   const [isVerifying, setIsVerifying] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [cooldown, setCooldown] = useState(0);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<ReturnType<typeof setInterval> | undefined>(
+    undefined,
+  );
 
   function startCooldown() {
     setCooldown(OTP_RESEND_COOLDOWN);
     timerRef.current = setInterval(() => {
       setCooldown((s) => {
-        if (s <= 1) { clearInterval(timerRef.current!); return 0; }
+        if (s <= 1) {
+          clearInterval(timerRef.current);
+          return 0;
+        }
         return s - 1;
       });
     }, 1000);
   }
 
-  useEffect(() => () => clearInterval(timerRef.current!), []);
+  useEffect(() => () => clearInterval(timerRef.current), []);
 
   async function handleSendOtp() {
     const trimmed = phone.trim();
     if (!/^\+[1-9]\d{1,14}$/.test(trimmed)) {
-      setPhoneError("Enter your number in international format, e.g. +15551234567");
+      setPhoneError(
+        "Enter your number in international format, e.g. +15551234567",
+      );
       return;
     }
     setIsSending(true);
@@ -121,7 +145,9 @@ function PhoneVerificationFlow({ onVerified, initialPhone = "" }: PhoneVerificat
       if (next >= OTP_MAX_ATTEMPTS) {
         setCodeError("Too many incorrect attempts. Please try again later.");
       } else {
-        setCodeError(`Incorrect code. ${OTP_MAX_ATTEMPTS - next} attempt${OTP_MAX_ATTEMPTS - next !== 1 ? "s" : ""} remaining.`);
+        setCodeError(
+          `Incorrect code. ${OTP_MAX_ATTEMPTS - next} attempt${OTP_MAX_ATTEMPTS - next !== 1 ? "s" : ""} remaining.`,
+        );
       }
     } catch {
       setCodeError("Verification failed. Try again.");
@@ -139,14 +165,18 @@ function PhoneVerificationFlow({ onVerified, initialPhone = "" }: PhoneVerificat
             <input
               type="tel"
               value={phone}
-              onChange={(e) => { setPhone(e.target.value); setPhoneError(null); }}
+              onChange={(e) => {
+                setPhone(e.target.value);
+                setPhoneError(null);
+              }}
               onKeyDown={(e) => e.key === "Enter" && handleSendOtp()}
               placeholder="+15551234567"
-              autoFocus
               className={cn(
                 "flex-1 px-3 py-2 text-sm rounded-xl border bg-white/90 text-charcoal",
                 "placeholder:text-river/50 outline-none transition-colors",
-                phoneError ? "border-red-400 focus:border-red-500" : "border-charcoal/20 focus:border-sage",
+                phoneError
+                  ? "border-red-400 focus:border-red-500"
+                  : "border-charcoal/20 focus:border-sage",
               )}
             />
             <button
@@ -158,7 +188,9 @@ function PhoneVerificationFlow({ onVerified, initialPhone = "" }: PhoneVerificat
               {isSending ? "Sending…" : "Send code"}
             </button>
           </div>
-          {phoneError && <p className="text-red-500 text-xs pl-1">{phoneError}</p>}
+          {phoneError && (
+            <p className="text-red-500 text-xs pl-1">{phoneError}</p>
+          )}
         </>
       ) : (
         <>
@@ -168,29 +200,37 @@ function PhoneVerificationFlow({ onVerified, initialPhone = "" }: PhoneVerificat
               type="text"
               inputMode="numeric"
               value={code}
-              onChange={(e) => { setCode(e.target.value.replace(/\D/g, "").slice(0, 6)); setCodeError(null); }}
+              onChange={(e) => {
+                setCode(e.target.value.replace(/\D/g, "").slice(0, 6));
+                setCodeError(null);
+              }}
               onKeyDown={(e) => e.key === "Enter" && handleVerify()}
               placeholder="000000"
               maxLength={6}
-              autoFocus
               disabled={attempts >= OTP_MAX_ATTEMPTS}
               className={cn(
                 "w-32 px-3 py-2 text-sm rounded-xl border bg-white/90 text-charcoal text-center tracking-widest font-mono",
                 "placeholder:text-river/40 outline-none transition-colors",
-                codeError ? "border-red-400 focus:border-red-500" : "border-charcoal/20 focus:border-sage",
+                codeError
+                  ? "border-red-400 focus:border-red-500"
+                  : "border-charcoal/20 focus:border-sage",
                 "disabled:opacity-40 disabled:cursor-not-allowed",
               )}
             />
             <button
               type="button"
               onClick={handleVerify}
-              disabled={isVerifying || code.length !== 6 || attempts >= OTP_MAX_ATTEMPTS}
+              disabled={
+                isVerifying || code.length !== 6 || attempts >= OTP_MAX_ATTEMPTS
+              }
               className="px-3 py-2 rounded-xl text-sm font-medium bg-sage text-white hover:bg-sage/90 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
             >
               {isVerifying ? "Checking…" : "Verify"}
             </button>
           </div>
-          {codeError && <p className="text-red-500 text-xs pl-1">{codeError}</p>}
+          {codeError && (
+            <p className="text-red-500 text-xs pl-1">{codeError}</p>
+          )}
           <button
             type="button"
             onClick={handleResend}
@@ -202,7 +242,11 @@ function PhoneVerificationFlow({ onVerified, initialPhone = "" }: PhoneVerificat
                 : "text-sage hover:text-sage/80 underline underline-offset-2",
             )}
           >
-            {isSending ? "Sending…" : cooldown > 0 ? `Resend in ${cooldown}s` : "Resend code"}
+            {isSending
+              ? "Sending…"
+              : cooldown > 0
+                ? `Resend in ${cooldown}s`
+                : "Resend code"}
           </button>
         </>
       )}
@@ -231,11 +275,15 @@ export function ProfilePreferences({
     call_opted_in?: boolean;
   } | null;
   const savedPhone = notifPrefs?.phone_number ?? "";
-  const [whatsappOptedIn, setWhatsappOptedIn] = useState(!!notifPrefs?.whatsapp_opted_in);
+  const [whatsappOptedIn, setWhatsappOptedIn] = useState(
+    !!notifPrefs?.whatsapp_opted_in,
+  );
   const [callOptedIn, setCallOptedIn] = useState(!!notifPrefs?.call_opted_in);
   const [togglingWhatsapp, setTogglingWhatsapp] = useState(false);
   const [togglingCall, setTogglingCall] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(() => getPermissionState() === 'granted');
+  const [pushEnabled, setPushEnabled] = useState(
+    () => getPermissionState() === "granted",
+  );
   const [togglingPush, setTogglingPush] = useState(false);
 
   async function handleTogglePush() {
@@ -259,10 +307,14 @@ export function ProfilePreferences({
     setTogglingWhatsapp(true);
     try {
       if (!whatsappOptedIn) {
-        const res = await apiFetch("/api/v1/account/whatsapp/opt-in", { method: "POST" });
+        const res = await apiFetch("/api/v1/account/whatsapp/opt-in", {
+          method: "POST",
+        });
         if (res.ok) setWhatsappOptedIn(true);
       } else {
-        await onPatch({ notification_preferences: { whatsapp_opted_in: false } });
+        await onPatch({
+          notification_preferences: { whatsapp_opted_in: false },
+        });
         setWhatsappOptedIn(false);
       }
     } finally {
@@ -274,7 +326,9 @@ export function ProfilePreferences({
     if (!phoneVerified || togglingCall) return;
     setTogglingCall(true);
     try {
-      await onPatch({ notification_preferences: { call_opted_in: !callOptedIn } });
+      await onPatch({
+        notification_preferences: { call_opted_in: !callOptedIn },
+      });
       setCallOptedIn((v) => !v);
     } finally {
       setTogglingCall(false);
@@ -472,7 +526,9 @@ export function ProfilePreferences({
                 <Phone className="w-5 h-5 text-river/60" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-river/70 mb-0.5">Phone number</p>
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-river/70 mb-0.5">
+                  Phone number
+                </p>
                 <p className="text-sm text-charcoal">{savedPhone}</p>
               </div>
             </div>
@@ -484,9 +540,13 @@ export function ProfilePreferences({
               <Bell className="w-5 h-5 text-river/60" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-charcoal">Push notifications</p>
+              <p className="text-sm font-semibold text-charcoal">
+                Push notifications
+              </p>
               <p className="text-xs text-river/60 mt-0.5">
-                {pushEnabled ? "Browser notifications enabled" : "Get notified right in your browser"}
+                {pushEnabled
+                  ? "Browser notifications enabled"
+                  : "Get notified right in your browser"}
               </p>
             </div>
             <button
@@ -498,7 +558,11 @@ export function ProfilePreferences({
                 "focus:outline-none disabled:cursor-not-allowed",
                 pushEnabled ? "bg-sage" : "bg-river/20",
               )}
-              aria-label={pushEnabled ? "Disable push notifications" : "Enable push notifications"}
+              aria-label={
+                pushEnabled
+                  ? "Disable push notifications"
+                  : "Enable push notifications"
+              }
             >
               <span
                 className={cn(
@@ -510,14 +574,23 @@ export function ProfilePreferences({
           </div>
 
           {/* WhatsApp opt-in */}
-          <div className={cn("flex items-center gap-3", !phoneVerified && "opacity-50")}>
+          <div
+            className={cn(
+              "flex items-center gap-3",
+              !phoneVerified && "opacity-50",
+            )}
+          >
             <div className="w-10 h-10 rounded-2xl glass-bubble flex items-center justify-center shrink-0">
               <MessageCircle className="w-5 h-5 text-river/60" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-charcoal">WhatsApp reminders</p>
+              <p className="text-sm font-semibold text-charcoal">
+                WhatsApp reminders
+              </p>
               <p className="text-xs text-river/60 mt-0.5">
-                {phoneVerified ? "Receive reminders via WhatsApp" : "Verify your phone to enable"}
+                {phoneVerified
+                  ? "Receive reminders via WhatsApp"
+                  : "Verify your phone to enable"}
               </p>
             </div>
             <button
@@ -529,7 +602,11 @@ export function ProfilePreferences({
                 "focus:outline-none disabled:cursor-not-allowed",
                 whatsappOptedIn ? "bg-sage" : "bg-river/20",
               )}
-              aria-label={whatsappOptedIn ? "Disable WhatsApp reminders" : "Enable WhatsApp reminders"}
+              aria-label={
+                whatsappOptedIn
+                  ? "Disable WhatsApp reminders"
+                  : "Enable WhatsApp reminders"
+              }
             >
               <span
                 className={cn(
@@ -541,14 +618,23 @@ export function ProfilePreferences({
           </div>
 
           {/* Call opt-in */}
-          <div className={cn("flex items-center gap-3", !phoneVerified && "opacity-50")}>
+          <div
+            className={cn(
+              "flex items-center gap-3",
+              !phoneVerified && "opacity-50",
+            )}
+          >
             <div className="w-10 h-10 rounded-2xl glass-bubble flex items-center justify-center shrink-0">
               <Phone className="w-5 h-5 text-river/60" />
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold text-charcoal">Phone call reminders</p>
+              <p className="text-sm font-semibold text-charcoal">
+                Phone call reminders
+              </p>
               <p className="text-xs text-river/60 mt-0.5">
-                {phoneVerified ? "Receive reminders via phone call" : "Verify your phone to enable"}
+                {phoneVerified
+                  ? "Receive reminders via phone call"
+                  : "Verify your phone to enable"}
               </p>
             </div>
             <button
@@ -560,7 +646,9 @@ export function ProfilePreferences({
                 "focus:outline-none disabled:cursor-not-allowed",
                 callOptedIn ? "bg-sage" : "bg-river/20",
               )}
-              aria-label={callOptedIn ? "Disable call reminders" : "Enable call reminders"}
+              aria-label={
+                callOptedIn ? "Disable call reminders" : "Enable call reminders"
+              }
             >
               <span
                 className={cn(

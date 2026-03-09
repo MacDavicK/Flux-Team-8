@@ -20,8 +20,22 @@ function GoalCard({ goal }: { goal: GoalProgress }) {
 
   return (
     <div className="flex items-center gap-3 px-4 py-3 w-full">
-      <svg width="44" height="44" className="shrink-0 -rotate-90">
-        <circle cx="22" cy="22" r={radius} fill="none" stroke="currentColor" strokeWidth="3" className="text-black/10" />
+      <svg
+        width="44"
+        height="44"
+        className="shrink-0 -rotate-90"
+        role="img"
+        aria-label={`${pct}% complete`}
+      >
+        <circle
+          cx="22"
+          cy="22"
+          r={radius}
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="3"
+          className="text-black/10"
+        />
         <circle
           cx="22"
           cy="22"
@@ -35,10 +49,14 @@ function GoalCard({ goal }: { goal: GoalProgress }) {
         />
       </svg>
       <div className="flex-1 min-w-0">
-        <p className="text-sm font-semibold text-charcoal truncate">{goal.title}</p>
+        <p className="text-sm font-semibold text-charcoal truncate">
+          {goal.title}
+        </p>
         <div className="flex items-center gap-2 mt-0.5">
           <p className="text-xs text-charcoal/60">{pct}% complete</p>
-          <span className={`text-xs font-medium ${goal.on_track ? "text-sage" : "text-red-400"}`}>
+          <span
+            className={`text-xs font-medium ${goal.on_track ? "text-sage" : "text-red-400"}`}
+          >
             {goal.on_track ? "· on track" : "· slipping"}
           </span>
         </div>
@@ -102,9 +120,10 @@ export function GoalProgressCard() {
 
       {goals.length > 1 && (
         <div className="flex justify-center gap-1.5 pb-2.5">
-          {goals.map((_, i) => (
+          {goals.map((goal, i) => (
             <button
-              key={i}
+              key={goal.goal_id}
+              type="button"
               onClick={() => setIndex(i)}
               className={`rounded-full transition-all duration-300 ${
                 i === index ? "w-4 h-1.5 bg-sage" : "w-1.5 h-1.5 bg-black/15"

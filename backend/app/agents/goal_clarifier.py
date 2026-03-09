@@ -1,4 +1,3 @@
-import json
 from pathlib import Path
 
 from app.agents.state import AgentState
@@ -64,9 +63,8 @@ async def goal_clarifier_node(state: AgentState) -> dict:
     return {
         "intent": "GOAL_CLARIFY",
         "goal_draft": goal_draft,
-        "conversation_history": history + [
-            {"role": "assistant", "content": assistant_message}
-        ],
+        "conversation_history": history
+        + [{"role": "assistant", "content": assistant_message}],
         # options carries the structured question list for the frontend
         "options": [q.model_dump() for q in result.questions],
     }

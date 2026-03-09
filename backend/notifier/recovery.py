@@ -1,6 +1,7 @@
 """
 15.3 — Recovery for stuck dispatch_log entries.
 """
+
 from __future__ import annotations
 
 import logging
@@ -49,14 +50,19 @@ async def recover_stuck_dispatches() -> None:
 
             await db.execute(
                 "UPDATE dispatch_log SET status = 'dispatched', dispatched_at = now() WHERE task_id = $1 AND channel = $2 AND status = 'pending'",
-                task_id, channel,
+                task_id,
+                channel,
             )
             recovered += 1
         except Exception as exc:
-            logger.warning("Recovery failed for task %s channel %s: %s", task_id, channel, exc)
+            logger.warning(
+                "Recovery failed for task %s channel %s: %s", task_id, channel, exc
+            )
             await db.execute(
                 "UPDATE dispatch_log SET status = 'failed', error = $3 WHERE task_id = $1 AND channel = $2 AND status = 'pending'",
-                task_id, channel, str(exc),
+                task_id,
+                channel,
+                str(exc),
             )
 
     if recovered:

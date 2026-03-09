@@ -9,7 +9,7 @@
     "start": "node .output/server/index.mjs",
     "lint": "biome lint .",
     "format": "biome format . --write",
-    "check": "biome check --write .",
+    "check": "biome check --write . --unsafe",
     "test": "vitest run",
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage"

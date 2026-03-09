@@ -90,15 +90,17 @@ def load_intents() -> list[dict[str, Any]]:
             if param.get("required"):
                 required.append(param["name"])
 
-        functions.append({
-            "name": intent["name"],
-            "description": intent.get("description", ""),
-            "parameters": {
-                "type": "object",
-                "properties": properties,
-                "required": required,
-            },
-        })
+        functions.append(
+            {
+                "name": intent["name"],
+                "description": intent.get("description", ""),
+                "parameters": {
+                    "type": "object",
+                    "properties": properties,
+                    "required": required,
+                },
+            }
+        )
 
     return functions
 
@@ -132,7 +134,9 @@ async def _load_user_context(user_id: str) -> str:
         lines.append("\n### Today's active tasks:")
         for t in tasks:
             tid = t.get("id", "")[:8]
-            lines.append(f"- [{tid}] {t['title']} (at {t.get('scheduled_at', 'unscheduled')})")
+            lines.append(
+                f"- [{tid}] {t['title']} (at {t.get('scheduled_at', 'unscheduled')})"
+            )
     else:
         lines.append("\n### Today's active tasks: none")
     return "\n".join(lines)

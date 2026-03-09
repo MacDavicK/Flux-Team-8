@@ -1,6 +1,7 @@
 """
 21.2.1 — Integration tests for POST /chat/message.
 """
+
 from __future__ import annotations
 
 import pytest
@@ -12,11 +13,13 @@ from fastapi.testclient import TestClient
 def chat_client():
     from fastapi import FastAPI
     from app.api.v1.chat import router
+
     app = FastAPI()
     app.include_router(router)
 
     # Override auth
     from app.middleware.auth import get_current_user
+
     mock_user = MagicMock()
     mock_user.id = "test-user-uuid"
     app.dependency_overrides[get_current_user] = lambda: mock_user
@@ -37,16 +40,26 @@ async def test_post_chat_message_creates_conversation(chat_client):
         "goal_draft": None,
     }
 
-    with patch("app.api.v1.chat.db") as mock_db, \
-         patch("app.api.v1.chat.compiled_graph") as mock_graph, \
-         patch("app.api.v1.chat.window_conversation_history", AsyncMock(side_effect=lambda h, uid, cid=None: h)):
-
+    with (
+        patch("app.api.v1.chat.db") as mock_db,
+        patch("app.api.v1.chat.compiled_graph") as mock_graph,
+        patch(
+            "app.api.v1.chat.window_conversation_history",
+            AsyncMock(side_effect=lambda h, uid, cid=None: h),
+        ),
+    ):
         import uuid
+
         conv_id = uuid.uuid4()
-        mock_db.fetchrow = AsyncMock(side_effect=[
-            {"id": conv_id, "langgraph_thread_id": str(uuid.uuid4())},  # INSERT conversation
-            {"profile": {}, "timezone": "UTC"},  # user profile fetch
-        ])
+        mock_db.fetchrow = AsyncMock(
+            side_effect=[
+                {
+                    "id": conv_id,
+                    "langgraph_thread_id": str(uuid.uuid4()),
+                },  # INSERT conversation
+                {"profile": {}, "timezone": "UTC"},  # user profile fetch
+            ]
+        )
         mock_db.fetch = AsyncMock(return_value=[])  # no existing messages
         mock_db.execute = AsyncMock(return_value="OK")
         mock_graph.ainvoke = AsyncMock(return_value=mock_graph_result)

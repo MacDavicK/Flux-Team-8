@@ -87,9 +87,9 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   // Keep the service worker push listener alive so notifications are handled
   // while the app is in the foreground.
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
     let cleanup: (() => void) | undefined;
-    import('~/lib/pushNotifications').then(({ listenForInAppPushes }) => {
+    import("~/lib/pushNotifications").then(({ listenForInAppPushes }) => {
       cleanup = listenForInAppPushes(() => {
         // Push notifications are handled natively by the service worker.
         // Add in-app banner logic here if needed in the future.
@@ -105,7 +105,10 @@ function RootDocument({ children }: { children: React.ReactNode }) {
       </head>
       <body>
         {showSplash && (
-          <SplashScreen onComplete={() => setShowSplash(false)} minDuration={3000} />
+          <SplashScreen
+            onComplete={() => setShowSplash(false)}
+            minDuration={3000}
+          />
         )}
         <main className="relative min-h-screen overflow-x-hidden w-full max-w-md mx-auto">
           {children}

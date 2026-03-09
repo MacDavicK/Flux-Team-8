@@ -34,6 +34,7 @@ def get_pool() -> asyncpg.Pool:
 # Query helpers
 # ─────────────────────────────────────────────────────────────────
 
+
 class _Database:
     async def fetch(self, query: str, *args) -> list[asyncpg.Record]:
         async with get_pool().acquire() as conn:

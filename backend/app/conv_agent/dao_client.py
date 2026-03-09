@@ -31,9 +31,7 @@ class ConvAgentDaoClient:
         self._external_client = client
         self._headers = {"X-Flux-Service-Key": self.service_key}
 
-    async def _request(
-        self, method: str, path: str, **kwargs: Any
-    ) -> httpx.Response:
+    async def _request(self, method: str, path: str, **kwargs: Any) -> httpx.Response:
         """Execute an HTTP request, using injected or fresh client."""
         url = f"{self.base_url}{path}"
         if self._external_client is not None:
@@ -51,7 +49,10 @@ class ConvAgentDaoClient:
     # -- Conversations -------------------------------------------------------
 
     async def create_conversation(
-        self, user_id: str, langgraph_thread_id: str, context_type: str = "voice",
+        self,
+        user_id: str,
+        langgraph_thread_id: str,
+        context_type: str = "voice",
         voice_session_id: str | None = None,
     ) -> dict:
         """POST /api/v1/conversations/"""
@@ -82,16 +83,23 @@ class ConvAgentDaoClient:
     # -- Messages ------------------------------------------------------------
 
     async def save_message(
-        self, conversation_id: str, role: str, content: str,
+        self,
+        conversation_id: str,
+        role: str,
+        content: str,
         input_modality: str = "voice",
     ) -> dict:
         """POST /api/v1/messages/"""
-        resp = await self._request("POST", "/api/v1/messages/", json={
-            "conversation_id": conversation_id,
-            "role": role,
-            "content": content,
-            "input_modality": input_modality,
-        })
+        resp = await self._request(
+            "POST",
+            "/api/v1/messages/",
+            json={
+                "conversation_id": conversation_id,
+                "role": role,
+                "content": content,
+                "input_modality": input_modality,
+            },
+        )
         return resp.json()
 
     async def get_messages(self, conversation_id: str) -> list[dict]:
@@ -126,7 +134,8 @@ class ConvAgentDaoClient:
         """GET /api/v1/tasks/by-timerange -- returns [] on error."""
         try:
             resp = await self._request(
-                "GET", "/api/v1/tasks/by-timerange",
+                "GET",
+                "/api/v1/tasks/by-timerange",
                 params={"user_id": user_id, "start_at": start_at, "end_at": end_at},
             )
             return resp.json()
@@ -146,9 +155,7 @@ class ConvAgentDaoClient:
 
     async def update_task(self, task_id: str, **fields: Any) -> dict:
         """PATCH /api/v1/tasks/{task_id}"""
-        resp = await self._request(
-            "PATCH", f"/api/v1/tasks/{task_id}", json=fields
-        )
+        resp = await self._request("PATCH", f"/api/v1/tasks/{task_id}", json=fields)
         return resp.json()
 
     async def create_task(
@@ -168,17 +175,24 @@ class ConvAgentDaoClient:
     # -- Goals ---------------------------------------------------------------
 
     async def create_goal(
-        self, user_id: str, title: str, target_weeks: int = 6,
+        self,
+        user_id: str,
+        title: str,
+        target_weeks: int = 6,
         description: str = "",
     ) -> dict:
         """POST /api/v1/goals/"""
-        resp = await self._request("POST", "/api/v1/goals/", json={
-            "user_id": user_id,
-            "title": title,
-            "target_weeks": target_weeks,
-            "description": description,
-            "status": "active",
-        })
+        resp = await self._request(
+            "POST",
+            "/api/v1/goals/",
+            json={
+                "user_id": user_id,
+                "title": title,
+                "target_weeks": target_weeks,
+                "description": description,
+                "status": "active",
+            },
+        )
         return resp.json()
 
 

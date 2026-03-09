@@ -3,7 +3,11 @@
 import pytest
 from httpx import AsyncClient
 
-from dao_service.tests.conftest import make_conversation_data, make_message_data, make_user_data
+from dao_service.tests.conftest import (
+    make_conversation_data,
+    make_message_data,
+    make_user_data,
+)
 
 
 @pytest.mark.asyncio
@@ -55,9 +59,7 @@ class TestMessageCRUD:
         assert resp.json()["id"] == msg_id
 
     async def test_get_message_not_found(self, client: AsyncClient):
-        resp = await client.get(
-            "/api/v1/messages/00000000-0000-0000-0000-000000000000"
-        )
+        resp = await client.get("/api/v1/messages/00000000-0000-0000-0000-000000000000")
         assert resp.status_code == 404
 
     async def test_delete_message(self, client: AsyncClient):

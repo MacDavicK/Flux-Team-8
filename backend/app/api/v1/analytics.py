@@ -1,8 +1,8 @@
 """Analytics API endpoints — §17.4"""
+
 from __future__ import annotations
 
 from datetime import date, timedelta
-from typing import Any
 
 from fastapi import APIRouter, Depends, Query, Request
 
@@ -41,16 +41,36 @@ async def get_overview(request: Request, user=Depends(get_current_user)) -> dict
         user_id,
     )
     streak_days = _compute_streak([row["day"] for row in done_date_rows])
-    today_done = await db.fetchval("SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status = 'done' AND DATE(scheduled_at) = $2", user_id, today) or 0
-    today_total = await db.fetchval("SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status IN ('pending', 'done') AND DATE(scheduled_at) = $2", user_id, today) or 0
+    today_done = (
+        await db.fetchval(
+            "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status = 'done' AND DATE(scheduled_at) = $2",
+            user_id,
+            today,
+        )
+        or 0
+    )
+    today_total = (
+        await db.fetchval(
+            "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status IN ('pending', 'done') AND DATE(scheduled_at) = $2",
+            user_id,
+            today,
+        )
+        or 0
+    )
     today_completion_pct = (today_done / today_total) if today_total > 0 else 0.0
-    heatmap_rows = await db.fetch("SELECT day, completed_count FROM activity_heatmap WHERE user_id = $1 ORDER BY day DESC LIMIT 365", user_id)
+    heatmap_rows = await db.fetch(
+        "SELECT day, completed_count FROM activity_heatmap WHERE user_id = $1 ORDER BY day DESC LIMIT 365",
+        user_id,
+    )
     return {
         "streak_days": streak_days,
         "today_done": today_done,
         "today_total": today_total,
         "today_completion_pct": round(today_completion_pct, 4),
-        "heatmap": [{"day": str(row["day"]), "done_count": row["completed_count"]} for row in heatmap_rows],
+        "heatmap": [
+            {"day": str(row["day"]), "done_count": row["completed_count"]}
+            for row in heatmap_rows
+        ],
     }
 
 
@@ -58,27 +78,80 @@ async def get_overview(request: Request, user=Depends(get_current_user)) -> dict
 @limiter.limit("30/minute")
 async def get_goals_progress(request: Request, user=Depends(get_current_user)) -> list:
     user_id = str(user["sub"])
-    goals = await db.fetch("SELECT id, title, status FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY pipeline_order ASC", user_id)
+    goals = await db.fetch(
+        "SELECT id, title, status FROM goals WHERE user_id = $1 AND status = 'active' ORDER BY pipeline_order ASC",
+        user_id,
+    )
     result = []
     for goal in goals:
         goal_id = str(goal["id"])
-        done_count = await db.fetchval("SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND goal_id = $2 AND status = 'done'", user_id, goal_id) or 0
-        total_count = await db.fetchval("SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND goal_id = $2 AND status IN ('pending','done')", user_id, goal_id) or 0
-        result.append({"goal_id": goal_id, "title": goal["title"], "tasks_done": done_count, "tasks_total": total_count, "completion_pct": round(done_count / total_count, 4) if total_count > 0 else 0.0})
+        done_count = (
+            await db.fetchval(
+                "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND goal_id = $2 AND status = 'done'",
+                user_id,
+                goal_id,
+            )
+            or 0
+        )
+        total_count = (
+            await db.fetchval(
+                "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND goal_id = $2 AND status IN ('pending','done')",
+                user_id,
+                goal_id,
+            )
+            or 0
+        )
+        result.append(
+            {
+                "goal_id": goal_id,
+                "title": goal["title"],
+                "tasks_done": done_count,
+                "tasks_total": total_count,
+                "completion_pct": round(done_count / total_count, 4)
+                if total_count > 0
+                else 0.0,
+            }
+        )
     return result
 
 
 @router.get("/missed-by-cat")
 @limiter.limit("30/minute")
-async def get_missed_by_category(request: Request, user=Depends(get_current_user)) -> list:
+async def get_missed_by_category(
+    request: Request, user=Depends(get_current_user)
+) -> list:
     user_id = str(user["sub"])
-    rows = await db.fetch("SELECT category, missed_count FROM missed_by_category WHERE user_id = $1 ORDER BY missed_count DESC", user_id)
-    return [{"category": row["category"], "missed_count": row["missed_count"]} for row in rows]
+    rows = await db.fetch(
+        "SELECT category, missed_count FROM missed_by_category WHERE user_id = $1 ORDER BY missed_count DESC",
+        user_id,
+    )
+    return [
+        {"category": row["category"], "missed_count": row["missed_count"]}
+        for row in rows
+    ]
 
 
 @router.get("/weekly")
 @limiter.limit("30/minute")
-async def get_weekly_stats(request: Request, weeks: int = Query(default=12, ge=1, le=52), user=Depends(get_current_user)) -> list:
+async def get_weekly_stats(
+    request: Request,
+    weeks: int = Query(default=12, ge=1, le=52),
+    user=Depends(get_current_user),
+) -> list:
     user_id = str(user["sub"])
-    rows = await db.fetch("SELECT week, completed, total FROM user_weekly_stats WHERE user_id = $1 ORDER BY week DESC LIMIT $2", user_id, weeks)
-    return [{"week": str(row["week"]), "completed": row["completed"], "total": row["total"], "completion_pct": round(row["completed"] / row["total"], 4) if row["total"] > 0 else 0.0} for row in rows]
+    rows = await db.fetch(
+        "SELECT week, completed, total FROM user_weekly_stats WHERE user_id = $1 ORDER BY week DESC LIMIT $2",
+        user_id,
+        weeks,
+    )
+    return [
+        {
+            "week": str(row["week"]),
+            "completed": row["completed"],
+            "total": row["total"],
+            "completion_pct": round(row["completed"] / row["total"], 4)
+            if row["total"] > 0
+            else 0.0,
+        }
+        for row in rows
+    ]

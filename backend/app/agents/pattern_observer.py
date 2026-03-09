@@ -38,8 +38,12 @@ async def pattern_observer_node(state: AgentState) -> dict:
         {
             "title": row["title"],
             "status": row["status"],
-            "scheduled_at": row["scheduled_at"].isoformat() if row["scheduled_at"] else None,
-            "completed_at": row["completed_at"].isoformat() if row["completed_at"] else None,
+            "scheduled_at": row["scheduled_at"].isoformat()
+            if row["scheduled_at"]
+            else None,
+            "completed_at": row["completed_at"].isoformat()
+            if row["completed_at"]
+            else None,
             "duration_minutes": row["duration_minutes"],
             "tags": list(row["class_tags"]),
         }
@@ -71,7 +75,9 @@ async def pattern_observer_node(state: AgentState) -> dict:
     result: PatternObserverOutput = await validated_llm_call(
         model=_MODEL,
         system_prompt=_PROMPT + context_block,
-        messages=[{"role": "user", "content": "Analyze this user's scheduling patterns."}],
+        messages=[
+            {"role": "user", "content": "Analyze this user's scheduling patterns."}
+        ],
         output_model=PatternObserverOutput,
         max_tokens=1024,
         user_id=user_id,
@@ -81,7 +87,9 @@ async def pattern_observer_node(state: AgentState) -> dict:
         "pattern_output": {
             "best_times": result.best_times,
             "avoid_slots": [s.model_dump() for s in result.avoid_slots],
-            "category_performance": [p.model_dump() for p in result.category_performance],
+            "category_performance": [
+                p.model_dump() for p in result.category_performance
+            ],
             "general_notes": result.general_notes,
         }
     }
@@ -135,14 +143,16 @@ async def flag_goal_milestone_completion(
         pattern_key,
         f"Completed milestone '{milestone_title}' (pipeline_order={pipeline_order})",
         confidence,
-        json.dumps({
-            "goal_id": goal_id,
-            "pipeline_order": pipeline_order,
-            "milestone_title": milestone_title,
-            "completed_task_count": done,
-            "total_task_count": total,
-            "completion_rate": completion_rate,
-        }),
+        json.dumps(
+            {
+                "goal_id": goal_id,
+                "pipeline_order": pipeline_order,
+                "milestone_title": milestone_title,
+                "completed_task_count": done,
+                "total_task_count": total,
+                "completion_rate": completion_rate,
+            }
+        ),
     )
 
 
@@ -222,5 +232,7 @@ async def check_and_flag_pattern(user_id: str, task_id: str) -> None:
             pattern_key,
             f"Consistently missed on {day_of_week} around {time_str}",
             confidence,
-            json.dumps({"miss_count": miss_count, "day": day_of_week, "time": time_str}),
+            json.dumps(
+                {"miss_count": miss_count, "day": day_of_week, "time": time_str}
+            ),
         )

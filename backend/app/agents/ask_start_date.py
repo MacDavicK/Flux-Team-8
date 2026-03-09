@@ -22,7 +22,7 @@ async def ask_start_date_node(state: AgentState) -> dict:
     history = list(state.get("conversation_history") or [])
     question = (
         "When would you like to start? "
-        "You can say \"today\", \"tomorrow\", \"next Monday\", or give me a specific date — "
+        'You can say "today", "tomorrow", "next Monday", or give me a specific date — '
         "and I'll schedule your first task from there."
     )
     return {

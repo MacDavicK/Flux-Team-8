@@ -52,7 +52,9 @@ async def handle_intent(
     except Exception as exc:
         logger.error(
             "Intent handler failed: function=%s error=%s",
-            function_name, exc, exc_info=True,
+            function_name,
+            exc,
+            exc_info=True,
         )
         return "Something went wrong while processing your request. Please try again."
 
@@ -216,6 +218,7 @@ def _parse_timeline_weeks(timeline: str | None) -> int:
     lower = timeline.lower()
     # Simple heuristic: look for a number followed by week/month
     import re
+
     match = re.search(r"(\d+)\s*(week|month|wk|mo)", lower)
     if match:
         num = int(match.group(1))

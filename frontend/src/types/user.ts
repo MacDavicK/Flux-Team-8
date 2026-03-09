@@ -154,8 +154,8 @@ export interface AccountMe {
   timezone?: string | null;
   onboarded?: boolean | null;
   phone_verified?: boolean | null;
-  notification_preferences?: { [key: string]: {} } | null;
-  monthly_token_usage?: { [key: string]: {} } | null;
+  notification_preferences?: { [key: string]: unknown } | null;
+  monthly_token_usage?: { [key: string]: unknown } | null;
 }
 
 /**

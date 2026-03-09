@@ -1,5 +1,5 @@
 import json
-from typing import TYPE_CHECKING, Type, TypeVar
+from typing import Type, TypeVar
 
 import litellm
 from pydantic import BaseModel, ValidationError
@@ -26,13 +26,18 @@ litellm.request_timeout = 30  # seconds
 litellm.fallbacks = [
     {"openrouter/openai/gpt-4o": ["openrouter/anthropic/claude-sonnet-4"]},
     {"openrouter/anthropic/claude-sonnet-4": ["openrouter/openai/gpt-4o"]},
-    {"openrouter/openai/gpt-4o-mini": ["openrouter/anthropic/claude-haiku-4-5-20251001"]},
+    {
+        "openrouter/openai/gpt-4o-mini": [
+            "openrouter/anthropic/claude-haiku-4-5-20251001"
+        ]
+    },
 ]
 
 
 # ─────────────────────────────────────────────────────────────────
 # 4.3 — Core LLM call
 # ─────────────────────────────────────────────────────────────────
+
 
 async def llm_call(
     model: str,
@@ -69,6 +74,7 @@ async def llm_call(
 # 4.4 — Atomic token usage update
 # ─────────────────────────────────────────────────────────────────
 
+
 async def update_token_usage(user_id: str, provider: str, tokens: int) -> None:
     """Atomically increment per-provider and total monthly token usage."""
     await db.execute(
@@ -93,6 +99,7 @@ async def update_token_usage(user_id: str, provider: str, tokens: int) -> None:
 # ─────────────────────────────────────────────────────────────────
 # 7.1 — Validated LLM call with Pydantic parsing + retry loop
 # ─────────────────────────────────────────────────────────────────
+
 
 async def validated_llm_call(
     model: str,
@@ -158,6 +165,7 @@ async def validated_llm_call(
 # ─────────────────────────────────────────────────────────────────
 # 4.5 — Token budget check
 # ─────────────────────────────────────────────────────────────────
+
 
 async def check_token_budget(user_id: str) -> str:
     """Returns 'ok' | 'soft_limit' | 'hard_limit'."""

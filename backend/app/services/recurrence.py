@@ -9,6 +9,7 @@ For any recurring task that transitions out of 'pending' (done or missed),
 advance_recurring_task() inserts the next occurrence — subject to the goal's
 active timeframe when the task belongs to a goal.
 """
+
 from __future__ import annotations
 
 import logging
@@ -49,7 +50,11 @@ async def advance_recurring_task(task_id: str) -> bool:
     user_tz = (tz_row["timezone"] if tz_row else None) or "UTC"
 
     scheduled_at = task_row["scheduled_at"]
-    ref_dt = pendulum.instance(scheduled_at) if hasattr(scheduled_at, "isoformat") else pendulum.parse(str(scheduled_at))
+    ref_dt = (
+        pendulum.instance(scheduled_at)
+        if hasattr(scheduled_at, "isoformat")
+        else pendulum.parse(str(scheduled_at))
+    )
 
     next_utc = next_occurrence_after(
         rrule_string=task_row["recurrence_rule"],
@@ -68,15 +73,24 @@ async def advance_recurring_task(task_id: str) -> bool:
             goal_id,
         )
         if goal_row and goal_row["status"] in ("completed", "abandoned"):
-            logger.info("Goal %s is %s — not advancing recurring task %s", goal_id, goal_row["status"], task_id)
+            logger.info(
+                "Goal %s is %s — not advancing recurring task %s",
+                goal_id,
+                goal_row["status"],
+                task_id,
+            )
             return False
         if goal_row and goal_row["activated_at"] and goal_row["target_weeks"]:
-            sprint_end = pendulum.instance(goal_row["activated_at"]).add(weeks=goal_row["target_weeks"])
+            sprint_end = pendulum.instance(goal_row["activated_at"]).add(
+                weeks=goal_row["target_weeks"]
+            )
             next_dt = pendulum.parse(next_utc)
             if next_dt > sprint_end:
                 logger.info(
                     "Next occurrence %s is past sprint end %s — not advancing recurring task %s",
-                    next_utc, sprint_end.isoformat(), task_id,
+                    next_utc,
+                    sprint_end.isoformat(),
+                    task_id,
                 )
                 return False
 
