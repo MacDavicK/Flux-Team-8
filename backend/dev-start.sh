@@ -77,9 +77,9 @@ ask() {
     fi
 
     if [[ "$secret" == "secret" ]]; then
-        IFS= read -rs reply; echo
+        IFS= read -rsp "" reply; echo
     else
-        IFS= read -r reply
+        IFS= read -re reply
     fi
 
     if [[ -z "$reply" && -n "$default" ]]; then
