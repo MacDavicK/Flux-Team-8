@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock, patch
 
 def _make_state(conversation_history=None):
     return {
-        "user_id": "test-user-id",
+        "user_id": "00000000-0000-0000-0000-000000000001",
         "conversation_history": conversation_history
         or [{"role": "user", "content": "I want to run a 5K"}],
         "intent": None,

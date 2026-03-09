@@ -16,7 +16,9 @@ async def test_returns_ok_below_soft_limit():
     ):
         mock_settings.monthly_token_soft_limit = 500_000
         mock_settings.monthly_token_hard_limit = 1_000_000
-        mock_db.fetchval = AsyncMock(return_value=100_000)
+        mock_db.fetchrow = AsyncMock(
+            return_value={"monthly_token_usage": {"total": 100_000}}
+        )
 
         from app.services.llm import check_token_budget
 
@@ -32,7 +34,9 @@ async def test_returns_soft_limit_between_thresholds():
     ):
         mock_settings.monthly_token_soft_limit = 500_000
         mock_settings.monthly_token_hard_limit = 1_000_000
-        mock_db.fetchval = AsyncMock(return_value=600_000)
+        mock_db.fetchrow = AsyncMock(
+            return_value={"monthly_token_usage": {"total": 600_000}}
+        )
 
         from app.services.llm import check_token_budget
 
@@ -48,7 +52,9 @@ async def test_returns_hard_limit_above_hard_threshold():
     ):
         mock_settings.monthly_token_soft_limit = 500_000
         mock_settings.monthly_token_hard_limit = 1_000_000
-        mock_db.fetchval = AsyncMock(return_value=1_200_000)
+        mock_db.fetchrow = AsyncMock(
+            return_value={"monthly_token_usage": {"total": 1_200_000}}
+        )
 
         from app.services.llm import check_token_budget
 

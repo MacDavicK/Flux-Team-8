@@ -39,6 +39,7 @@ async def test_goal_planner_returns_plan_summary():
     from app.models.agent_outputs import GoalPlannerOutput, ProposedTask
 
     mock_output = GoalPlannerOutput(
+        goal_title="Run a 5K",
         goal_feasible_in_6_weeks=True,
         proposed_tasks=[
             ProposedTask(
@@ -64,7 +65,9 @@ async def test_goal_planner_returns_plan_summary():
             "app.agents.goal_planner.check_token_budget", AsyncMock(return_value="ok")
         ),
         patch("app.agents.goal_planner.db"),
+        patch("app.services.user_notes.db") as mock_notes_db,
     ):
+        mock_notes_db.fetch = AsyncMock(return_value=[])
         from app.agents.goal_planner import goal_planner_node
 
         result = await goal_planner_node(_make_state())
@@ -86,6 +89,7 @@ async def test_milestone_decomposition_when_not_feasible():
     from app.models.agent_outputs import GoalPlannerOutput, ProposedTask, Milestone
 
     mock_output = GoalPlannerOutput(
+        goal_title="Run a 5K",
         goal_feasible_in_6_weeks=False,
         milestone_roadmap=[
             Milestone(
@@ -119,9 +123,11 @@ async def test_milestone_decomposition_when_not_feasible():
             "app.agents.goal_planner.check_token_budget", AsyncMock(return_value="ok")
         ),
         patch("app.agents.goal_planner.db") as mock_db,
+        patch("app.services.user_notes.db") as mock_notes_db,
     ):
         mock_db.execute = AsyncMock()
         mock_db.fetchrow = AsyncMock(return_value=None)
+        mock_notes_db.fetch = AsyncMock(return_value=[])
 
         from app.agents.goal_planner import goal_planner_node
 

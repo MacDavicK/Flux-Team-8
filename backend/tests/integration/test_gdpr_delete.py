@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 import pytest
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 from fastapi.testclient import TestClient
 
 
@@ -19,8 +19,7 @@ def account_client():
 
     from app.middleware.auth import get_current_user
 
-    mock_user = MagicMock()
-    mock_user.id = "test-user-uuid"
+    mock_user = {"sub": "00000000-0000-0000-0000-000000000001"}
     app.dependency_overrides[get_current_user] = lambda: mock_user
 
     return TestClient(app)
@@ -39,7 +38,7 @@ def test_delete_account_cascades_all_rows(account_client):
     with patch("app.api.v1.account.db") as mock_db:
         mock_db.execute = AsyncMock(side_effect=capture_execute)
 
-        response = account_client.delete("/")
+        response = account_client.delete("/account/")
 
     assert response.status_code == 204
     # All major table deletions should have occurred

@@ -47,12 +47,9 @@ async def test_summarization_triggers_at_message_limit():
         mock_settings.max_conversation_messages = 20
         mock_settings.max_conversation_tokens = 8000
 
-        from importlib import reload
-        import app.services.context_manager as cm_module
+        from app.services.context_manager import window_conversation_history
 
-        reload(cm_module)
-
-        result = await cm_module.window_conversation_history(history, "user-1")
+        result = await window_conversation_history(history, "user-1")
 
     # Summary message should be prepended
     assert result[0]["role"] == "summary"
@@ -76,12 +73,9 @@ async def test_summary_is_prepended_correctly():
         mock_settings.max_conversation_messages = 20
         mock_settings.max_conversation_tokens = 8000
 
-        from importlib import reload
-        import app.services.context_manager as cm_module
+        from app.services.context_manager import window_conversation_history
 
-        reload(cm_module)
-
-        result = await cm_module.window_conversation_history(history, "user-1")
+        result = await window_conversation_history(history, "user-1")
 
     assert result[0] == {"role": "summary", "content": mock_summary}
     # Recent half messages are preserved after summary

@@ -15,6 +15,16 @@ import pytest
 
 
 @pytest.fixture
+def sample_user_data():
+    """Sample user data for smoke tests."""
+    return {
+        "email": "testuser@flux.dev",
+        "name": "Test User",
+        "id": "00000000-0000-0000-0000-000000000001",
+    }
+
+
+@pytest.fixture
 def mock_llm_call(monkeypatch):
     """Patch llm_call and validated_llm_call to return controllable values."""
     mock = AsyncMock(
