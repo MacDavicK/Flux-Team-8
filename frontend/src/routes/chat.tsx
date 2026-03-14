@@ -1,39 +1,63 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, redirect, useRouter } from "@tanstack/react-router";
 import { AnimatePresence, motion } from "framer-motion";
 import { History, MessageSquarePlus, X } from "lucide-react";
+import type React from "react";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { z } from "zod";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { ChatInput } from "~/components/chat/ChatInput";
+import { GoalClarifierView } from "~/components/chat/GoalClarifierView";
+import { MarkdownMessage } from "~/components/chat/MarkdownMessage";
+import {
+  MilestoneRoadmapView,
+  type RoadmapMilestone,
+} from "~/components/chat/MilestoneRoadmapView";
+import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { PlanView } from "~/components/chat/PlanView";
+import { StartDatePicker } from "~/components/chat/StartDatePicker";
+import { type ProposedTask, TasksView } from "~/components/chat/TasksView";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
+import { LoadingState } from "~/components/ui/LoadingState";
 import { useAuth } from "~/contexts/AuthContext";
-import { useSimulation } from "~/contexts/SimulationContext";
-import { VoiceOverlay } from "~/conv_agent/components/VoiceOverlay";
-import { useVoiceAgent } from "~/conv_agent/useVoiceAgent";
-import type {
-  ConversationSummary,
-  HistoryMessage,
-} from "~/services/ChatService";
+import { useVoice } from "~/hooks/useVoice";
+import { setInMemoryToken } from "~/lib/apiClient";
+import { serverGetMe } from "~/lib/authServerFns";
+import type { ConversationSummary } from "~/services/ChatService";
+import { chatService } from "~/services/ChatService";
+import { tasksService } from "~/services/TasksService";
 import type { ChatMessage, PlanMilestone } from "~/types";
 import { MessageVariant } from "~/types/message";
-import { api, type RAGSource } from "~/utils/api";
-import { useBackendReady } from "~/utils/useMockFallback";
 
-const MAX_CHAT_RETRIES = 2;
+const _MAX_CHAT_RETRIES = 2;
 
 /** Substring that indicates the "no expert guidance" fallback message (show in plan card banner). */
-const FALLBACK_EXPERT_PREFIX =
+const _FALLBACK_EXPERT_PREFIX =
   "I don't have expert guidance for this specific goal yet";
-const RETRY_DELAY_MS = 1500;
+const _RETRY_DELAY_MS = 1500;
 
 export const Route = createFileRoute("/chat")({
+  pendingComponent: () => (
+    <div className="relative min-h-screen flex flex-col items-center justify-center">
+      <AmbientBackground variant="dark" />
+      <LoadingState />
+    </div>
+  ),
+  pendingMs: 0,
+  validateSearch: z.object({
+    reschedule_task_id: z.string().optional(),
+    task_name: z.string().optional(),
+    conversation: z.string().optional(),
+  }),
+  loader: async () => {
+    const { user, token } = await serverGetMe();
+    if (!user) throw redirect({ to: "/login" });
+    if (!user.onboarded) throw redirect({ to: "/onboarding" });
+    return { user, token };
+  },
   component: ChatPage,
 });
-
-/** Mock user ID for MVP — matches Alice in seed_test_data.sql. Will come from auth in production. */
-const MOCK_USER_ID = "a1000000-0000-0000-0000-000000000001";
 
 function formatRelativeTime(dateStr: string): string {
   const date = new Date(dateStr);
@@ -54,33 +78,184 @@ function getGreeting(name?: string): string {
   return name ? `${salutation}, ${name.split(" ")[0]}` : salutation;
 }
 
+interface ParsedPlan {
+  feasible: boolean;
+  milestones: PlanMilestone[] | null;
+  roadmap: RoadmapMilestone[] | null;
+  firstMilestoneTasks: ProposedTask[] | null;
+}
+
+function parseProposedPlan(proposed_plan: Record<string, unknown>): ParsedPlan {
+  const plan = proposed_plan.plan as Record<string, unknown> | undefined;
+  const empty: ParsedPlan = {
+    feasible: true,
+    milestones: null,
+    roadmap: null,
+    firstMilestoneTasks: null,
+  };
+  if (!plan) return empty;
+
+  const feasible = (plan.goal_feasible_in_6_weeks as boolean) ?? true;
+
+  if (!feasible) {
+    const rawRoadmap = plan.milestone_roadmap as
+      | Array<{
+          title: string;
+          description?: string;
+          pipeline_order?: number;
+          target_weeks?: number;
+        }>
+      | undefined;
+
+    const roadmap: RoadmapMilestone[] | null =
+      Array.isArray(rawRoadmap) && rawRoadmap.length > 0
+        ? rawRoadmap
+            .slice()
+            .sort((a, b) => (a.pipeline_order ?? 0) - (b.pipeline_order ?? 0))
+            .map((item) => ({
+              title: item.title,
+              description: item.description ?? "",
+              pipeline_order: item.pipeline_order ?? 0,
+              target_weeks: item.target_weeks ?? 6,
+            }))
+        : null;
+
+    const rawTasks = plan.proposed_tasks as
+      | Array<{
+          title: string;
+          description?: string;
+          scheduled_days?: string[];
+          suggested_time?: string;
+          duration_minutes?: number;
+          recurrence_rule?: string;
+          week_range?: number[];
+        }>
+      | undefined;
+
+    const firstMilestoneTasks: ProposedTask[] | null =
+      Array.isArray(rawTasks) && rawTasks.length > 0
+        ? rawTasks.map((t) => ({
+            title: t.title,
+            description: t.description ?? "",
+            scheduled_days: t.scheduled_days ?? [],
+            suggested_time: t.suggested_time ?? "",
+            duration_minutes: t.duration_minutes ?? 30,
+            recurrence_rule: t.recurrence_rule ?? "",
+            week_range: t.week_range ?? [1, 6],
+          }))
+        : null;
+
+    return { feasible: false, milestones: null, roadmap, firstMilestoneTasks };
+  }
+
+  const rawTasks = plan.proposed_tasks as
+    | Array<{ title: string; description?: string; week_range?: number[] }>
+    | undefined;
+  if (!Array.isArray(rawTasks) || rawTasks.length === 0) return empty;
+
+  const groups = new Map<
+    string,
+    { weekStart: number; tasks: string[]; milestone: string }
+  >();
+  for (const task of rawTasks) {
+    const [start = 1, end = start] = task.week_range ?? [1, 1];
+    const key = start === end ? `${start}` : `${start}-${end}`;
+    if (!groups.has(key)) {
+      groups.set(key, {
+        weekStart: start,
+        tasks: [],
+        milestone: task.description ?? "",
+      });
+    }
+    groups.get(key)?.tasks.push(task.title);
+  }
+
+  const milestones: PlanMilestone[] = Array.from(groups.entries())
+    .sort(([, a], [, b]) => a.weekStart - b.weekStart)
+    .map(([key, { tasks: groupTasks, milestone }]) => ({
+      week: key.includes("-") ? `Weeks ${key}` : `Week ${key}`,
+      milestone,
+      tasks: groupTasks,
+    }));
+
+  return {
+    feasible: true,
+    milestones,
+    roadmap: null,
+    firstMilestoneTasks: null,
+  };
+}
+
+function renderPlanUI(
+  parsed: ParsedPlan,
+  onConfirm: () => void,
+): React.ReactNode {
+  if (parsed.feasible && parsed.milestones) {
+    return <PlanView plan={parsed.milestones} onConfirm={onConfirm} />;
+  }
+  if (!parsed.feasible) {
+    return (
+      <>
+        {parsed.roadmap && <MilestoneRoadmapView milestones={parsed.roadmap} />}
+        {parsed.firstMilestoneTasks && (
+          <TasksView tasks={parsed.firstMilestoneTasks} onConfirm={onConfirm} />
+        )}
+      </>
+    );
+  }
+  return null;
+}
+
+function formatSlotLabel(iso: string): string {
+  try {
+    return new Intl.DateTimeFormat(undefined, {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    }).format(new Date(iso));
+  } catch {
+    return iso;
+  }
+}
+
+const WELCOME_MESSAGE = (name?: string) => {
+  const firstName = name?.split(" ")[0];
+  return `Hey${firstName ? ` ${firstName}` : ""}! 👋 I'm your **Flux** assistant.\n\nI can help you:\n- **Set and track goals** — break big ambitions into milestones\n- **Build habits** — create routines that stick\n- **Stay on top of tasks** — reminders, rescheduling, and follow-ups\n\nWhat would you like to work on today?`;
+};
+
 function ChatPage() {
-  const navigate = useNavigate();
-  const {
-    isAuthenticated,
-    isLoading: authLoading,
-    user,
-    refreshAuthStatus,
-  } = useAuth();
+  const router = useRouter();
+  const { user } = useAuth();
+  const { token } = Route.useLoaderData();
+  useEffect(() => {
+    setInMemoryToken(token);
+  }, [token]);
+  const { reschedule_task_id, task_name, conversation } = Route.useSearch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
-  const [conversationId, setConversationId] = useState<string | undefined>(
-    undefined,
-  );
+  const conversationIdRef = useRef<string | undefined>(undefined);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
+  const [convCursor, setConvCursor] = useState<string | null>(null);
+  const [convHasMore, setConvHasMore] = useState(false);
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
-
+  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
+  const [isLoadingMoreConversations, setIsLoadingMoreConversations] =
+    useState(false);
+  const [activeClarifier, setActiveClarifier] = useState<{
+    questions: import("~/types").GoalClarifierQuestion[];
+    messageId: string;
+  } | null>(null);
+  const drawerScrollRef = useRef<HTMLDivElement | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-  const { stopEscalation } = useSimulation();
   const initDoneRef = useRef(false);
-  const { ready: backendReady } = useBackendReady();
-
-  const isOnboarding = user && !user.onboarded;
-
-  // Voice agent hook
-  const voice = useVoiceAgent(MOCK_USER_ID);
-  const isVoiceActive = voice.status !== "idle";
+  // Preserve reschedule_task_id across URL rewrites (it's cleared from search params
+  // when conversation_id is substituted in, but we still need it for slot confirmation).
+  const rescheduleTaskIdRef = useRef<string | undefined>(reschedule_task_id);
+  const lastInputWasVoiceRef = useRef<boolean>(false);
+  const voice = useVoice();
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -92,183 +267,230 @@ function ChatPage() {
     scrollToBottom();
   }, [scrollToBottom]);
 
+  // On mount: if reschedule_task_id is present, auto-submit the reschedule request.
+  // Otherwise show the standard welcome message.
   useEffect(() => {
-    if (!authLoading && !isAuthenticated) {
-      navigate({ to: "/login" });
-    }
-  }, [authLoading, isAuthenticated, navigate]);
-
-  // Navigate to home once onboarding completes (user.onboarded flips to true).
-  // Only redirect if the user arrived at /chat because they were non-onboarded;
-  // once onboarding finishes send them to the flow page.
-  const wasOnboardingRef = useRef(false);
-  useEffect(() => {
-    if (isOnboarding) wasOnboardingRef.current = true;
-  }, [isOnboarding]);
-  useEffect(() => {
-    if (
-      !authLoading &&
-      isAuthenticated &&
-      user?.onboarded &&
-      wasOnboardingRef.current
-    ) {
-      navigate({ to: "/" });
-    }
-  }, [authLoading, isAuthenticated, user?.onboarded, navigate]);
-
-  // Initialise chat once auth is ready.
-  // Onboarding: resume the most recent conversation when backend is ready.
-  // Onboarded: leave messages empty; history is available via History drawer.
-  useEffect(() => {
-    if (authLoading || !isAuthenticated || initDoneRef.current) return;
+    if (initDoneRef.current) return;
     initDoneRef.current = true;
 
-    if (isOnboarding && backendReady) {
-      api
-        .chatHistory()
-        .then(({ messages: history, conversation_id }) => {
-          if (conversation_id) setConversationId(conversation_id);
-          const list = Array.isArray(history) ? history : [];
-          const uiMessages: ChatMessage[] = list
-            .filter(
-              (m: HistoryMessage) =>
-                m.role === "user" || m.role === "assistant",
-            )
-            .map((m: HistoryMessage, i: number) => ({
-              id: `history-${i}`,
-              type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
-              content: m.content,
-            }));
-          setMessages(uiMessages);
+    if (reschedule_task_id) {
+      const displayName = task_name ?? "this task";
+      const userMsg: ChatMessage = {
+        id: "reschedule-user",
+        type: MessageVariant.USER,
+        content: `Help me reschedule "${displayName}"`,
+      };
+      setMessages([userMsg]);
+      setIsThinking(true);
+
+      chatService
+        .sendMessage(`Help me reschedule "${displayName}"`, undefined, {
+          intent: "RESCHEDULE_TASK",
+          task_id: reschedule_task_id,
+        })
+        .then((result) => {
+          setIsThinking(false);
+          if (result.conversation_id) {
+            conversationIdRef.current = result.conversation_id;
+            window.history.replaceState(
+              null,
+              "",
+              `/chat?conversation=${result.conversation_id}`,
+            );
+          } else {
+            window.history.replaceState(null, "", "/chat");
+          }
+          const aiMsg: ChatMessage = {
+            id: "reschedule-ai",
+            type: MessageVariant.AI,
+            content: <MarkdownMessage>{result.message}</MarkdownMessage>,
+            options: result.options,
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+          scrollToBottom();
         })
         .catch(() => {
-          // No prior history — leave empty; agent responds on first send.
+          setIsThinking(false);
+          window.history.replaceState(null, "", "/chat");
+          setMessages((prev) => [
+            ...prev,
+            {
+              id: "reschedule-error",
+              type: MessageVariant.AI,
+              content:
+                "Sorry, I couldn't load reschedule options. Please try again.",
+            },
+          ]);
         });
+      return;
     }
-  }, [authLoading, isAuthenticated, isOnboarding, backendReady]);
 
-  // Clear state and start a brand-new conversation.
+    setMessages([
+      {
+        id: "welcome",
+        type: MessageVariant.AI,
+        content: (
+          <MarkdownMessage>{WELCOME_MESSAGE(user?.name)}</MarkdownMessage>
+        ),
+      },
+    ]);
+  }, [user?.name, reschedule_task_id, task_name, scrollToBottom]);
+
   const startNewChat = useCallback(() => {
     initDoneRef.current = true;
-    setMessages([]);
-    setConversationId(undefined);
+    setMessages([
+      {
+        id: "welcome",
+        type: MessageVariant.AI,
+        content: (
+          <MarkdownMessage>{WELCOME_MESSAGE(user?.name)}</MarkdownMessage>
+        ),
+      },
+    ]);
+    conversationIdRef.current = undefined;
     setIsHistoryOpen(false);
-  }, []);
+    window.history.replaceState(null, "", "/chat");
+  }, [user?.name]);
 
-  // Load a specific past conversation from the history drawer.
-  const loadConversation = useCallback(
-    async (id: string) => {
-      setIsHistoryOpen(false);
-      setIsLoadingHistory(true);
-      try {
-        if (!backendReady) {
-          setMessages([]);
-          return;
-        }
-        const { messages: history, conversation_id } =
-          await api.chatHistory(id);
-        if (conversation_id) setConversationId(conversation_id);
-        const list = Array.isArray(history) ? history : [];
-        const uiMessages: ChatMessage[] = list
-          .filter(
-            (m: HistoryMessage) => m.role === "user" || m.role === "assistant",
-          )
-          .map((m: HistoryMessage, i: number) => ({
-            id: `history-${i}`,
-            type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
-            content: m.content,
-          }));
-        setMessages(uiMessages);
-      } catch {
-        // Silently fail — keep current chat state.
-      } finally {
-        setIsLoadingHistory(false);
-      }
-    },
-    [backendReady],
-  );
-
-  // Open history drawer and fetch the conversations list.
   const openHistory = useCallback(async () => {
     setIsHistoryOpen(true);
+    setIsLoadingConversations(true);
+    setConversations([]);
+    setConvCursor(null);
+    setConvHasMore(false);
     try {
-      if (!backendReady) {
-        setConversations([]);
-        return;
-      }
-      const data = await api.chatConversations();
-      const list =
-        (data as { conversations: ConversationSummary[] }).conversations ?? [];
-      setConversations(list);
+      const page = await chatService.getConversations();
+      setConversations(page.conversations);
+      setConvCursor(page.next_cursor);
+      setConvHasMore(page.has_more);
     } catch {
       setConversations([]);
+    } finally {
+      setIsLoadingConversations(false);
     }
-  }, [backendReady]);
+  }, []);
+
+  const loadMoreConversations = useCallback(async () => {
+    if (!convHasMore || isLoadingMoreConversations) return;
+    setIsLoadingMoreConversations(true);
+    try {
+      const page = await chatService.getConversations(convCursor ?? undefined);
+      setConversations((prev) => [...prev, ...page.conversations]);
+      setConvCursor(page.next_cursor);
+      setConvHasMore(page.has_more);
+    } catch {
+      // keep existing list
+    } finally {
+      setIsLoadingMoreConversations(false);
+    }
+  }, [convHasMore, convCursor, isLoadingMoreConversations]);
 
   const handleSendMessage = useCallback(
     async (text: string) => {
-      const userMessage: ChatMessage = {
-        id: Date.now().toString(),
-        type: MessageVariant.USER,
-        content: text,
-      };
-      setMessages((prev) => [...prev, userMessage]);
-      setIsThinking(true);
-      scrollToBottom();
-      stopEscalation();
-
-      if (!backendReady) {
-        setIsThinking(false);
+      // Handle slot confirmation (ISO UTC string from reschedule options)
+      if (rescheduleTaskIdRef.current && /^\d{4}-\d{2}-\d{2}T/.test(text)) {
+        const slotLabel = formatSlotLabel(text);
         setMessages((prev) => [
-          ...prev,
+          ...prev.map((m) => ({ ...m, options: null })),
           {
-            id: (Date.now() + 1).toString(),
-            type: MessageVariant.AI,
-            content:
-              "Backend unavailable. Demo mode — your message was received.",
+            id: Date.now().toString(),
+            type: MessageVariant.USER,
+            content: slotLabel,
           },
         ]);
-        scrollToBottom();
+        setIsThinking(true);
+        tasksService
+          .confirmReschedule(rescheduleTaskIdRef.current, text)
+          .then(() => {
+            setIsThinking(false);
+            // Invalidate router cache so the home page re-fetches updated tasks.
+            router.invalidate();
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                type: MessageVariant.AI,
+                content: (
+                  <MarkdownMessage>
+                    Done! Your task has been rescheduled. You'll get a reminder
+                    at the new time.
+                  </MarkdownMessage>
+                ),
+              },
+            ]);
+            scrollToBottom();
+          })
+          .catch(() => {
+            setIsThinking(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                type: MessageVariant.AI,
+                content:
+                  "Sorry, I couldn't confirm that reschedule. Please try again.",
+              },
+            ]);
+          });
         return;
       }
 
-      let lastError: Error | null = null;
-      for (let attempt = 0; attempt <= MAX_CHAT_RETRIES; attempt++) {
-        try {
-          const result = await api.chatMessage(text, conversationId);
-          if (!conversationId) {
-            setConversationId(result.conversation_id);
-          }
-          setIsThinking(false);
-          const hasFallback = result.message.includes(FALLBACK_EXPERT_PREFIX);
-          const fallbackBannerText = hasFallback ? result.message : undefined;
-          const displayMessage = hasFallback ? "" : result.message;
-          const rawSources =
-            result.sources ??
-            (result.proposed_plan &&
-            typeof result.proposed_plan === "object" &&
-            "sources" in result.proposed_plan
-              ? (result.proposed_plan as { sources: RAGSource[] }).sources
-              : undefined);
-          const sources = Array.isArray(rawSources) ? rawSources : undefined;
+      const userMessage: ChatMessage = {
+        id: Date.now().toString(),
+        type: MessageVariant.USER,
+        content: /^\d{4}-\d{2}-\d{2}T/.test(text)
+          ? formatSlotLabel(text)
+          : text,
+      };
 
+      // Clear options from all previous messages when the user responds
+      setMessages((prev) => [
+        ...prev.map((m) => ({ ...m, options: null })),
+        userMessage,
+      ]);
+      setIsThinking(true);
+      scrollToBottom();
+
+      try {
+        const result = await chatService.sendMessage(
+          text,
+          conversationIdRef.current,
+        );
+
+        if (!conversationIdRef.current && result.conversation_id) {
+          conversationIdRef.current = result.conversation_id;
+          window.history.replaceState(
+            null,
+            "",
+            `/chat?conversation=${result.conversation_id}`,
+          );
+        }
+
+        setTimeout(() => {
+          setIsThinking(false);
+
+          const parsed = result.proposed_plan
+            ? parseProposedPlan(result.proposed_plan as Record<string, unknown>)
+            : null;
+
+          const isStartDatePrompt = result.agent_node === "ask_start_date";
+
+          const msgId = (Date.now() + 1).toString();
           const aiMessage: ChatMessage = {
-            id: (Date.now() + 1).toString(),
+            id: msgId,
             type: MessageVariant.AI,
             content: (
               <div className="space-y-3">
-                {displayMessage ? <p>{displayMessage}</p> : null}
-                {result.proposed_plan && (
-                  <PlanView
-                    plan={result.proposed_plan as unknown as PlanMilestone[]}
-                    onConfirm={() =>
-                      handleSendMessage("Yes, this looks great!")
-                    }
-                    sources={sources}
-                    fallbackBannerText={fallbackBannerText}
+                <MarkdownMessage>{result.message}</MarkdownMessage>
+                {isStartDatePrompt ? (
+                  <StartDatePicker
+                    onSelect={(date) => handleSendMessage(date)}
                   />
-                )}
-                {result.requires_user_action && (
+                ) : parsed ? (
+                  renderPlanUI(parsed, () =>
+                    handleSendMessage("Yes, this looks great!"),
+                  )
+                ) : result.requires_user_action && !result.options?.length ? (
                   <button
                     type="button"
                     onClick={() => handleSendMessage("OK")}
@@ -276,64 +498,111 @@ function ChatPage() {
                   >
                     Confirm
                   </button>
-                )}
+                ) : null}
               </div>
             ),
+            options: result.options,
           };
-          setMessages((prev) => [...prev, aiMessage]);
-          scrollToBottom();
-          if (isOnboarding) {
-            refreshAuthStatus().catch(() => {});
-          }
-          return;
-        } catch (err) {
-          lastError = err instanceof Error ? err : new Error(String(err));
-          if (attempt < MAX_CHAT_RETRIES) {
-            setMessages((prev) => [
-              ...prev,
-              {
-                id: `retry-${Date.now()}`,
-                type: MessageVariant.AI,
-                content: "Connection lost. Retrying…",
-              },
-            ]);
-            scrollToBottom();
-            await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
-          }
-        }
-      }
 
-      setIsThinking(false);
-      const errorMessage: ChatMessage = {
-        id: (Date.now() + 1).toString(),
-        type: MessageVariant.AI,
-        content:
-          lastError?.message ??
-          "Sorry, I had trouble understanding that. Could you try again?",
-      };
-      setMessages((prev) => [...prev, errorMessage]);
+          setMessages((prev) => [...prev, aiMessage]);
+
+          if (result.questions?.length) {
+            setActiveClarifier({
+              questions: result.questions,
+              messageId: msgId,
+            });
+          }
+
+          if (lastInputWasVoiceRef.current && result.spoken_summary) {
+            lastInputWasVoiceRef.current = false;
+            voice.playTTS(result.spoken_summary);
+          }
+
+          scrollToBottom();
+        }, 800);
+      } catch {
+        setIsThinking(false);
+        const errorMessage: ChatMessage = {
+          id: (Date.now() + 1).toString(),
+          type: MessageVariant.AI,
+          content:
+            "Sorry, I had trouble understanding that. Could you try again?",
+        };
+        setMessages((prev) => [...prev, errorMessage]);
+      }
     },
-    [
-      backendReady,
-      conversationId,
-      isOnboarding,
-      scrollToBottom,
-      stopEscalation,
-      refreshAuthStatus,
-    ],
+    [scrollToBottom, router, voice],
   );
 
-  if (authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-pulse text-sage">Loading...</div>
-      </div>
-    );
-  }
+  const loadConversation = useCallback(
+    async (id: string) => {
+      setIsHistoryOpen(false);
+      setIsLoadingHistory(true);
+      window.history.replaceState(null, "", `/chat?conversation=${id}`);
+      try {
+        const { messages: history, conversation_id } =
+          await chatService.getHistory(id);
+        if (conversation_id) conversationIdRef.current = conversation_id;
 
-  if (!isAuthenticated) {
-    return null;
-  }
+        const filtered = history.filter(
+          (m) => m.role === "user" || m.role === "assistant",
+        );
+        // Only the last assistant message can still be awaiting a start date
+        const lastAssistantIdx = filtered.reduce(
+          (acc, m, i) => (m.role === "assistant" ? i : acc),
+          -1,
+        );
+        const uiMessages: ChatMessage[] = filtered.map((m, i) => {
+          const parsed =
+            m.role === "assistant" && m.metadata?.proposed_plan
+              ? parseProposedPlan(m.metadata.proposed_plan)
+              : null;
+          const isStartDatePrompt =
+            m.role === "assistant" &&
+            m.agent_node === "ask_start_date" &&
+            i === lastAssistantIdx;
+          return {
+            id: `history-${i}`,
+            type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
+            content:
+              m.role === "assistant" ? (
+                <div className="space-y-3">
+                  <MarkdownMessage>{m.content}</MarkdownMessage>
+                  {isStartDatePrompt ? (
+                    <StartDatePicker
+                      onSelect={(date) => handleSendMessage(date)}
+                    />
+                  ) : (
+                    parsed &&
+                    renderPlanUI(parsed, () =>
+                      handleSendMessage("Yes, this looks great!"),
+                    )
+                  )}
+                </div>
+              ) : (
+                m.content
+              ),
+          };
+        });
+
+        setMessages(uiMessages);
+      } catch {
+        // Silently fail — keep current chat state.
+      } finally {
+        setIsLoadingHistory(false);
+      }
+    },
+    [handleSendMessage],
+  );
+
+  // If conversation_id is in the URL (e.g. page reload), load that conversation.
+  // Intentionally depends only on `token` — runs once after token is hydrated,
+  // not on every loadConversation identity change.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional one-shot on token hydration
+  useEffect(() => {
+    if (!conversation || !token) return;
+    loadConversation(conversation);
+  }, [token]);
 
   return (
     <div className="relative h-screen flex flex-col overflow-hidden">
@@ -342,37 +611,33 @@ function ChatPage() {
       {/* Header */}
       <div className="flex items-center justify-between px-5 pt-12 pb-3 relative z-10">
         <h1 className="font-display italic text-xl text-charcoal/80">
-          {isOnboarding ? "Getting started" : getGreeting(user?.name)}
+          {getGreeting(user?.name)}
         </h1>
-        {!isOnboarding && (
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={openHistory}
-              aria-label="Chat history"
-              className="w-9 h-9 flex items-center justify-center rounded-full glass-bubble text-river hover:text-charcoal transition-colors"
-            >
-              <History className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              onClick={startNewChat}
-              aria-label="New chat"
-              className="w-9 h-9 flex items-center justify-center rounded-full glass-bubble text-river hover:text-charcoal transition-colors"
-            >
-              <MessageSquarePlus className="w-4 h-4" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={openHistory}
+            aria-label="Chat history"
+            className="w-9 h-9 flex items-center justify-center rounded-full glass-bubble text-river hover:text-charcoal transition-colors"
+          >
+            <History className="w-4 h-4" />
+          </button>
+          <button
+            type="button"
+            onClick={startNewChat}
+            aria-label="New chat"
+            className="w-9 h-9 flex items-center justify-center rounded-full glass-bubble text-river hover:text-charcoal transition-colors"
+          >
+            <MessageSquarePlus className="w-4 h-4" />
+          </button>
+        </div>
       </div>
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto px-4 pt-2 space-y-4 pb-4">
         {isLoadingHistory ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-pulse text-sage text-sm">
-              Loading conversation…
-            </div>
+          <div className="flex flex-col items-center justify-center h-full">
+            <LoadingState />
           </div>
         ) : (
           <AnimatePresence mode="popLayout">
@@ -390,6 +655,15 @@ function ChatPage() {
                 <ChatBubble variant={message.type} animate={false}>
                   {message.content}
                 </ChatBubble>
+                {message.type === MessageVariant.AI &&
+                  message.options &&
+                  message.options.length > 0 && (
+                    <OnboardingOptions
+                      options={message.options}
+                      onSelect={handleSendMessage}
+                      disabled={isThinking}
+                    />
+                  )}
               </motion.div>
             ))}
           </AnimatePresence>
@@ -412,33 +686,17 @@ function ChatPage() {
 
       <ChatInput
         onSend={handleSendMessage}
+        onVoiceSend={() => {
+          lastInputWasVoiceRef.current = true;
+        }}
         disabled={isThinking || isLoadingHistory}
         placeholder={
-          messages.length === 0
+          messages.length <= 1
             ? "What would you like to achieve?"
             : "What's on your mind?"
         }
-        voiceStatus={voice.status}
-        onVoiceToggle={() => {
-          if (isVoiceActive) {
-            voice.endSession();
-          } else {
-            voice.startSession();
-          }
-        }}
+        voice={voice}
       />
-
-      {/* Voice overlay — shown when a voice session is active */}
-      <AnimatePresence>
-        {isVoiceActive && (
-          <VoiceOverlay
-            status={voice.status}
-            messages={voice.messages}
-            isAgentSpeaking={voice.isAgentSpeaking}
-            onEndSession={voice.endSession}
-          />
-        )}
-      </AnimatePresence>
 
       <BottomNav />
 
@@ -474,8 +732,33 @@ function ChatPage() {
                 </button>
               </div>
 
-              <div className="overflow-y-auto max-h-[55vh] pb-8">
-                {conversations.length === 0 ? (
+              <div
+                ref={drawerScrollRef}
+                className="overflow-y-auto max-h-[55vh] pb-8"
+                onScroll={(e) => {
+                  const el = e.currentTarget;
+                  if (el.scrollHeight - el.scrollTop - el.clientHeight < 80) {
+                    loadMoreConversations();
+                  }
+                }}
+              >
+                {isLoadingConversations ? (
+                  <div className="flex items-center justify-center py-8 gap-2">
+                    {[0, 0.15, 0.3].map((delay) => (
+                      <motion.div
+                        key={delay}
+                        className="w-2 h-2 rounded-full bg-sage"
+                        animate={{ scale: [1, 1.2, 1], opacity: [0.4, 1, 0.4] }}
+                        transition={{
+                          duration: 1.2,
+                          ease: "easeInOut",
+                          repeat: Infinity,
+                          delay,
+                        }}
+                      />
+                    ))}
+                  </div>
+                ) : conversations.length === 0 ? (
                   <p className="text-center text-river/60 text-sm py-8">
                     No past conversations yet.
                   </p>
@@ -489,7 +772,7 @@ function ChatPage() {
                           className="w-full text-left px-5 py-4 hover:bg-black/5 transition-colors"
                         >
                           <p className="text-charcoal text-sm font-medium line-clamp-1">
-                            {conv.preview ?? "New conversation"}
+                            {conv.title ?? conv.preview ?? "New conversation"}
                           </p>
                           <p className="text-river/60 text-xs mt-0.5">
                             {formatRelativeTime(
@@ -499,11 +782,118 @@ function ChatPage() {
                         </button>
                       </li>
                     ))}
+                    {isLoadingMoreConversations && (
+                      <li className="flex items-center justify-center py-4 gap-2">
+                        {[0, 0.15, 0.3].map((delay) => (
+                          <motion.div
+                            key={delay}
+                            className="w-1.5 h-1.5 rounded-full bg-sage"
+                            animate={{
+                              scale: [1, 1.2, 1],
+                              opacity: [0.4, 1, 0.4],
+                            }}
+                            transition={{
+                              duration: 1.2,
+                              ease: "easeInOut",
+                              repeat: Infinity,
+                              delay,
+                            }}
+                          />
+                        ))}
+                      </li>
+                    )}
                   </ul>
                 )}
               </div>
             </motion.div>
           </>
+        )}
+      </AnimatePresence>
+
+      {/* Goal Clarifier Sheet */}
+      <AnimatePresence>
+        {activeClarifier && (
+          <GoalClarifierView
+            questions={activeClarifier.questions}
+            disabled={isThinking}
+            onDismiss={() => setActiveClarifier(null)}
+            onSubmit={(answers) => {
+              setActiveClarifier(null);
+              const summary = answers
+                .map((a) => `${a.question}: ${a.answer}`)
+                .join(", ");
+              setMessages((prev) => [
+                ...prev,
+                {
+                  id: Date.now().toString(),
+                  type: MessageVariant.USER,
+                  content: summary,
+                },
+              ]);
+              setIsThinking(true);
+              scrollToBottom();
+              chatService
+                .sendMessage(summary, conversationIdRef.current, {
+                  intent: "GOAL_CLARIFY",
+                  answers,
+                })
+                .then((result) => {
+                  if (!conversationIdRef.current && result.conversation_id) {
+                    conversationIdRef.current = result.conversation_id;
+                    window.history.replaceState(
+                      null,
+                      "",
+                      `/chat?conversation=${result.conversation_id}`,
+                    );
+                  }
+                  setTimeout(() => {
+                    setIsThinking(false);
+                    const parsed = result.proposed_plan
+                      ? parseProposedPlan(
+                          result.proposed_plan as Record<string, unknown>,
+                        )
+                      : null;
+                    const isStartDatePrompt =
+                      result.agent_node === "ask_start_date";
+                    setMessages((prev) => [
+                      ...prev,
+                      {
+                        id: (Date.now() + 1).toString(),
+                        type: MessageVariant.AI,
+                        content: (
+                          <div className="space-y-3">
+                            <MarkdownMessage>{result.message}</MarkdownMessage>
+                            {isStartDatePrompt ? (
+                              <StartDatePicker
+                                onSelect={(date) => handleSendMessage(date)}
+                              />
+                            ) : parsed ? (
+                              renderPlanUI(parsed, () =>
+                                handleSendMessage("Yes, this looks great!"),
+                              )
+                            ) : null}
+                          </div>
+                        ),
+                        options: result.options,
+                      },
+                    ]);
+                    scrollToBottom();
+                  }, 800);
+                })
+                .catch(() => {
+                  setIsThinking(false);
+                  setMessages((prev) => [
+                    ...prev,
+                    {
+                      id: Date.now().toString(),
+                      type: MessageVariant.AI,
+                      content:
+                        "Sorry, I had trouble understanding that. Could you try again?",
+                    },
+                  ]);
+                });
+            }}
+          />
         )}
       </AnimatePresence>
     </div>

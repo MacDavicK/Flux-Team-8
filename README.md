@@ -217,9 +217,9 @@ The main backend app lives under `backend/app/` (agents, routers, services, mode
 ## Roadmap
 
 - [x] Week 1: Foundation — Project setup, routing, mock API (Feb 10–16)
-- [ ] Week 2: Core Features — Calendar view, goal chat, task management (Feb 17–23)
-- [ ] Week 3: AI Agents — Planner, scheduler, nudge agents (Feb 24–Mar 2)
-- [ ] Week 4: Polish & Demo — Animations, edge cases, demo mode (Mar 3–9)
+- [x] Week 2: Core Features — Calendar view, goal chat, task management (Feb 17–23)
+- [x] Week 3: AI Agents — Planner, scheduler, nudge agents (Feb 24–Mar 2)
+- [x] Week 4: Polish & Demo — Animations, edge cases, demo mode (Mar 3–9)
 
 ---
 

@@ -92,6 +92,7 @@ export interface User {
   preferences?: Preference;
   profile?: Profile;
   onboarded: boolean;
+  timezone?: string | null;
   onboardingProfile?: OnboardingProfile;
   createdAt?: string;
   lastActive?: string;
@@ -153,16 +154,26 @@ export interface AccountMe {
   timezone?: string | null;
   onboarded?: boolean | null;
   phone_verified?: boolean | null;
-  notification_preferences?: { [key: string]: unknown } | null;
-  monthly_token_usage?: { [key: string]: unknown } | null;
+  notification_preferences?: Record<
+    string,
+    string | number | boolean | object
+  > | null;
+  monthly_token_usage?: Record<
+    string,
+    string | number | boolean | object
+  > | null;
 }
 
 /**
  * Real backend: PATCH /api/v1/account/me request body
  */
 export interface AccountPatchRequest {
+  name?: string | null;
   timezone?: string | null;
-  notification_preferences?: { [key: string]: unknown } | null;
+  notification_preferences?: Record<
+    string,
+    string | number | boolean | object
+  > | null;
 }
 
 /**

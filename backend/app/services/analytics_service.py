@@ -24,6 +24,7 @@ def _db():
 
 # ── Overview ───────────────────────────────────────────────
 
+
 def get_overview(user_id: str) -> dict[str, Any]:
     """
     Build the analytics overview:
@@ -32,10 +33,14 @@ def get_overview(user_id: str) -> dict[str, Any]:
     - heatmap via RPC daily_heatmap
     """
     # 1. Streak
-    streak_result = _db().rpc(
-        "calculate_streak",
-        {"p_user_id": user_id},
-    ).execute()
+    streak_result = (
+        _db()
+        .rpc(
+            "calculate_streak",
+            {"p_user_id": user_id},
+        )
+        .execute()
+    )
     streak_days = streak_result.data if isinstance(streak_result.data, int) else 0
 
     # 2. Today's tasks
@@ -60,10 +65,14 @@ def get_overview(user_id: str) -> dict[str, Any]:
     )
 
     # 3. Heatmap
-    heatmap_result = _db().rpc(
-        "daily_heatmap",
-        {"p_user_id": user_id, "p_days": 365},
-    ).execute()
+    heatmap_result = (
+        _db()
+        .rpc(
+            "daily_heatmap",
+            {"p_user_id": user_id, "p_days": 365},
+        )
+        .execute()
+    )
     heatmap = heatmap_result.data or []
 
     return {
@@ -76,6 +85,7 @@ def get_overview(user_id: str) -> dict[str, Any]:
 
 
 # ── Weekly Stats ───────────────────────────────────────────
+
 
 def get_weekly(user_id: str, weeks: int = 12) -> list[dict[str, Any]]:
     """
@@ -109,6 +119,7 @@ def get_weekly(user_id: str, weeks: int = 12) -> list[dict[str, Any]]:
 
 
 # ── Goals Progress ─────────────────────────────────────────
+
 
 def get_goals(user_id: str) -> list[dict[str, Any]]:
     """
@@ -166,6 +177,7 @@ def get_goals(user_id: str) -> list[dict[str, Any]]:
 
 
 # ── Missed by Category ────────────────────────────────────
+
 
 def get_missed_by_category(user_id: str) -> list[dict[str, Any]]:
     """

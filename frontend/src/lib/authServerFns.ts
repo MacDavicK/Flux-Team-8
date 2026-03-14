@@ -96,6 +96,76 @@ export const serverGetAccessToken = createServerFn({ method: "GET" }).handler(
   },
 );
 
+type ServerMe = {
+  token: string | null;
+  user: (ServerUser & { onboarded: boolean; timezone?: string | null }) | null;
+  /** Set to true when the FastAPI backend rejected the token (401/403). */
+  sessionInvalid?: boolean;
+};
+
+/**
+ * Server function that combines token retrieval and the /account/me fetch in a
+ * single server-side round-trip. Replaces the two-step sequence in AuthContext
+ * (serverGetAccessToken → raw fetch /account/me) with one call.
+ *
+ * The FastAPI backend call runs server-side (no browser waterfall).
+ * Returns `sessionInvalid: true` when the backend rejects the token so the
+ * client can clear auth state without making any extra requests.
+ */
+export const serverGetMe = createServerFn({ method: "GET" }).handler(
+  async (): Promise<ServerMe> => {
+    const client = getServerSupabaseClient();
+
+    const { data: userData, error: userError } = await client.auth.getUser();
+    if (userError || !userData.user) {
+      return { token: null, user: null };
+    }
+
+    const { data: sessionData } = await client.auth.getSession();
+    const token = sessionData.session?.access_token ?? null;
+    if (!token) {
+      return { token: null, user: null };
+    }
+
+    const baseUser = extractUser(userData.user);
+
+    // Fetch authoritative profile fields (onboarded, name) from FastAPI backend.
+    // This runs server-side so there is no client-side waterfall.
+    try {
+      const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+      const res = await fetch(`${backendUrl}/api/v1/account/me`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (res.status === 401 || res.status === 403) {
+        return { token: null, user: null, sessionInvalid: true };
+      }
+
+      if (res.ok) {
+        const me = (await res.json()) as {
+          onboarded?: boolean | null;
+          name?: string | null;
+          timezone?: string | null;
+        };
+        return {
+          token,
+          user: {
+            ...baseUser,
+            onboarded: me.onboarded ?? false,
+            ...(me.name ? { name: me.name } : {}),
+            timezone: me.timezone ?? null,
+          },
+        };
+      }
+    } catch {
+      // Backend temporarily unavailable — return base user with safe defaults.
+      // Do not treat as logged-out; the backend may just be starting up.
+    }
+
+    return { token, user: { ...baseUser, onboarded: false } };
+  },
+);
+
 /**
  * Generates a Google OAuth redirect URL server-side (keys hidden from client).
  * The client receives the URL string and navigates to it via window.location.href.

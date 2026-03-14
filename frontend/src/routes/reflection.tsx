@@ -1,113 +1,127 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { motion } from "framer-motion";
 import { CheckCircle2, Clock, Flame } from "lucide-react";
-import { useEffect, useState } from "react";
+import { GoalProgressCard } from "~/components/flow/v2/GoalProgressCard";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { EnergyAura } from "~/components/reflection/EnergyAura";
-import { EnergyAuraLoadingState } from "~/components/reflection/EnergyAuraLoadingState";
-import { FocusDistribution } from "~/components/reflection/FocusDistribution";
-import { FocusDistributionLoadingState } from "~/components/reflection/FocusDistributionLoadingState";
+import {
+  CATEGORY_COLORS,
+  DEFAULT_COLOR,
+  FocusDistribution,
+} from "~/components/reflection/FocusDistribution";
 import { ProfileHeader } from "~/components/reflection/ProfileHeader";
-import { StatsLoadingState } from "~/components/reflection/StatsLoadingState";
-import { WeeklyInsightLoadingState } from "~/components/reflection/WeeklyInsightLoadingState";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { StatPill } from "~/components/ui/StatPill";
-import { accountService } from "~/services/AccountService";
+import { serverGetMe } from "~/lib/authServerFns";
+import { debugSsrLog } from "~/utils/env";
 
-type StatsResponse = {
-  title: string;
-  stats: { icon: "check" | "clock" | "flame"; value: string; label: string }[];
-};
-type EnergyAuraResponse = { data: { date: string; intensity: number }[] };
-type FocusDistributionResponse = {
-  work: number;
-  personal: number;
-  health: number;
-};
-type WeeklyInsightResponse = { title: string; insight: string };
+function ReflectionPagePending() {
+  return (
+    <div className="min-h-screen flex flex-col items-center justify-center">
+      <AmbientBackground />
+      <LoadingState />
+    </div>
+  );
+}
 
 const iconMap = {
   check: CheckCircle2,
   clock: Clock,
   flame: Flame,
-};
+} as const;
 
 export const Route = createFileRoute("/reflection")({
-  component: ReflectionPage,
+  pendingComponent: ReflectionPagePending,
+  pendingMs: 0,
   loader: async () => {
-    const me = await accountService.getMe();
-    return {
-      profile: { id: me.id, name: me.email ?? "User", email: me.email ?? "" },
+    const { user, token } = await serverGetMe();
+    if (!user) throw redirect({ to: "/login" });
+    const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
+    const headers = { Authorization: `Bearer ${token}` };
+
+    const [overview, weekly, missed] = await Promise.all([
+      fetch(`${backendUrl}/api/v1/analytics/overview`, { headers }).then((r) =>
+        r.ok ? r.json() : {},
+      ),
+      fetch(`${backendUrl}/api/v1/analytics/weekly`, { headers }).then((r) =>
+        r.ok ? r.json() : [],
+      ),
+      fetch(`${backendUrl}/api/v1/analytics/missed-by-cat`, { headers }).then(
+        (r) => (r.ok ? r.json() : []),
+      ),
+    ]);
+
+    const o = overview as {
+      tasks_completed?: number;
+      focus_hours?: number;
+      streak_days?: number;
+      week_label?: string;
+      insight?: string;
     };
-  },
-});
 
-function ReflectionPage() {
-  const { profile } = Route.useLoaderData();
+    const energyData = (weekly as { week?: string; completed?: number }[]).map(
+      (w, i) => ({
+        date: new Date(
+          Date.now() - (6 - i) * 24 * 60 * 60 * 1000,
+        ).toISOString(),
+        intensity: Math.min(1, (w.completed ?? 0) / 6),
+      }),
+    );
 
-  const [stats, setStats] = useState<StatsResponse | null>(null);
-  const [energyData, setEnergyData] = useState<EnergyAuraResponse | null>(null);
-  const [focusData, setFocusData] = useState<FocusDistributionResponse | null>(
-    null,
-  );
-  const [insight, setInsight] = useState<WeeklyInsightResponse | null>(null);
+    const byCategory = missed as { category?: string; missed_count?: number }[];
+    const totalMissed =
+      byCategory.reduce((s, c) => s + (c.missed_count ?? 0), 0) || 1;
+    const focusCategories = byCategory
+      .filter((c) => c.category)
+      .map((c) => ({
+        name: c.category ?? "",
+        count: c.missed_count ?? 0,
+        percent: Math.round(((c.missed_count ?? 0) / totalMissed) * 100),
+        color: CATEGORY_COLORS[c.category ?? ""] ?? DEFAULT_COLOR,
+      }));
 
-  useEffect(() => {
-    accountService.getOverview().then((overview) => {
-      const o = overview as {
-        tasks_completed?: number;
-        focus_hours?: number;
-        streak_days?: number;
-        week_label?: string;
-        insight?: string;
-      };
-      setStats({
+    const data = {
+      profile: user
+        ? { id: user.id, name: user.name ?? "User", email: user.email }
+        : null,
+      stats: {
         title: o.week_label ?? "This Week",
-        stats: [
+        items: [
           {
-            icon: "check",
+            icon: "check" as const,
             value: String(o.tasks_completed ?? 0),
             label: "Done",
           },
-          { icon: "clock", value: `${o.focus_hours ?? 0}h`, label: "Focus" },
-          { icon: "flame", value: String(o.streak_days ?? 0), label: "Streak" },
+          {
+            icon: "clock" as const,
+            value: `${o.focus_hours ?? 0}h`,
+            label: "Focus",
+          },
+          {
+            icon: "flame" as const,
+            value: String(o.streak_days ?? 0),
+            label: "Streak",
+          },
         ],
-      });
-      setInsight({
+      },
+      insight: {
         title: "This Week's Insight",
-        insight:
+        text:
           o.insight ?? "Keep up the great work! You're building strong habits.",
-      });
-    });
+      },
+      energyData,
+      focusCategories,
+    };
+    debugSsrLog("/reflection (ReflectionPage)", data);
+    return data;
+  },
+  component: ReflectionPage,
+});
 
-    accountService.getWeeklyStats().then((weekly) => {
-      const data = (weekly as { week?: string; completed?: number }[]).map(
-        (w, i) => ({
-          date: new Date(
-            Date.now() - (6 - i) * 24 * 60 * 60 * 1000,
-          ).toISOString(),
-          intensity: Math.min(1, (w.completed ?? 0) / 6),
-        }),
-      );
-      setEnergyData({ data });
-    });
-
-    accountService.getMissedByCategory().then((missed) => {
-      const byCategory = missed as { category?: string; count?: number }[];
-      const work = byCategory.find((c) => c.category === "work")?.count ?? 0;
-      const personal =
-        byCategory.find((c) => c.category === "personal")?.count ?? 0;
-      const health =
-        byCategory.find((c) => c.category === "health")?.count ?? 0;
-      const total = work + personal + health || 1;
-      setFocusData({
-        work: Math.round((work / total) * 100),
-        personal: Math.round((personal / total) * 100),
-        health: Math.round((health / total) * 100),
-      });
-    });
-  }, []);
+function ReflectionPage() {
+  const { profile, stats, insight, energyData, focusCategories } =
+    Route.useLoaderData();
 
   if (!profile) {
     return <LoadingState />;
@@ -119,34 +133,33 @@ function ReflectionPage() {
 
       <ProfileHeader name={profile.name} avatarUrl={undefined} />
 
+      <GoalProgressCard />
+
       <main className="px-5 space-y-6">
+        <h2 className="text-display text-2xl italic text-charcoal">
+          Your reflection
+        </h2>
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          {stats ? (
-            <>
-              <h3 className="text-river text-xs font-semibold uppercase tracking-wider mb-3">
-                {stats.title}
-              </h3>
-              <div className="grid grid-cols-3 gap-3">
-                {stats.stats.map((stat) => {
-                  const IconComponent = iconMap[stat.icon];
-                  return (
-                    <StatPill
-                      key={stat.label}
-                      icon={<IconComponent className="w-5 h-5" />}
-                      value={stat.value}
-                      label={stat.label}
-                    />
-                  );
-                })}
-              </div>
-            </>
-          ) : (
-            <StatsLoadingState />
-          )}
+          <h3 className="text-river text-xs font-semibold uppercase tracking-wider mb-3">
+            {stats.title}
+          </h3>
+          <div className="grid grid-cols-3 gap-3">
+            {stats.items.map((stat) => {
+              const IconComponent = iconMap[stat.icon];
+              return (
+                <StatPill
+                  key={stat.label}
+                  icon={<IconComponent className="w-5 h-5" />}
+                  value={stat.value}
+                  label={stat.label}
+                />
+              );
+            })}
+          </div>
         </motion.div>
 
         <motion.div
@@ -154,11 +167,7 @@ function ReflectionPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
-          {energyData ? (
-            <EnergyAura data={energyData.data} />
-          ) : (
-            <EnergyAuraLoadingState />
-          )}
+          <EnergyAura data={energyData} />
         </motion.div>
 
         <motion.div
@@ -166,15 +175,7 @@ function ReflectionPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
         >
-          {focusData ? (
-            <FocusDistribution
-              work={focusData.work}
-              personal={focusData.personal}
-              health={focusData.health}
-            />
-          ) : (
-            <FocusDistributionLoadingState />
-          )}
+          <FocusDistribution categories={focusCategories} />
         </motion.div>
 
         <motion.div
@@ -182,18 +183,12 @@ function ReflectionPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.5 }}
         >
-          {insight ? (
-            <div className="glass-card p-5">
-              <h3 className="text-display italic text-lg text-charcoal mb-2">
-                {insight.title}
-              </h3>
-              <p className="text-river text-sm leading-relaxed">
-                {insight.insight}
-              </p>
-            </div>
-          ) : (
-            <WeeklyInsightLoadingState />
-          )}
+          <div className="glass-card p-5">
+            <h3 className="text-display italic text-lg text-charcoal mb-2">
+              {insight.title}
+            </h3>
+            <p className="text-river text-sm leading-relaxed">{insight.text}</p>
+          </div>
         </motion.div>
       </main>
 

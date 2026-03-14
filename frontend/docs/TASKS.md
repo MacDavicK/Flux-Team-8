@@ -66,3 +66,17 @@ The following files were removed as part of the MSW removal and service cleanup:
 - **`proposed_plan`**: mapped to `PlanView` component via cast to `PlanMilestone[]`.
 - **Reflection analytics**: `accountService` methods return `unknown[]` / `{[key: string]: unknown}`. Mapping to legacy component shapes is done in `reflection.tsx`. Legacy types (`UserStatsResponse`, etc.) kept with `@deprecated` tags until components are updated.
 - **Flow tasks**: `index.tsx` maps raw backend task objects to `TimelineEvent` / `TaskRailItem` shapes via `mapTaskToDisplayTypes()`.
+
+---
+
+## Post-Migration Changes (Mar 2026)
+
+### Onboarding greeting (Mar 2026)
+- Added `POST /api/v1/chat/onboarding/start` endpoint (`backend/app/api/v1/chat.py`) — triggers the first onboarding question without requiring user input. Idempotent: returns existing conversation if messages already exist; 409 if already onboarded.
+- `ChatService.startOnboarding()` added — called from `chat.tsx` when history is empty on mount.
+- `chat.tsx` onboarding `useEffect`: if `getHistory()` returns no messages, calls `startOnboarding()` and seeds the greeting as the first AI message.
+
+### Auth: eliminated client-side `/account/me` fetch (Mar 2026)
+- Added `serverGetMe` to `frontend/src/lib/authServerFns.ts` — server function that retrieves the Supabase token **and** calls `GET /api/v1/account/me` in one server-side round-trip. Returns `{ token, user: { ...supabaseUser, onboarded, name } }`.
+- `AuthContext.refreshAuthStatus()` now calls `serverGetMe()` once instead of `serverGetAccessToken()` + raw `fetch("/api/v1/account/me")`. The client-side `/account/me` fetch is eliminated.
+- `BACKEND_URL` env var added to `frontend/.env` — used by `serverGetMe` for the inter-service fetch (defaults to `http://localhost:8000`).

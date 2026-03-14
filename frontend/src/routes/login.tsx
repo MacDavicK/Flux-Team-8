@@ -30,7 +30,7 @@ function LoginPage() {
     if (resolvedUser?.onboarded) {
       navigate({ to: "/" });
     } else {
-      navigate({ to: "/chat" });
+      navigate({ to: "/onboarding" });
     }
   };
 
