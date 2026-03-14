@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import itertools
 import json
+import re
 import uuid
 from typing import Any, cast
 
@@ -36,6 +37,32 @@ from app.api.v1.tasks import (
 )
 
 router = APIRouter(prefix="/chat", tags=["chat"])
+
+
+def strip_markdown(text: str) -> str:
+    """Remove common markdown syntax for TTS."""
+    text = re.sub(r"\*\*(.+?)\*\*", r"\1", text)
+    text = re.sub(r"\*(.+?)\*", r"\1", text)
+    text = re.sub(r"__(.+?)__", r"\1", text)
+    text = re.sub(r"_(.+?)_", r"\1", text)
+    text = re.sub(r"#{1,6}\s+", "", text)
+    text = re.sub(r"`(.+?)`", r"\1", text)
+    text = re.sub(r"\[(.+?)\]\(.+?\)", r"\1", text)
+    return text.strip()
+
+
+def build_spoken_summary(response: "ChatMessageResponse") -> str:
+    if response.proposed_plan:
+        n = len(response.proposed_plan.get("milestones", []))
+        return f"I've built a {n}-week plan for you. Take a look and tap Activate when you're ready."
+    if response.questions:
+        n = len(response.questions)
+        return f"I have {n} quick question{'s' if n > 1 else ''} to help me plan your goal better."
+    if response.options and response.agent_node == "ask_start_date":
+        return "When would you like to start? Pick a date below."
+    if response.options:
+        return "Here are some options for you. Tap one to continue."
+    return strip_markdown(response.message)[:300]
 
 
 @router.post("/message", response_model=ChatMessageResponse)
@@ -106,7 +133,7 @@ async def send_message(
             conv_id,
         )
 
-        return ChatMessageResponse(
+        resp = ChatMessageResponse(
             conversation_id=str(conv_id),
             message=reply,
             agent_node="RESCHEDULE_TASK",
@@ -114,6 +141,8 @@ async def send_message(
             requires_user_action=True,
             options=slot_options,
         )
+        resp.spoken_summary = build_spoken_summary(resp)
+        return resp
 
     # ── 17.1.2  Resolve or create conversation ──────────────────────────────
     if body.conversation_id is None:
@@ -239,6 +268,7 @@ async def send_message(
         "error": None,
         "token_usage": {},
         "correlation_id": str(uuid.uuid4()),
+        "conversation_id": str(conv_id),
         "options": None,
         **({"user_profile": user_profile} if user_profile else {}),
     }
@@ -330,7 +360,7 @@ async def send_message(
 
     raw_options = result.get("options")
     is_clarifier = agent_node_value == "GOAL_CLARIFY"
-    return ChatMessageResponse(
+    resp = ChatMessageResponse(
         conversation_id=str(conv_id),
         message=reply,
         agent_node=agent_node_value,
@@ -339,6 +369,8 @@ async def send_message(
         options=None if is_clarifier else raw_options,
         questions=raw_options if is_clarifier else None,
     )
+    resp.spoken_summary = build_spoken_summary(resp)
+    return resp
 
 
 @router.post("/onboarding/start", response_model=ChatMessageResponse)

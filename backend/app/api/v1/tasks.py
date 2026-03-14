@@ -15,7 +15,9 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 import pendulum
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
+
+import pendulum as _pendulum
 
 from app.agents.graph import compiled_graph
 from app.middleware.auth import get_current_user
@@ -23,9 +25,11 @@ from app.models.api_schemas import (
     EscalationPolicyUpdate,
     OnboardingOptionSchema,
     RescheduleConfirmRequest,
+    TaskActionRequest,
     TodoCreateRequest,
 )
 from app.services.recurrence import advance_recurring_task
+from app.services.rrule_expander import occurrence_on_date
 from app.services.supabase import db
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -114,9 +118,61 @@ async def get_tasks(
             user_uuid,
         )
 
-    return [_serialize_task(row) for row in scheduled_rows] + [
-        _serialize_task(row) for row in todo_rows
-    ]
+    result = [_serialize_task(row) for row in scheduled_rows]
+
+    # C.3 — RRULE projection for future/today dates only
+    target_date_str = date if date else start_of_today.strftime("%Y-%m-%d")
+    today_local = datetime.now(user_tz).replace(
+        hour=0, minute=0, second=0, microsecond=0
+    )
+    target_local = start_of_today
+    if target_local >= today_local:
+        scheduled_ids = {str(row["id"]) for row in scheduled_rows}
+
+        recurring_rows = await db.fetch(
+            """
+            SELECT t.id, t.user_id, t.goal_id, t.title, t.description, t.status,
+                   t.scheduled_at, t.duration_minutes, t.trigger_type, t.location_trigger,
+                   t.recurrence_rule, t.shared_with_goal_ids, t.escalation_policy, t.completed_at, t.created_at,
+                   g.title AS goal_name
+            FROM tasks t
+            LEFT JOIN goals g ON g.id = t.goal_id
+            WHERE t.user_id = $1
+              AND t.status = 'pending'
+              AND t.recurrence_rule IS NOT NULL
+              AND t.scheduled_at IS NOT NULL
+            """,
+            user_uuid,
+        )
+
+        projections = []
+        for row in recurring_rows:
+            if str(row["id"]) in scheduled_ids:
+                continue
+            task_scheduled_at = _pendulum.instance(row["scheduled_at"]).in_timezone(
+                "UTC"
+            )
+            occ_utc = occurrence_on_date(
+                row["recurrence_rule"],
+                task_scheduled_at,
+                target_date_str,
+                tz_name,
+            )
+            if occ_utc is None:
+                continue
+            serialized = _serialize_task(row)
+            serialized["scheduled_at"] = occ_utc
+            serialized["is_projected"] = True
+            serialized["occurrence_date"] = target_date_str
+            projections.append(serialized)
+
+        # Merge and re-sort by scheduled_at
+        result = sorted(
+            result + projections,
+            key=lambda t: t.get("scheduled_at") or "",
+        )
+
+    return result + [_serialize_task(row) for row in todo_rows]
 
 
 @router.post("/todo")
@@ -156,16 +212,22 @@ async def get_task(
 async def complete_task(
     task_id: str,
     current_user=Depends(get_current_user),
+    body: TaskActionRequest = Body(default_factory=TaskActionRequest),
 ) -> dict:
     """
     17.3.3 — Mark a task as done. If it is the last pending task on its goal,
     mark the goal completed and activate the next pipeline goal if present.
+    Accepts optional occurrence_date for projected recurring occurrences.
     """
     user_id = str(current_user["sub"])
     user_uuid = uuid.UUID(user_id)
     task = await _fetch_task_or_404(task_id, user_id)
     task_uuid = uuid.UUID(task_id)
     goal_uuid = task["goal_id"]
+
+    # C.4 — Materialize projected occurrence before advancing
+    tz_name = await _fetch_user_tz(user_uuid)
+    await _maybe_materialize_occurrence(task, task_uuid, user_uuid, body, tz_name)
 
     await db.execute(
         "UPDATE tasks SET status = 'done', completed_at = NOW() WHERE id = $1 AND user_id = $2",
@@ -221,12 +283,18 @@ async def complete_task(
 async def missed_task(
     task_id: str,
     current_user=Depends(get_current_user),
+    body: TaskActionRequest = Body(default_factory=TaskActionRequest),
 ) -> dict:
-    """17.3.4 — Mark a task as missed and trigger the pattern observer asynchronously."""
+    """17.3.4 — Mark a task as missed and trigger the pattern observer asynchronously.
+    Accepts optional occurrence_date for projected recurring occurrences."""
     user_id = str(current_user["sub"])
     user_uuid = uuid.UUID(user_id)
-    await _fetch_task_or_404(task_id, user_id)
+    task = await _fetch_task_or_404(task_id, user_id)
     task_uuid = uuid.UUID(task_id)
+
+    # C.4 — Materialize projected occurrence before advancing
+    tz_name = await _fetch_user_tz(user_uuid)
+    await _maybe_materialize_occurrence(task, task_uuid, user_uuid, body, tz_name)
 
     await db.execute(
         "UPDATE tasks SET status = 'missed' WHERE id = $1 AND user_id = $2",
@@ -491,6 +559,61 @@ def _build_slot_options(
 # ─────────────────────────────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────────────────────────────
+
+
+async def _fetch_user_tz(user_uuid: uuid.UUID) -> str:
+    """Return the user's IANA timezone string, defaulting to UTC."""
+    row = await db.fetchrow("SELECT timezone FROM users WHERE id = $1", user_uuid)
+    if row and row["timezone"]:
+        return row["timezone"]
+    return "UTC"
+
+
+async def _maybe_materialize_occurrence(
+    task: dict,
+    task_uuid: uuid.UUID,
+    user_uuid: uuid.UUID,
+    body: TaskActionRequest,
+    tz_name: str,
+) -> None:
+    """C.4 — If occurrence_date is set and differs from the task's current scheduled_at date,
+    update scheduled_at to that occurrence's UTC time so advance_recurring_task advances correctly."""
+    if (
+        not body.occurrence_date
+        or not task.get("recurrence_rule")
+        or not task.get("scheduled_at")
+    ):
+        return
+
+    scheduled_at = task["scheduled_at"]
+    # scheduled_at may be a datetime object or ISO string
+    if isinstance(scheduled_at, str):
+        task_dt = _pendulum.parse(scheduled_at)
+    else:
+        task_dt = _pendulum.instance(scheduled_at)
+
+    task_date_local = task_dt.in_timezone(tz_name).strftime("%Y-%m-%d")
+    if task_date_local == body.occurrence_date:
+        return  # Already on this occurrence — nothing to do
+
+    occ_utc = occurrence_on_date(
+        task["recurrence_rule"],
+        task_dt,
+        body.occurrence_date,
+        tz_name,
+    )
+    if occ_utc is None:
+        return
+
+    from datetime import datetime as _datetime  # noqa: F811
+
+    occ_dt = _datetime.fromisoformat(occ_utc.replace("Z", "+00:00"))
+    await db.execute(
+        "UPDATE tasks SET scheduled_at = $1 WHERE id = $2 AND user_id = $3",
+        occ_dt,
+        task_uuid,
+        user_uuid,
+    )
 
 
 async def _fetch_task_or_404(task_id: str, user_id: str) -> dict:

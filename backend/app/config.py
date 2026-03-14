@@ -41,6 +41,9 @@ class Settings(BaseSettings):
     twilio_verify_service_sid: str
     twilio_webhook_base_url: str
 
+    # Deepgram (Voice)
+    deepgram_api_key: str = ""
+
     # Web Push
     vapid_private_key: str
     vapid_public_key: str
@@ -53,6 +56,7 @@ class Settings(BaseSettings):
     reminder_lead_minutes: int = 10
     escalation_window_minutes: int = 2
     notification_poll_interval_seconds: int = 60
+    auto_miss_grace_minutes: int = 90
 
     # Cost controls
     monthly_token_soft_limit: int = 500_000

@@ -70,6 +70,26 @@ async def _upsert_user(payload: dict) -> None:
         logger.warning("Failed to upsert user row: %s", exc)
 
 
+async def verify_token(token: str) -> dict | None:
+    """
+    Validate a raw JWT string. Returns the decoded payload or None if invalid.
+    Used by WebSocket endpoints that can't use HTTPBearer.
+    """
+    try:
+        signing_key = _jwks_client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["ES256"],
+            audience="authenticated",
+        )
+        await _upsert_user(payload)
+        return payload
+    except Exception as exc:
+        logger.warning("WS JWT validation failed: %s", exc)
+        return None
+
+
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(_bearer),
 ):

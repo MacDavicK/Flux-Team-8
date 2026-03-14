@@ -166,53 +166,29 @@ async def _step_call() -> None:
 
 async def _step_auto_miss() -> None:
     """
-    15.2.7 — Mark tasks as missed once all their escalation channels have had
-    time to fire. Trigger window varies by policy:
+    15.2.7 — Mark tasks as missed once the grace period after scheduled_at has
+    elapsed, regardless of which notification channels fired.
 
-      aggressive — after call_sent_at + escalation_window  (original behaviour)
-      standard   — after whatsapp_sent_at + escalation_window × 2
-      silent     — after reminder_sent_at + escalation_window × 3
+    A single time-based query replaces the three policy-dependent sub-queries.
+    The notification steps (_step_push, _step_whatsapp, _step_call) continue
+    to fire independently — they are now purely informational, no longer gates
+    for auto-miss.
 
     For recurring tasks, a new occurrence is inserted instead of stopping.
     """
-    esc = settings.escalation_window_minutes
+    grace = settings.auto_miss_grace_minutes
 
-    # Sub-query A: aggressive tasks that completed the call step
-    aggressive_rows = await db.fetch(
+    rows = await db.fetch(
         f"""
         SELECT id, user_id FROM tasks
         WHERE status = 'pending'
-          AND escalation_policy = 'aggressive'
-          AND call_sent_at IS NOT NULL
-          AND call_sent_at <= now() - ('{esc} minutes')::interval
+          AND trigger_type = 'time'
+          AND scheduled_at IS NOT NULL
+          AND scheduled_at <= now() - ('{grace} minutes')::interval
         """,
     )
 
-    # Sub-query B: standard tasks whose WhatsApp window has fully elapsed
-    standard_rows = await db.fetch(
-        f"""
-        SELECT id, user_id FROM tasks
-        WHERE status = 'pending'
-          AND escalation_policy = 'standard'
-          AND whatsapp_sent_at IS NOT NULL
-          AND call_sent_at IS NULL
-          AND whatsapp_sent_at <= now() - ('{esc * 2} minutes')::interval
-        """,
-    )
-
-    # Sub-query C: silent tasks whose push window has fully elapsed
-    silent_rows = await db.fetch(
-        f"""
-        SELECT id, user_id FROM tasks
-        WHERE status = 'pending'
-          AND escalation_policy = 'silent'
-          AND reminder_sent_at IS NOT NULL
-          AND whatsapp_sent_at IS NULL
-          AND reminder_sent_at <= now() - ('{esc * 3} minutes')::interval
-        """,
-    )
-
-    for row in list(aggressive_rows) + list(standard_rows) + list(silent_rows):
+    for row in rows:
         await _process_auto_miss(str(row["id"]), str(row["user_id"]))
 
 

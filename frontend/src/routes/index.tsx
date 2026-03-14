@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { DateHeader } from "~/components/flow/v2/DateHeader";
 import { FlowTimeline } from "~/components/flow/v2/FlowTimeline";
-import { TaskRail } from "~/components/flow/v2/TaskRail";
 import { TaskDetailSheet } from "~/components/modals/TaskDetailSheet";
 import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
@@ -13,7 +12,7 @@ import { useAuth } from "~/contexts/AuthContext";
 import { setInMemoryToken } from "~/lib/apiClient";
 import { serverGetMe } from "~/lib/authServerFns";
 import { tasksService } from "~/services/TasksService";
-import { EventType, type TaskRailItem, type TimelineEvent } from "~/types";
+import { EventType, type TimelineEvent } from "~/types";
 import { debugSsrLog, isClient } from "~/utils/env";
 
 function FlowPagePending() {
@@ -66,31 +65,27 @@ export const Route = createFileRoute("/")({
     })();
 
     const events: TimelineEvent[] = [];
-    const tasks: TaskRailItem[] = [];
     for (const t of rawTasks) {
-      const { railItem, event } = mapTaskToDisplayTypes(t);
+      const event = mapTaskToDisplayTypes(t);
       const hasTime = Boolean(
         t.scheduled_at ?? t.scheduled_time ?? t.time ?? "",
       );
       if (hasTime) {
         events.push(event);
-      } else {
-        tasks.push(railItem);
       }
     }
-    const data = { user, events, tasks, selectedDate: searchDate ?? null };
+    const data = { user, events, selectedDate: searchDate ?? null };
     debugSsrLog("/ (FlowPage)", data);
     return data;
   },
   component: FlowPage,
 });
 
-// Map a raw task object from /api/v1/tasks/today to UI display types.
+// Map a raw task object from /api/v1/tasks to a TimelineEvent.
 // The backend shape is not yet strictly typed, so we defensively cast.
-function mapTaskToDisplayTypes(task: { [key: string]: unknown }): {
-  railItem: TaskRailItem;
-  event: TimelineEvent;
-} {
+function mapTaskToDisplayTypes(task: {
+  [key: string]: unknown;
+}): TimelineEvent {
   const id = String(task.id ?? "");
   const title = String(task.title ?? "Untitled");
   const description = String(task.description ?? "");
@@ -130,21 +125,23 @@ function mapTaskToDisplayTypes(task: { [key: string]: unknown }): {
     typeof task.goal_name === "string" && task.goal_name
       ? task.goal_name
       : undefined;
+  const isProjected = task.is_projected === true;
+  const occurrenceDate =
+    typeof task.occurrence_date === "string" ? task.occurrence_date : undefined;
 
   return {
-    railItem: { id, title, completed: isDone },
-    event: {
-      id,
-      title,
-      description,
-      time,
-      period,
-      type: eventType,
-      isPast,
-      status,
-      durationMinutes,
-      goalName,
-    },
+    id,
+    title,
+    description,
+    time,
+    period,
+    type: eventType,
+    isPast,
+    status,
+    durationMinutes,
+    goalName,
+    isProjected,
+    occurrenceDate,
   };
 }
 
@@ -158,7 +155,6 @@ function getGreeting(name?: string): string {
 function FlowPage() {
   const {
     events: initialEvents,
-    tasks: initialTasks,
     user: loaderUser,
     selectedDate: loaderDate,
   } = Route.useLoaderData();
@@ -166,17 +162,15 @@ function FlowPage() {
   const { user } = useAuth();
   const [data, setData] = useState<{
     events: TimelineEvent[];
-    tasks: TaskRailItem[];
   }>({
     events: initialEvents,
-    tasks: initialTasks,
   });
 
   // Keep local state in sync whenever the router loader provides fresh data
   // (e.g. after router.invalidate() is called from the chat page post-reschedule).
   useEffect(() => {
-    setData({ events: initialEvents, tasks: initialTasks });
-  }, [initialEvents, initialTasks]);
+    setData({ events: initialEvents });
+  }, [initialEvents]);
   const [isLoadingDate, setIsLoadingDate] = useState(false);
 
   const displayName = user?.name ?? loaderUser.name;
@@ -190,16 +184,14 @@ function FlowPage() {
       const rawTasks = await tasksService.getTasks(date ?? undefined);
 
       const events: TimelineEvent[] = [];
-      const tasks: TaskRailItem[] = [];
       for (const t of rawTasks) {
-        const { railItem, event } = mapTaskToDisplayTypes(t);
+        const event = mapTaskToDisplayTypes(t);
         const hasTime = Boolean(
           t.scheduled_at ?? t.scheduled_time ?? t.time ?? "",
         );
         if (hasTime) events.push(event);
-        else tasks.push(railItem);
       }
-      setData({ events, tasks });
+      setData({ events });
     } catch (e) {
       Sentry.captureException(e);
     } finally {
@@ -207,71 +199,47 @@ function FlowPage() {
     }
   };
 
-  const handleAddTodo = (title: string) => {
-    const tempId = `temp-${Date.now()}`;
-    setData((prev) => ({
-      ...prev,
-      tasks: [...prev.tasks, { id: tempId, title, completed: false }],
-    }));
-
-    tasksService
-      .addTodo(title)
-      .then((result) => {
-        setData((prev) => ({
-          ...prev,
-          tasks: prev.tasks.map((t) =>
-            t.id === tempId ? { ...t, id: result.task_id } : t,
-          ),
-        }));
-      })
-      .catch((error) => {
-        Sentry.captureException(error, { extra: { title } });
-        setData((prev) => ({
-          ...prev,
-          tasks: prev.tasks.filter((t) => t.id !== tempId),
-        }));
-      });
-  };
-
-  const handleComplete = useCallback((taskId: string) => {
-    // Optimistic update — mark done immediately in local state.
-    setData((prev) => ({
-      events: prev.events.map((e) =>
-        e.id === taskId ? { ...e, isPast: true } : e,
-      ),
-      tasks: prev.tasks.map((t) =>
-        t.id === taskId ? { ...t, completed: true } : t,
-      ),
-    }));
-
-    tasksService.completeTask(taskId).catch((error) => {
-      Sentry.captureException(error, { extra: { taskId } });
-      // Revert optimistic update on error.
+  const handleComplete = useCallback(
+    (taskId: string, occurrenceDate?: string) => {
+      // Optimistic update — mark done immediately in local state.
       setData((prev) => ({
         events: prev.events.map((e) =>
-          e.id === taskId ? { ...e, isPast: false } : e,
-        ),
-        tasks: prev.tasks.map((t) =>
-          t.id === taskId ? { ...t, completed: false } : t,
+          e.id === taskId ? { ...e, isPast: true } : e,
         ),
       }));
-    });
-  }, []);
+
+      tasksService.completeTask(taskId, occurrenceDate).catch((error) => {
+        Sentry.captureException(error, { extra: { taskId } });
+        // Revert optimistic update on error.
+        setData((prev) => ({
+          events: prev.events.map((e) =>
+            e.id === taskId ? { ...e, isPast: false } : e,
+          ),
+        }));
+      });
+    },
+    [],
+  );
 
   const navigate = useNavigate();
   const [selectedTask, setSelectedTask] = useState<TimelineEvent | null>(null);
 
-  const handleMissed = useCallback((taskId: string) => {
-    setData((prev) => ({
-      ...prev,
-      events: prev.events.map((e) =>
-        e.id === taskId ? { ...e, status: "missed", isPast: true } : e,
-      ),
-    }));
-    tasksService.missedTask(taskId).catch((error: unknown) => {
-      Sentry.captureException(error, { extra: { taskId } });
-    });
-  }, []);
+  const handleMissed = useCallback(
+    (taskId: string, occurrenceDate?: string) => {
+      setData((prev) => ({
+        ...prev,
+        events: prev.events.map((e) =>
+          e.id === taskId ? { ...e, status: "missed", isPast: true } : e,
+        ),
+      }));
+      tasksService
+        .missedTask(taskId, occurrenceDate)
+        .catch((error: unknown) => {
+          Sentry.captureException(error, { extra: { taskId } });
+        });
+    },
+    [],
+  );
 
   // Handle deep-links from push notification actions (done / missed)
   useEffect(() => {
@@ -306,17 +274,10 @@ function FlowPage() {
           <LoadingState />
         </div>
       ) : (
-        <>
-          <TaskRail
-            tasks={data.tasks}
-            onComplete={handleComplete}
-            onAddTodo={handleAddTodo}
-          />
-          <FlowTimeline
-            events={data.events}
-            onTaskClick={(event) => setSelectedTask(event)}
-          />
-        </>
+        <FlowTimeline
+          events={data.events}
+          onTaskClick={(event) => setSelectedTask(event)}
+        />
       )}
 
       <BottomNav />
@@ -325,11 +286,11 @@ function FlowPage() {
         task={selectedTask}
         onClose={() => setSelectedTask(null)}
         onComplete={(taskId) => {
-          handleComplete(taskId);
+          handleComplete(taskId, selectedTask?.occurrenceDate);
           setSelectedTask(null);
         }}
         onMissed={(taskId) => {
-          handleMissed(taskId);
+          handleMissed(taskId, selectedTask?.occurrenceDate);
           setSelectedTask(null);
         }}
         onReschedule={(taskId, taskTitle) => {

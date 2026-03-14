@@ -98,7 +98,6 @@ export type {
   RescheduleRequest,
   Task,
   TaskFilter,
-  TaskRailItem,
   TaskSuggestion,
 } from "./task";
 export {

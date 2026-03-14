@@ -281,6 +281,22 @@ setup_openrouter() {
     fi
 }
 
+setup_deepgram() {
+    header "── Deepgram (Voice) ──────────────────────────────"
+    info "Sign up and get your API key at: https://console.deepgram.com"
+    echo
+
+    local api_key
+    api_key="$(get_env DEEPGRAM_API_KEY)"
+    if is_placeholder "$api_key"; then
+        info "Get your key at: https://console.deepgram.com → API Keys"
+        api_key="$(ask "DEEPGRAM_API_KEY (leave blank to skip)" "" "secret")"
+        [[ -n "$api_key" ]] && set_env "DEEPGRAM_API_KEY" "$api_key"
+    else
+        success "DEEPGRAM_API_KEY already set"
+    fi
+}
+
 setup_langsmith() {
     header "── LangSmith (Agent Tracing) ────────────────────"
     info "Optional but recommended for debugging LangGraph agents."
@@ -586,6 +602,7 @@ run_env_setup() {
     setup_app
     setup_supabase
     setup_openrouter
+    setup_deepgram
     setup_langsmith
     setup_sentry
     setup_twilio

@@ -94,6 +94,7 @@ def _row_to_tuple(row: dict) -> tuple:
         row.get("recurrence_rule"),
         row.get("shared_with_goal_ids") or [],
         row.get("escalation_policy", "standard"),
+        row.get("conversation_id"),
     )
 
 
@@ -101,8 +102,8 @@ _INSERT_SQL = """
 INSERT INTO tasks (
     user_id, goal_id, title, description, status,
     scheduled_at, duration_minutes, trigger_type, location_trigger,
-    recurrence_rule, shared_with_goal_ids, escalation_policy
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+    recurrence_rule, shared_with_goal_ids, escalation_policy, conversation_id
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
 """
 
 
@@ -147,6 +148,7 @@ async def save_tasks_node(state: AgentState) -> dict:
     goal_draft: dict = state.get("goal_draft") or {}
     scheduler_output: dict = state.get("scheduler_output") or {}
     history: list[dict] = list(state.get("conversation_history") or [])
+    intent: str = state.get("intent") or ""
 
     # ── Step 1: Resolve or create goal ───────────────────────────────────
     goal_id = await _ensure_goal(user_id, goal_draft)
@@ -266,6 +268,10 @@ async def save_tasks_node(state: AgentState) -> dict:
             "trigger_type": trigger_type,
             "location_trigger": location_trigger,
             "shared_with_goal_ids": shared_with_goal_ids,
+            # Stamp conversation_id on NEW_TASK rows so amendments can find them
+            "conversation_id": state.get("conversation_id")
+            if intent == "NEW_TASK"
+            else None,
         }
 
         escalation_policy: str = task.get("escalation_policy", "standard")
@@ -334,7 +340,6 @@ async def save_tasks_node(state: AgentState) -> dict:
     # Avoid appending a second generic message; just return history as-is.
     # For GOAL / MODIFY_GOAL / NEXT_MILESTONE flows there is no prior assistant
     # reply in this turn, so we still need to append the summary.
-    intent: str = state.get("intent") or ""
     last_assistant = next(
         (m["content"] for m in reversed(history) if m.get("role") == "assistant"),
         None,

@@ -21,6 +21,7 @@ import { BottomNav } from "~/components/navigation/BottomNav";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
 import { useAuth } from "~/contexts/AuthContext";
+import { useVoice } from "~/hooks/useVoice";
 import { setInMemoryToken } from "~/lib/apiClient";
 import { serverGetMe } from "~/lib/authServerFns";
 import type { ConversationSummary } from "~/services/ChatService";
@@ -53,8 +54,7 @@ export const Route = createFileRoute("/chat")({
     const { user, token } = await serverGetMe();
     if (!user) throw redirect({ to: "/login" });
     if (!user.onboarded) throw redirect({ to: "/onboarding" });
-    setInMemoryToken(token);
-    return { user };
+    return { user, token };
   },
   component: ChatPage,
 });
@@ -228,7 +228,11 @@ const WELCOME_MESSAGE = (name?: string) => {
 function ChatPage() {
   const router = useRouter();
   const { user } = useAuth();
-  const { reschedule_task_id, task_name } = Route.useSearch();
+  const { token } = Route.useLoaderData();
+  useEffect(() => {
+    setInMemoryToken(token);
+  }, [token]);
+  const { reschedule_task_id, task_name, conversation } = Route.useSearch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const conversationIdRef = useRef<string | undefined>(undefined);
@@ -250,6 +254,8 @@ function ChatPage() {
   // Preserve reschedule_task_id across URL rewrites (it's cleared from search params
   // when conversation_id is substituted in, but we still need it for slot confirmation).
   const rescheduleTaskIdRef = useRef<string | undefined>(reschedule_task_id);
+  const lastInputWasVoiceRef = useRef<boolean>(false);
+  const voice = useVoice();
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -507,6 +513,11 @@ function ChatPage() {
             });
           }
 
+          if (lastInputWasVoiceRef.current && result.spoken_summary) {
+            lastInputWasVoiceRef.current = false;
+            voice.playTTS(result.spoken_summary);
+          }
+
           scrollToBottom();
         }, 800);
       } catch {
@@ -520,7 +531,7 @@ function ChatPage() {
         setMessages((prev) => [...prev, errorMessage]);
       }
     },
-    [scrollToBottom, router],
+    [scrollToBottom, router, voice],
   );
 
   const loadConversation = useCallback(
@@ -583,6 +594,15 @@ function ChatPage() {
     },
     [handleSendMessage],
   );
+
+  // If conversation_id is in the URL (e.g. page reload), load that conversation.
+  // Intentionally depends only on `token` — runs once after token is hydrated,
+  // not on every loadConversation identity change.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: intentional one-shot on token hydration
+  useEffect(() => {
+    if (!conversation || !token) return;
+    loadConversation(conversation);
+  }, [token]);
 
   return (
     <div className="relative h-screen flex flex-col overflow-hidden">
@@ -666,12 +686,16 @@ function ChatPage() {
 
       <ChatInput
         onSend={handleSendMessage}
+        onVoiceSend={() => {
+          lastInputWasVoiceRef.current = true;
+        }}
         disabled={isThinking || isLoadingHistory}
         placeholder={
           messages.length <= 1
             ? "What would you like to achieve?"
             : "What's on your mind?"
         }
+        voice={voice}
       />
 
       <BottomNav />

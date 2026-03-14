@@ -16,9 +16,13 @@ class TasksService {
 
   async completeTask(
     taskId: string,
+    occurrenceDate?: string,
   ): Promise<{ task_id: string; status: string }> {
     const response = await apiFetch(`/api/v1/tasks/${taskId}/complete`, {
       method: "PATCH",
+      ...(occurrenceDate
+        ? { body: JSON.stringify({ occurrence_date: occurrenceDate }) }
+        : {}),
     });
 
     if (!response.ok) {
@@ -45,9 +49,13 @@ class TasksService {
 
   async missedTask(
     taskId: string,
+    occurrenceDate?: string,
   ): Promise<{ task_id: string; status: string }> {
     const response = await apiFetch(`/api/v1/tasks/${taskId}/missed`, {
       method: "PATCH",
+      ...(occurrenceDate
+        ? { body: JSON.stringify({ occurrence_date: occurrenceDate }) }
+        : {}),
     });
 
     if (!response.ok) {

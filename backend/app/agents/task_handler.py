@@ -4,6 +4,9 @@
 Handles the NEW_TASK intent: extracts task details from the user's message via
 LLM, converts the local scheduled time to UTC, and prepares a proposed_task dict
 for save_tasks to insert into the database.
+
+Amendment flow: if there is already a pending task linked to this conversation_id,
+the handler UPDATEs it in-place instead of creating a new one.
 """
 
 from typing import Optional
@@ -13,13 +16,18 @@ from pydantic import BaseModel
 
 from app.agents.state import AgentState
 from app.services.llm import validated_llm_call
+from app.services.supabase import db
 
 _MODEL = "openrouter/openai/gpt-4o-mini"
 
 _SYSTEM = """\
 You are Flux, helping the user schedule a task or reminder.
 
-Extract the task details from the user's latest message and produce a confirmation reply.
+Extract the task details from the conversation and produce a confirmation reply.
+If the user's latest message is amending or correcting a task that was just created
+(e.g. "actually make it every 20 minutes", "change the time to 3pm", "make it 1 hour"),
+use the FULL conversation history to infer all unchanged fields (title, description, etc.)
+and only update the fields the user explicitly changed.
 
 FIELD RULES:
 - title: concise task title, max 60 characters
@@ -187,6 +195,62 @@ async def task_handler_node(state: AgentState) -> dict:
         "goal_id": None,
         "shared_with_goal_ids": [],
     }
+
+    # Amendment flow: if there's already a pending task from this conversation,
+    # UPDATE it in-place instead of inserting a duplicate.
+    conversation_id: Optional[str] = state.get("conversation_id")
+    if conversation_id:
+        existing = await db.fetchrow(
+            """
+            SELECT id FROM tasks
+            WHERE conversation_id = $1::uuid
+              AND user_id = $2
+              AND status = 'pending'
+            ORDER BY created_at ASC
+            LIMIT 1
+            """,
+            conversation_id,
+            user_id,
+        )
+        if existing:
+            scheduled_at_parsed = None
+            if scheduled_at_utc:
+                try:
+                    scheduled_at_parsed = pendulum.parse(scheduled_at_utc)
+                except Exception:
+                    pass
+            await db.execute(
+                """
+                UPDATE tasks SET
+                    title = $1,
+                    description = $2,
+                    scheduled_at = $3,
+                    duration_minutes = $4,
+                    recurrence_rule = $5,
+                    escalation_policy = $6,
+                    trigger_type = $7,
+                    location_trigger = $8,
+                    reminder_sent_at = NULL,
+                    whatsapp_sent_at = NULL,
+                    call_sent_at = NULL
+                WHERE id = $9
+                """,
+                result.title,
+                result.description,
+                scheduled_at_parsed,
+                result.duration_minutes,
+                result.recurrence_rule,
+                result.escalation_policy,
+                result.trigger_type,
+                result.location_trigger,
+                existing["id"],
+            )
+            return {
+                "proposed_tasks": [],
+                "approval_status": "approved",
+                "conversation_history": history
+                + [{"role": "assistant", "content": result.reply}],
+            }
 
     return {
         "proposed_tasks": [proposed_task],

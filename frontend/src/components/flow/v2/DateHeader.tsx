@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight, User } from "lucide-react";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { format } from "~/utils/date";
 
 interface DateHeaderProps {
@@ -26,6 +26,12 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(y, m - 1, d);
 }
 
+function addDays(dateStr: string, days: number): string {
+  const d = parseLocalDate(dateStr);
+  d.setDate(d.getDate() + days);
+  return toLocalDateString(d);
+}
+
 export function DateHeader({
   date: _date,
   greeting,
@@ -33,22 +39,40 @@ export function DateHeader({
   onDateChange,
 }: DateHeaderProps) {
   const inputRef = useRef<HTMLInputElement>(null);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const activeDate = selectedDate ?? todayString();
   const isToday = activeDate === todayString();
+
+  const today = todayString();
+  const minDate = addDays(today, -42);
+  const maxDate = addDays(today, 42);
 
   const displayDate = (() => {
     const d = parseLocalDate(activeDate);
     return format(d, "MMMM do");
   })();
 
-  const go = (offsetDays: number) => {
-    const d = parseLocalDate(activeDate);
-    d.setDate(d.getDate() + offsetDays);
-    const next = toLocalDateString(d);
-    const isNextToday = next === todayString();
-    onDateChange?.(isNextToday ? null : next);
-  };
+  const pendingOffsetRef = useRef(0);
+
+  const go = useCallback(
+    (offsetDays: number) => {
+      pendingOffsetRef.current += offsetDays;
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(() => {
+        const totalOffset = pendingOffsetRef.current;
+        pendingOffsetRef.current = 0;
+        const next = addDays(activeDate, totalOffset);
+        if (next < minDate || next > maxDate) return;
+        const isNextToday = next === today;
+        onDateChange?.(isNextToday ? null : next);
+      }, 300);
+    },
+    [activeDate, minDate, maxDate, today, onDateChange],
+  );
+
+  const atMin = activeDate <= minDate;
+  const atMax = activeDate >= maxDate;
 
   return (
     <header className="pt-10 px-6 pb-6 relative z-10 flex justify-between items-end">
@@ -60,7 +84,8 @@ export function DateHeader({
           <button
             type="button"
             onClick={() => go(-1)}
-            className="w-7 h-7 flex items-center justify-center rounded-full text-charcoal/50 hover:text-charcoal hover:bg-charcoal/10 active:scale-95 transition-all duration-150"
+            disabled={atMin}
+            className="w-7 h-7 flex items-center justify-center rounded-full text-charcoal/50 hover:text-charcoal hover:bg-charcoal/10 active:scale-95 transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
             aria-label="Previous day"
           >
             <ChevronLeft className="w-4 h-4" />
@@ -78,7 +103,8 @@ export function DateHeader({
           <button
             type="button"
             onClick={() => go(1)}
-            className="w-7 h-7 flex items-center justify-center rounded-full text-charcoal/50 hover:text-charcoal hover:bg-charcoal/10 active:scale-95 transition-all duration-150"
+            disabled={atMax}
+            className="w-7 h-7 flex items-center justify-center rounded-full text-charcoal/50 hover:text-charcoal hover:bg-charcoal/10 active:scale-95 transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
             aria-label="Next day"
           >
             <ChevronRight className="w-4 h-4" />
@@ -89,10 +115,12 @@ export function DateHeader({
             ref={inputRef}
             type="date"
             value={activeDate}
+            min={minDate}
+            max={maxDate}
             onChange={(e) => {
               const val = e.target.value;
               if (!val) return;
-              onDateChange?.(val === todayString() ? null : val);
+              onDateChange?.(val === today ? null : val);
             }}
             className="sr-only"
             aria-hidden="true"

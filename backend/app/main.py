@@ -38,6 +38,7 @@ from app.api.v1.echoconfig import router as echoconfig_router  # noqa: E402
 from app.api.v1.goals import router as goals_router  # noqa: E402
 from app.api.v1.patterns import router as patterns_router  # noqa: E402
 from app.api.v1.tasks import router as tasks_router  # noqa: E402
+from app.api.v1.voice import router as voice_router  # noqa: E402
 from app.api.v1.webhooks import router as webhooks_router  # noqa: E402
 
 
@@ -95,6 +96,7 @@ _PREFIX = "/api/v1"
 app.include_router(chat_router, prefix=_PREFIX)
 app.include_router(goals_router, prefix=_PREFIX)
 app.include_router(tasks_router, prefix=_PREFIX)
+app.include_router(voice_router, prefix=_PREFIX)
 app.include_router(analytics_router, prefix=_PREFIX)
 app.include_router(patterns_router, prefix=_PREFIX)
 app.include_router(account_router, prefix=_PREFIX)
@@ -135,3 +137,8 @@ def custom_openapi() -> dict[str, Any]:
 
 
 app.openapi = custom_openapi  # type: ignore[method-assign]
+
+
+@app.get("/health", include_in_schema=False)
+async def health() -> dict[str, str]:
+    return {"status": "ok"}

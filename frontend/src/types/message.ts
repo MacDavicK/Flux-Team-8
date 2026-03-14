@@ -211,6 +211,7 @@ export interface ChatMessageResponse {
   requires_user_action: boolean;
   options?: OnboardingOption[] | null;
   questions?: GoalClarifierQuestion[] | null;
+  spoken_summary?: string | null;
 }
 
 /**

@@ -62,6 +62,46 @@ def expand_rrule_to_tasks(
     return tasks
 
 
+def occurrence_on_date(
+    rrule_string: str,
+    task_scheduled_at: pendulum.DateTime,
+    target_date: str,
+    user_timezone: str,
+) -> str | None:
+    """
+    Return the UTC ISO8601 time of the occurrence on target_date if the
+    RRULE (anchored at task_scheduled_at) has one, else None.
+
+    Args:
+        rrule_string:      iCal RRULE, e.g. "FREQ=WEEKLY;BYDAY=MO"
+        task_scheduled_at: The pending row's scheduled_at (UTC or tz-aware).
+        target_date:       YYYY-MM-DD in the user's local timezone.
+        user_timezone:     IANA timezone string, e.g. "America/New_York".
+    """
+    tz = pendulum.timezone(user_timezone)
+
+    # Use the pending row's local wall-clock time as dtstart
+    local_start = task_scheduled_at.in_timezone(user_timezone)
+    naive_start = local_start.naive()
+
+    # Parse target_date as start/end of day (naive local)
+    y, m, d = (int(p) for p in target_date.split("-"))
+    import datetime as _dt
+
+    start_of_day = _dt.datetime(y, m, d, 0, 0, 0)
+    end_of_day = _dt.datetime(y, m, d, 23, 59, 59)
+
+    rule = rrulestr(rrule_string, dtstart=naive_start)
+    occurrences = rule.between(start_of_day, end_of_day, inc=True)
+
+    if not occurrences:
+        return None
+
+    occ = occurrences[0]
+    local_dt = pendulum.instance(occ, tz=tz)
+    return local_dt.in_timezone("UTC").isoformat()
+
+
 def next_occurrence_after(
     rrule_string: str,
     after_dt: pendulum.DateTime,

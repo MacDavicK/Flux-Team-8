@@ -1,6 +1,6 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { BarChart2, Home, MessageCircle, Sparkles } from "lucide-react";
+import { Home, MessageCircle, Sparkles } from "lucide-react";
 import { useAuth } from "~/contexts/AuthContext";
 import { cn } from "~/utils/cn";
 
@@ -23,12 +23,6 @@ const navItems: NavItem[] = [
     icon: <MessageCircle className="w-6 h-6" />,
     label: "Chat",
     position: "center",
-  },
-  {
-    to: "/analytics",
-    icon: <BarChart2 className="w-5 h-5" />,
-    label: "Progress",
-    position: "right",
   },
   {
     to: "/reflection",

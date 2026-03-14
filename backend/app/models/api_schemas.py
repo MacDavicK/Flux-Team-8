@@ -59,6 +59,7 @@ class ChatMessageResponse(BaseModel):
     requires_user_action: bool = False
     options: Optional[list[OnboardingOptionSchema]] = None
     questions: Optional[list[ClarifierQuestionSchema]] = None
+    spoken_summary: Optional[str] = None
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -262,3 +263,12 @@ class PushSubscriptionRequest(BaseModel):
 
 class EscalationPolicyUpdate(BaseModel):
     escalation_policy: str  # "silent" | "standard" | "aggressive"
+
+
+# ─────────────────────────────────────────────────────────────────
+# 19.15 — Task action (projected occurrence)
+# ─────────────────────────────────────────────────────────────────
+
+
+class TaskActionRequest(BaseModel):
+    occurrence_date: Optional[str] = None  # YYYY-MM-DD; only for projected occurrences
