@@ -209,6 +209,8 @@ def _apply_extraction(profile: dict, step: str, value: Any) -> dict:
     elif step == "phone_number":
         p["phone_number"] = str(value)  # Already E.164 from frontend validation
         p["_phone_collected"] = True
+        # Reset OTP attempt counter so a re-entered number gets a fresh 3 attempts
+        p.pop("_otp_attempts", None)
     elif step == "otp_verification":
         # OTP result is set by onboarding_node after async confirm_otp call
         p["_otp_verified"] = True
@@ -337,6 +339,43 @@ async def onboarding_node(state: AgentState) -> dict:
 
         # OTP step: verify code before advancing. On failure, re-ask with error.
         if step == "otp_verification":
+            import re as _re
+
+            # If the user submitted a phone number instead of an OTP code, treat it
+            # as "change number" — reset phone step and reprocess as a phone submission.
+            if _re.match(r"^\+[1-9]\d{1,14}$", user_msg.strip()):
+                profile.pop("_phone_collected", None)
+                profile.pop("_otp_attempts", None)
+                profile["phone_number"] = user_msg.strip()
+                profile["_phone_collected"] = True
+                # Fire OTP to the new number
+                try:
+                    from app.services.twilio_service import send_otp  # noqa: PLC0415
+
+                    await send_otp(user_msg.strip())
+                except Exception:
+                    pass
+                import json as _json
+
+                await db.execute(
+                    "UPDATE users SET profile = $1::jsonb, updated_at = now() WHERE id = $2",
+                    _json.dumps(profile),
+                    user_id,
+                )
+                otp_question = _get_question("otp_verification", profile)
+                updated_history = history + [
+                    {"role": "assistant", "content": otp_question}
+                ]
+                otp_options = _STEP_OPTIONS.get("otp_verification")
+                return {
+                    "conversation_history": updated_history,
+                    "user_profile": profile,
+                    "intent": "ONBOARDING",
+                    "options": [o.model_dump() for o in otp_options]
+                    if otp_options
+                    else None,
+                }
+
             phone = profile.get("phone_number", "")
             try:
                 from app.services.twilio_service import confirm_otp  # noqa: PLC0415

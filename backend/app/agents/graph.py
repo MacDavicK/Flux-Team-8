@@ -79,22 +79,35 @@ def route_from_orchestrator(state: AgentState) -> str:
     """Routes from orchestrator to the appropriate agent based on intent."""
     approval = state.get("approval_status") or ""
 
-    # User just approved — ask when they want to start before saving tasks.
+    # Pre-fan-out: user answered the start-date question before any plan was
+    # generated. proposed_tasks is None; goal_start_date was just set by the
+    # orchestrator's START_DATE handler. Route to goal_planner to trigger the
+    # fan-out with the correct date context.
+    if (
+        approval == "approved"
+        and not state.get("proposed_tasks")
+        and state.get("goal_start_date")
+    ):
+        return "goal_planner"
+
+    # Post-approval: plan was presented and user approved. goal_start_date is
+    # already set from the pre-fan-out question — go directly to save_tasks.
+    # No reschedule needed: the fan-out scheduler already used goal_start_date.
+    if (
+        approval == "approved"
+        and state.get("proposed_tasks")
+        and state.get("goal_start_date")
+    ):
+        return "save_tasks"
+
+    # Fallback: user approved but goal_start_date is missing (should not occur
+    # in normal flow; guards against malformed session state).
     if (
         approval == "approved"
         and state.get("proposed_tasks")
         and not state.get("goal_start_date")
     ):
         return "ask_start_date"
-
-    # User answered the start-date question — re-run scheduler with the new
-    # start date, then save tasks.
-    if (
-        approval == "approved"
-        and state.get("proposed_tasks")
-        and state.get("goal_start_date")
-    ):
-        return "reschedule"
 
     intent = state.get("intent") or ""
 
@@ -126,10 +139,16 @@ def route_from_orchestrator(state: AgentState) -> str:
 def route_from_goal_clarifier(state: AgentState) -> str:
     """
     Routes from goal_clarifier:
-    - GOAL_PLAN  → goal_planner (enough context gathered)
-    - otherwise  → END (questions sent to frontend; user answers on next turn)
+    - GOAL_PLAN + no goal_start_date → ask_start_date (collect date before fan-out)
+    - GOAL_PLAN + goal_start_date    → goal_planner (re-entry path, date already known)
+    - otherwise                      → END (questions sent to frontend; user answers on next turn)
     """
     if state.get("intent") == "GOAL_PLAN":
+        # Ask for start date BEFORE the fan-out so the scheduler receives the
+        # correct window on its first (and only) run. Skip if goal_start_date
+        # is already in state (e.g. NEXT_MILESTONE re-entry; see edge cases).
+        if not state.get("goal_start_date"):
+            return "ask_start_date"
         return "goal_planner"
     return END
 
@@ -177,6 +196,7 @@ def route_from_goal_planner(state: AgentState) -> str | list[Send]:
                     "user_profile": user_profile,
                     "conversation_history": conv_history,
                     "token_usage": token_usage,
+                    "goal_start_date": state.get("goal_start_date"),  # FIX BUG #3
                 },
             ),
             Send(
@@ -194,10 +214,9 @@ def route_from_goal_planner(state: AgentState) -> str | list[Send]:
     # 10.8 — Approval check after all sub-agents have reported
     approval = state.get("approval_status") or "negotiating"
     if approval == "approved":
-        # Route via ask_start_date unless a start date was already provided
-        if state.get("goal_start_date"):
-            return "save_tasks"
-        return "ask_start_date"
+        # goal_start_date is always set (asked pre-fan-out). Go directly to
+        # save_tasks — no reschedule round-trip needed.
+        return "save_tasks"
     if approval == "abandoned":
         return END
     # NEGOTIATING — end this turn; orchestrator re-routes on next user message

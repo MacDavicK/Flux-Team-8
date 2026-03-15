@@ -7,6 +7,7 @@ import { cn } from "~/utils/cn";
 interface OnboardingOptionsProps {
   options: OnboardingOption[];
   onSelect: (value: string) => void;
+  onChangeNumber?: () => void;
   disabled?: boolean;
   phoneNumber?: string; // required for the OTP resend button
 }
@@ -47,10 +48,16 @@ const OTP_MAX_ATTEMPTS = 3;
 interface OtpInputProps {
   phoneNumber: string;
   onSubmit: (code: string) => void;
+  onChangeNumber?: () => void;
   disabled?: boolean;
 }
 
-function OtpInput({ phoneNumber, onSubmit, disabled }: OtpInputProps) {
+function OtpInput({
+  phoneNumber,
+  onSubmit,
+  onChangeNumber,
+  disabled,
+}: OtpInputProps) {
   const [code, setCode] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [attempts, setAttempts] = useState(0);
@@ -168,23 +175,41 @@ function OtpInput({ phoneNumber, onSubmit, disabled }: OtpInputProps) {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={handleResend}
-        disabled={cooldown > 0 || isResending}
-        className={cn(
-          "text-xs transition-colors pl-1",
-          cooldown > 0 || isResending
-            ? "text-river/40 cursor-not-allowed"
-            : "text-sage hover:text-sage/80 underline underline-offset-2",
+      <div className="flex gap-3 pl-1">
+        <button
+          type="button"
+          onClick={handleResend}
+          disabled={cooldown > 0 || isResending}
+          className={cn(
+            "text-xs transition-colors",
+            cooldown > 0 || isResending
+              ? "text-river/40 cursor-not-allowed"
+              : "text-sage hover:text-sage/80 underline underline-offset-2",
+          )}
+        >
+          {isResending
+            ? "Sending…"
+            : cooldown > 0
+              ? `Resend code in ${cooldown}s`
+              : "Resend code"}
+        </button>
+
+        {onChangeNumber && (
+          <button
+            type="button"
+            onClick={onChangeNumber}
+            disabled={disabled}
+            className={cn(
+              "text-xs transition-colors",
+              disabled
+                ? "text-river/40 cursor-not-allowed"
+                : "text-river/60 hover:text-river underline underline-offset-2",
+            )}
+          >
+            Change number
+          </button>
         )}
-      >
-        {isResending
-          ? "Sending…"
-          : cooldown > 0
-            ? `Resend code in ${cooldown}s`
-            : "Resend code"}
-      </button>
+      </div>
     </div>
   );
 }
@@ -192,6 +217,7 @@ function OtpInput({ phoneNumber, onSubmit, disabled }: OtpInputProps) {
 export function OnboardingOptions({
   options,
   onSelect,
+  onChangeNumber,
   disabled,
   phoneNumber = "",
 }: OnboardingOptionsProps) {
@@ -208,6 +234,7 @@ export function OnboardingOptions({
       <OtpInput
         phoneNumber={phoneNumber}
         onSubmit={onSelect}
+        onChangeNumber={onChangeNumber}
         disabled={disabled}
       />
     );

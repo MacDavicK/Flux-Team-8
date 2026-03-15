@@ -14,7 +14,9 @@ import re
 import uuid
 from typing import Any, cast
 
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi.responses import StreamingResponse
 
 import app.agents.graph as _graph_module
 from app.middleware.auth import get_current_user
@@ -65,23 +67,30 @@ def build_spoken_summary(response: "ChatMessageResponse") -> str:
     return strip_markdown(response.message)[:300]
 
 
-@router.post("/message", response_model=ChatMessageResponse)
+@router.post("/message")
 @limiter.limit("20/minute")
 async def send_message(
     request: Request,
     body: ChatMessageRequest,
     current_user=Depends(get_current_user),
-) -> ChatMessageResponse:
-    """
-    17.1.1–17.1.4 — Accept a user message, run the LangGraph agent, persist
-    results to DB, and return the assistant reply with metadata.
-    """
+) -> StreamingResponse:
+    """SSE stream. Events: progress | complete | error (text/event-stream)."""
+    return StreamingResponse(
+        _send_message_events(body, current_user),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+            "Connection": "keep-alive",
+        },
+    )
+
+
+async def _send_message_events(body: ChatMessageRequest, current_user: dict):
+    """Async generator yielding SSE events for the chat message endpoint."""
     user_id: str = str(current_user["sub"])
 
     # ── Short-circuit: RESCHEDULE_TASK with pre-set intent ───────────────────
-    # Frontend sends intent="RESCHEDULE_TASK" + task_id to skip the orchestrator
-    # LLM call. We compute slots directly, create a real conversation, persist
-    # messages, and return a proper conversation_id for follow-up /message calls.
     if body.intent == "RESCHEDULE_TASK" and body.task_id:
         task = await _fetch_task_or_404(body.task_id, user_id)
 
@@ -93,7 +102,6 @@ async def send_message(
         if user_row:
             user_tz = user_row["timezone"] or "UTC"
 
-        # Create a new conversation for this reschedule thread
         thread_id = str(uuid.uuid4())
         conv = await db.fetchrow(
             """
@@ -117,7 +125,6 @@ async def send_message(
             f"Pick one or choose a custom date & time."
         )
 
-        # Persist both turns so conversation history is complete
         await db.execute(
             "INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)",
             conv_id,
@@ -142,7 +149,8 @@ async def send_message(
             options=slot_options,
         )
         resp.spoken_summary = build_spoken_summary(resp)
-        return resp
+        yield f"data: {json.dumps({'type': 'complete', 'data': resp.model_dump(mode='json')})}\n\n"
+        return
 
     # ── 17.1.2  Resolve or create conversation ──────────────────────────────
     if body.conversation_id is None:
@@ -164,9 +172,11 @@ async def send_message(
             uuid.UUID(body.conversation_id),
         )
         if conv is None:
-            raise HTTPException(status_code=404, detail="Conversation not found")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Conversation not found'})}\n\n"
+            return
         if str(conv["user_id"]) != user_id:
-            raise HTTPException(status_code=403, detail="Access denied")
+            yield f"data: {json.dumps({'type': 'error', 'message': 'Access denied'})}\n\n"
+            return
         conv_id = conv["id"]
         langgraph_thread_id = conv["langgraph_thread_id"]
 
@@ -181,7 +191,6 @@ async def send_message(
         conv_id,
     )
 
-    # Exclude 'summary' role messages from graph input; keep them in DB only.
     history: list[dict] = [
         {"role": row["role"], "content": row["content"]}
         for row in rows
@@ -205,15 +214,10 @@ async def send_message(
     else:
         user_profile = cast(dict[str, Any], dict(_raw_profile))
 
-    # Ensure timezone from dedicated column takes precedence over profile JSON
     if user_row and user_row["timezone"]:
         user_profile["timezone"] = user_row["timezone"]
 
-    # ── Restore pending approval state from last assistant message metadata ─────
-    # approval_status and goal_draft/proposed_tasks are not persisted in the DB
-    # as columns — they live only in LangGraph state. Since we rebuild state from
-    # scratch on every turn, we recover them from the metadata written when the
-    # plan was last presented to the user (approval_status="pending").
+    # ── Restore pending approval state ───────────────────────────────────────
     pending_goal_draft: dict | None = None
     pending_proposed_tasks: list | None = None
     pending_approval_status: str | None = None
@@ -234,7 +238,6 @@ async def send_message(
                     pending_approval_status = "pending"
                     pending_classifier_output = meta.get("classifier_output")
                 elif meta.get("approval_status") == "awaiting_start_date":
-                    # User approved and was asked for a start date — restore context
                     pending_goal_draft = plan
                     pending_proposed_tasks = plan.get("plan", {}).get("proposed_tasks")
                     pending_approval_status = "awaiting_start_date"
@@ -242,12 +245,6 @@ async def send_message(
             break
 
     # ── Build initial AgentState ─────────────────────────────────────────────
-    # user_profile is loaded from DB on every turn. The onboarding node writes
-    # partial answers back to users.profile after each step, so the DB is always
-    # the authoritative source of onboarding progress.
-
-    # For GOAL_CLARIFY: inject structured answers into goal_draft so goal_clarifier
-    # can detect them and route to goal_planner without an extra LLM call.
     initial_goal_draft = pending_goal_draft
     if body.intent == "GOAL_CLARIFY" and body.answers:
         initial_goal_draft = dict(pending_goal_draft or {})
@@ -273,11 +270,29 @@ async def send_message(
         **({"user_profile": user_profile} if user_profile else {}),
     }
 
-    # ── Run LangGraph ────────────────────────────────────────────────────────
-    result: dict = await _graph_module.compiled_graph.ainvoke(
-        state,
-        config={"configurable": {"thread_id": langgraph_thread_id}},
-    )
+    # ── Run LangGraph via astream_events ─────────────────────────────────────
+    result: dict | None = None
+    try:
+        async for event in _graph_module.compiled_graph.astream_events(
+            state,
+            version="v2",
+            config={"configurable": {"thread_id": langgraph_thread_id}},
+        ):
+            if event["event"] == "on_chain_start":
+                node = event.get("metadata", {}).get("langgraph_node")
+                # Only emit when the event name matches the node name to avoid
+                # duplicate events from parent subgraph on_chain_start firings.
+                if node and event.get("name") == node:
+                    yield f"data: {json.dumps({'type': 'progress', 'node': node})}\n\n"
+            elif event["event"] == "on_chain_end" and event.get("name") == "LangGraph":
+                result = event["data"].get("output")
+    except Exception as exc:
+        yield f"data: {json.dumps({'type': 'error', 'message': str(exc)})}\n\n"
+        return
+
+    if result is None:
+        yield f"data: {json.dumps({'type': 'error', 'message': 'Graph produced no output'})}\n\n"
+        return
 
     # ── Extract assistant reply ──────────────────────────────────────────────
     reply: str = ""
@@ -299,23 +314,19 @@ async def send_message(
     result_approval = result.get("approval_status")
     approval_pending = result_approval == "pending"
     awaiting_start_date = result_approval == "awaiting_start_date"
-    # Persist plan metadata when the user still needs to act on it:
-    #   - "pending": user hasn't approved yet
-    #   - "awaiting_start_date": user approved, now answering the start-date question
-    # After save_tasks runs, approval_status is None — don't echo the plan back.
+    agent_node_value = result.get("intent") or (
+        "ask_start_date" if awaiting_start_date else None
+    )
     if goal_draft and (approval_pending or awaiting_start_date):
         metadata: dict | None = {
             "proposed_plan": goal_draft,
             "classifier_output": result.get("classifier_output"),
-            # Persist the awaiting_start_date status so the next turn can restore it
             "approval_status": result_approval,
         }
+    elif agent_node_value == "ONBOARDING" and result.get("options"):
+        metadata = {"options": result.get("options")}
     else:
         metadata = None
-    # agent_node: prefer explicit intent; fall back to approval status sentinel
-    agent_node_value = result.get("intent") or (
-        "ask_start_date" if awaiting_start_date else None
-    )
     await db.execute(
         """
         INSERT INTO messages (conversation_id, role, content, agent_node, metadata)
@@ -328,13 +339,8 @@ async def send_message(
     )
 
     # ── Update conversation timestamp + title ────────────────────────────────
-    # Set a title once the agent produces a goal plan. Use the user's original
-    # goal message (first user message in this conversation) as the title —
-    # it's the most natural, human-readable label. Cap at 80 chars.
-    # COALESCE ensures an existing title is never overwritten.
     conv_title: str | None = None
     if result.get("intent") == "GOAL" and result.get("goal_draft"):
-        # Walk history to find the user message that triggered this goal turn
         for msg in result.get("conversation_history") or []:
             if msg.get("role") == "user":
                 raw = (msg.get("content") or "").strip()
@@ -370,7 +376,7 @@ async def send_message(
         questions=raw_options if is_clarifier else None,
     )
     resp.spoken_summary = build_spoken_summary(resp)
-    return resp
+    yield f"data: {json.dumps({'type': 'complete', 'data': resp.model_dump(mode='json')})}\n\n"
 
 
 @router.post("/onboarding/start", response_model=ChatMessageResponse)
@@ -485,13 +491,18 @@ async def start_onboarding(
 
     # Persist the greeting message and update conversation timestamp
     if greeting:
+        greeting_options = result.get("options")
+        greeting_metadata = (
+            json.dumps({"options": greeting_options}) if greeting_options else None
+        )
         await db.execute(
             """
-            INSERT INTO messages (conversation_id, role, content, agent_node)
-            VALUES ($1, 'assistant', $2, 'ONBOARDING')
+            INSERT INTO messages (conversation_id, role, content, agent_node, metadata)
+            VALUES ($1, 'assistant', $2, 'ONBOARDING', $3)
             """,
             conv_id,
             greeting,
+            greeting_metadata,
         )
         await db.execute(
             "UPDATE conversations SET last_message_at = NOW() WHERE id = $1",

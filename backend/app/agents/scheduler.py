@@ -6,6 +6,7 @@ import pendulum
 from app.agents.state import AgentState
 from app.models.agent_outputs import SchedulerOutput
 from app.services.llm import validated_llm_call
+from app.services.rrule_expander import projected_occurrences_in_window
 from app.services.supabase import db
 
 # 9.4.1 — Load system prompt once at import time
@@ -37,27 +38,86 @@ async def scheduler_node(state: AgentState) -> dict:
 
     user_tz = profile.get("timezone", "UTC")
 
-    # 9.4.2 — Query existing pending/rescheduled tasks for the next 6 weeks
-    existing_tasks = await db.fetch(
+    # ── Compute planning window ────────────────────────────────────────────
+    # Use goal_start_date (user's chosen start) as the window lower bound when
+    # available. This fixes BUG #2: previously the window always started at
+    # now() even when goal_start_date was set to next Monday.
+    goal_start_date: str | None = state.get("goal_start_date")
+    if goal_start_date:
+        # Parse date-only string ("2026-03-23") in user's timezone so midnight
+        # local time is the anchor, then convert to UTC.
+        window_start = (
+            pendulum.parse(goal_start_date, tz=pendulum.timezone(user_tz))
+            .start_of("day")
+            .in_timezone("UTC")
+        )
+    else:
+        window_start = pendulum.now("UTC")
+    window_end = window_start.add(weeks=6)
+
+    # ── 1. Materialized tasks (real DB rows in the window) ─────────────────
+    existing_rows = await db.fetch(
         """
         SELECT title, scheduled_at, duration_minutes
         FROM tasks
         WHERE user_id = $1
           AND status IN ('pending', 'rescheduled')
-          AND scheduled_at >= now()
-          AND scheduled_at <= now() + INTERVAL '6 weeks'
+          AND scheduled_at >= $2
+          AND scheduled_at <= $3
         ORDER BY scheduled_at
         """,
         user_id,
+        window_start,
+        window_end,
     )
-    existing_tasks_data = [
-        {
-            "title": row["title"],
-            "scheduled_at": row["scheduled_at"].isoformat(),
-            "duration_minutes": row["duration_minutes"],
-        }
-        for row in existing_tasks
-    ]
+    existing_tasks_data: list[dict] = []
+    seen: set[tuple[str, str]] = set()  # (title, scheduled_at ISO) dedup key
+    for row in existing_rows:
+        iso = row["scheduled_at"].isoformat()
+        existing_tasks_data.append(
+            {
+                "title": row["title"],
+                "scheduled_at": iso,
+                "duration_minutes": row["duration_minutes"],
+                "is_projected": False,
+            }
+        )
+        seen.add((row["title"], iso))
+
+    # ── 2. RRULE projections (virtual future occurrences of recurring tasks) ─
+    # Fixes BUG #1: fetch ALL pending recurring tasks and expand their RRULE
+    # into the planning window. These occurrences don't exist as DB rows yet
+    # but are hard time blocks for the scheduler.
+    recurring_rows = await db.fetch(
+        """
+        SELECT title, scheduled_at, duration_minutes, recurrence_rule
+        FROM tasks
+        WHERE user_id = $1
+          AND status IN ('pending', 'rescheduled')
+          AND recurrence_rule IS NOT NULL
+        """,
+        user_id,
+    )
+    for rec in recurring_rows:
+        anchor = pendulum.instance(rec["scheduled_at"])
+        for proj in projected_occurrences_in_window(
+            rec["recurrence_rule"], anchor, window_start, window_end, user_tz
+        ):
+            key = (rec["title"], proj["scheduled_at"])
+            if key in seen:
+                continue  # already covered by the materialized query (same slot)
+            existing_tasks_data.append(
+                {
+                    "title": rec["title"],
+                    "scheduled_at": proj["scheduled_at"],
+                    "duration_minutes": rec["duration_minutes"],
+                    "is_projected": True,
+                }
+            )
+            seen.add(key)
+
+    # Sort merged list chronologically so the LLM receives a clean timeline.
+    existing_tasks_data.sort(key=lambda x: x["scheduled_at"])
 
     # 9.4.3 — Load sleep_window and work_hours from user_profile.
     # work_hours may be stored as a natural-language string from onboarding
@@ -68,7 +128,6 @@ async def scheduler_node(state: AgentState) -> dict:
 
     # 9.4.4 — Build slot-finding context
     today_utc = pendulum.now("UTC").format("YYYY-MM-DD")
-    goal_start_date: str | None = state.get("goal_start_date")
     context_block = (
         f"\n\nContext:\n"
         f"today_date_utc: {today_utc}\n"

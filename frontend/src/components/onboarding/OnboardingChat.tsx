@@ -6,8 +6,28 @@ import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
 import type { HistoryMessage } from "~/services/ChatService";
 import { chatService } from "~/services/ChatService";
-import type { ChatMessage } from "~/types";
+import type { ChatMessage, OnboardingOption } from "~/types";
 import { MessageVariant } from "~/types/message";
+
+const OTP_OPTIONS: OnboardingOption[] = [
+  {
+    label: "Enter verification code",
+    value: null,
+    zod_validator:
+      'z.string().regex(/^\\d{6}$/, "Enter the 6-digit code from your SMS")',
+    input_type: "otp",
+  },
+];
+
+const PHONE_STEP_OPTIONS: OnboardingOption[] = [
+  {
+    label: "Specify",
+    value: null,
+    zod_validator:
+      'z.string().regex(/^\\+[1-9]\\d{1,14}$/, "Enter your number in international format, e.g. +15551234567")',
+    input_type: undefined,
+  },
+];
 
 interface OnboardingChatProps {
   onComplete: () => void;
@@ -22,6 +42,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
   const conversationIdRef = useRef<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const initDoneRef = useRef(false);
+  const phoneStepOptionsRef = useRef<OnboardingOption[] | null>(null);
 
   const scrollToBottom = useCallback(() => {
     setTimeout(() => {
@@ -77,9 +98,50 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
               ) : (
                 m.content
               ),
+            // Restore options from persisted metadata (new messages).
+            options:
+              m.role === "assistant"
+                ? (m.metadata?.options ?? undefined)
+                : undefined,
           }));
 
         if (uiMessages.length > 0) {
+          // For the last AI message, check whether we need to restore OTP state.
+          // This covers both new messages (options in metadata) and old messages
+          // (fallback: detect by question text and reattach static constants).
+          const lastAssistant = [...history]
+            .reverse()
+            .find((m: HistoryMessage) => m.role === "assistant");
+          const lastUiMsg = uiMessages[uiMessages.length - 1];
+          const hasOtpOption = lastUiMsg?.options?.some(
+            (o) => o.input_type === "otp",
+          );
+
+          // Fallback for old messages that predate metadata persistence.
+          const isOtpStepByContent =
+            !hasOtpOption &&
+            (lastAssistant?.content?.includes("verification code") ?? false);
+
+          if (isOtpStepByContent) {
+            uiMessages[uiMessages.length - 1] = {
+              ...uiMessages[uiMessages.length - 1],
+              options: OTP_OPTIONS,
+            };
+          }
+
+          // Restore phone number and phoneStepOptionsRef whenever we're at the OTP step.
+          if (hasOtpOption || isOtpStepByContent) {
+            const lastPhone = [...history]
+              .reverse()
+              .find(
+                (m: HistoryMessage) =>
+                  m.role === "user" &&
+                  /^\+[1-9]\d{1,14}$/.test(m.content.trim()),
+              );
+            if (lastPhone) setOnboardingPhone(lastPhone.content.trim());
+            phoneStepOptionsRef.current = PHONE_STEP_OPTIONS;
+          }
+
           setMessages(uiMessages);
           setIsInitializing(false);
         } else {
@@ -87,6 +149,29 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
         }
       })
       .catch(() => startFresh());
+  }, []);
+
+  const handleChangeNumber = useCallback(() => {
+    if (!phoneStepOptionsRef.current) return;
+    const phoneOptions = phoneStepOptionsRef.current;
+    setOnboardingPhone("");
+    setMessages((prev) => {
+      // Find the last AI message that has OTP options and replace its options
+      // with the phone step options, effectively going back to phone input.
+      const lastAiIdx = [...prev]
+        .reverse()
+        .findIndex(
+          (m) =>
+            m.type === MessageVariant.AI &&
+            m.options &&
+            m.options.some((o) => o.input_type === "otp"),
+        );
+      if (lastAiIdx === -1) return prev;
+      const realIdx = prev.length - 1 - lastAiIdx;
+      return prev.map((m, i) =>
+        i === realIdx ? { ...m, options: phoneOptions } : m,
+      );
+    });
   }, []);
 
   const handleSendMessage = async (text: string) => {
@@ -133,6 +218,21 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
 
       setTimeout(() => {
         setIsThinking(false);
+
+        // Cache phone step options when backend responds with the OTP step,
+        // so "Change number" can restore them without a network round-trip.
+        const isOtpStep = result.options?.some((o) => o.input_type === "otp");
+        if (isOtpStep && phoneStepOptionsRef.current === null) {
+          // The current message being processed was the phone number submission.
+          // Find the phone step options from the last message's options.
+          setMessages((prev) => {
+            const last = [...prev]
+              .reverse()
+              .find((m) => m.options && m.options.length > 0);
+            if (last?.options) phoneStepOptionsRef.current = last.options;
+            return prev;
+          });
+        }
 
         const aiMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
@@ -185,6 +285,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
                   <OnboardingOptions
                     options={message.options}
                     onSelect={handleSendMessage}
+                    onChangeNumber={handleChangeNumber}
                     disabled={isThinking || isInitializing}
                     phoneNumber={onboardingPhone}
                   />

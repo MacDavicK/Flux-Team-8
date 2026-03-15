@@ -1,4 +1,5 @@
 import { createFileRoute, redirect, useNavigate } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { OnboardingChat } from "~/components/onboarding/OnboardingChat";
 import { AmbientBackground } from "~/components/ui/AmbientBackground";
 import { LoadingState } from "~/components/ui/LoadingState";
@@ -17,8 +18,7 @@ export const Route = createFileRoute("/onboarding")({
     const { user, token } = await serverGetMe();
     if (!user) throw redirect({ to: "/login" });
     if (user.onboarded) throw redirect({ to: "/chat" });
-    setInMemoryToken(token);
-    return { user };
+    return { user, token };
   },
   component: OnboardingPage,
 });
@@ -32,7 +32,13 @@ function getGreeting(name?: string): string {
 
 function OnboardingPage() {
   const navigate = useNavigate();
-  const { user } = Route.useLoaderData();
+  const { user, token } = Route.useLoaderData();
+  const [tokenReady, setTokenReady] = useState(false);
+
+  useEffect(() => {
+    setInMemoryToken(token);
+    setTokenReady(true);
+  }, [token]);
 
   return (
     <div className="relative h-screen flex flex-col overflow-hidden">
@@ -45,7 +51,9 @@ function OnboardingPage() {
         </h1>
       </div>
 
-      <OnboardingChat onComplete={() => navigate({ to: "/chat" })} />
+      {tokenReady && (
+        <OnboardingChat onComplete={() => navigate({ to: "/chat" })} />
+      )}
     </div>
   );
 }

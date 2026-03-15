@@ -115,6 +115,11 @@ async def orchestrator_node(state: AgentState) -> dict:
         return {
             "approval_status": "approved",
             "goal_start_date": goal_start_date,
+            # Reset fan-out outputs so route_from_goal_planner triggers the fan-out
+            # on the next call to goal_planner (pre-fan-out path).
+            "classifier_output": None,
+            "scheduler_output": None,
+            "pattern_output": None,
         }
 
     out: dict = {

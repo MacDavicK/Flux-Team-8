@@ -1,5 +1,10 @@
 import { apiFetch } from "~/lib/apiClient";
-import type { ChatMessageResponse, GoalClarifierAnswer } from "~/types";
+import { getNodeLabel } from "~/lib/nodeLabels";
+import type {
+  ChatMessageResponse,
+  GoalClarifierAnswer,
+  OnboardingOption,
+} from "~/types";
 
 export interface HistoryMessage {
   id: string;
@@ -7,7 +12,10 @@ export interface HistoryMessage {
   content: string;
   agent_node: string | null;
   created_at: string;
-  metadata?: { proposed_plan?: Record<string, unknown> } | null;
+  metadata?: {
+    proposed_plan?: Record<string, unknown>;
+    options?: OnboardingOption[];
+  } | null;
 }
 
 export interface ConversationSummary {
@@ -80,6 +88,7 @@ class ChatService {
       task_id?: string;
       answers?: GoalClarifierAnswer[];
     },
+    onProgress?: (label: string) => void,
   ): Promise<ChatMessageResponse> {
     const response = await apiFetch("/api/v1/chat/message", {
       method: "POST",
@@ -96,7 +105,48 @@ class ChatService {
       throw new Error("Failed to send chat message");
     }
 
-    return response.json() as Promise<ChatMessageResponse>;
+    // Parse SSE stream
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      // Keep incomplete last line in buffer
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+
+        let event: {
+          type: string;
+          node?: string;
+          data?: unknown;
+          message?: string;
+        };
+        try {
+          event = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+
+        if (event.type === "progress" && event.node && onProgress) {
+          onProgress(getNodeLabel(event.node));
+        } else if (event.type === "complete") {
+          return event.data as ChatMessageResponse;
+        } else if (event.type === "error") {
+          throw new Error(event.message ?? "Stream error");
+        }
+      }
+    }
+
+    throw new Error("Stream ended without a complete event");
   }
 }
 

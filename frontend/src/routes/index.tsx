@@ -166,37 +166,23 @@ function FlowPage() {
     events: initialEvents,
   });
 
-  // Keep local state in sync whenever the router loader provides fresh data
-  // (e.g. after router.invalidate() is called from the chat page post-reschedule).
+  const [isLoadingDate, setIsLoadingDate] = useState(false);
+
+  // Keep local state in sync whenever the router loader provides fresh data.
+  // Also clears the loading spinner set by handleDateChange.
   useEffect(() => {
     setData({ events: initialEvents });
+    setIsLoadingDate(false);
   }, [initialEvents]);
-  const [isLoadingDate, setIsLoadingDate] = useState(false);
 
   const displayName = user?.name ?? loaderUser.name;
 
-  const handleDateChange = async (date: string | null) => {
-    const url = date ? `/?date=${encodeURIComponent(date)}` : "/";
-    window.history.pushState(null, "", url);
-
+  const handleDateChange = (date: string | null) => {
     setIsLoadingDate(true);
-    try {
-      const rawTasks = await tasksService.getTasks(date ?? undefined);
-
-      const events: TimelineEvent[] = [];
-      for (const t of rawTasks) {
-        const event = mapTaskToDisplayTypes(t);
-        const hasTime = Boolean(
-          t.scheduled_at ?? t.scheduled_time ?? t.time ?? "",
-        );
-        if (hasTime) events.push(event);
-      }
-      setData({ events });
-    } catch (e) {
-      Sentry.captureException(e);
-    } finally {
-      setIsLoadingDate(false);
-    }
+    navigate({
+      to: "/",
+      search: (prev) => ({ ...prev, date: date ?? undefined }),
+    });
   };
 
   const handleComplete = useCallback(

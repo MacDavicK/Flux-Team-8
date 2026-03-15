@@ -43,7 +43,7 @@ class AgentState(TypedDict):
     clarification_question: Optional[str]  # Set by orchestrator when intent == CLARIFY
     approval_status: Optional[
         str
-    ]  # 'pending' | 'approved' | 'approved_with_start' | 'negotiating' | 'abandoned'
+    ]  # 'pending' | 'approved' | 'awaiting_start_date' | 'negotiating' | 'abandoned'
     goal_start_date: Optional[
         str
     ]  # ISO8601 date the user wants to start (set after approval start-date question)

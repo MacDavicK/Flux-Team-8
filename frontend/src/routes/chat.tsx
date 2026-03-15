@@ -235,6 +235,9 @@ function ChatPage() {
   const { reschedule_task_id, task_name, conversation } = Route.useSearch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
+  const [progressLabel, setProgressLabel] = useState<string | undefined>(
+    undefined,
+  );
   const conversationIdRef = useRef<string | undefined>(undefined);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [conversations, setConversations] = useState<ConversationSummary[]>([]);
@@ -311,6 +314,7 @@ function ChatPage() {
         })
         .catch(() => {
           setIsThinking(false);
+          setProgressLabel(undefined);
           window.history.replaceState(null, "", "/chat");
           setMessages((prev) => [
             ...prev,
@@ -403,6 +407,7 @@ function ChatPage() {
           .confirmReschedule(rescheduleTaskIdRef.current, text)
           .then(() => {
             setIsThinking(false);
+            setProgressLabel(undefined);
             // Invalidate router cache so the home page re-fetches updated tasks.
             router.invalidate();
             setMessages((prev) => [
@@ -455,6 +460,8 @@ function ChatPage() {
         const result = await chatService.sendMessage(
           text,
           conversationIdRef.current,
+          undefined,
+          (label) => setProgressLabel(label),
         );
 
         if (!conversationIdRef.current && result.conversation_id) {
@@ -468,6 +475,7 @@ function ChatPage() {
 
         setTimeout(() => {
           setIsThinking(false);
+          setProgressLabel(undefined);
 
           const parsed = result.proposed_plan
             ? parseProposedPlan(result.proposed_plan as Record<string, unknown>)
@@ -522,6 +530,7 @@ function ChatPage() {
         }, 800);
       } catch {
         setIsThinking(false);
+        setProgressLabel(undefined);
         const errorMessage: ChatMessage = {
           id: (Date.now() + 1).toString(),
           type: MessageVariant.AI,
@@ -676,7 +685,7 @@ function ChatPage() {
             exit={{ opacity: 0 }}
           >
             <ChatBubble variant={MessageVariant.AI} animate={false}>
-              <ThinkingIndicator />
+              <ThinkingIndicator label={progressLabel} />
             </ChatBubble>
           </motion.div>
         )}
@@ -833,10 +842,12 @@ function ChatPage() {
               setIsThinking(true);
               scrollToBottom();
               chatService
-                .sendMessage(summary, conversationIdRef.current, {
-                  intent: "GOAL_CLARIFY",
-                  answers,
-                })
+                .sendMessage(
+                  summary,
+                  conversationIdRef.current,
+                  { intent: "GOAL_CLARIFY", answers },
+                  (label) => setProgressLabel(label),
+                )
                 .then((result) => {
                   if (!conversationIdRef.current && result.conversation_id) {
                     conversationIdRef.current = result.conversation_id;
@@ -848,6 +859,7 @@ function ChatPage() {
                   }
                   setTimeout(() => {
                     setIsThinking(false);
+                    setProgressLabel(undefined);
                     const parsed = result.proposed_plan
                       ? parseProposedPlan(
                           result.proposed_plan as Record<string, unknown>,
@@ -882,6 +894,7 @@ function ChatPage() {
                 })
                 .catch(() => {
                   setIsThinking(false);
+                  setProgressLabel(undefined);
                   setMessages((prev) => [
                     ...prev,
                     {

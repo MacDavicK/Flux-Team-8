@@ -102,6 +102,39 @@ def occurrence_on_date(
     return local_dt.in_timezone("UTC").isoformat()
 
 
+def projected_occurrences_in_window(
+    rrule_string: str,
+    task_scheduled_at: pendulum.DateTime,  # pending row's scheduled_at — RRULE dtstart anchor
+    window_start: pendulum.DateTime,  # UTC lower bound of the planning window
+    window_end: pendulum.DateTime,  # UTC upper bound of the planning window
+    user_timezone: str,
+) -> list[dict]:
+    """
+    Return virtual future occurrences of a recurring task that fall between
+    window_start and window_end (both UTC). Uses task_scheduled_at as the
+    RRULE dtstart anchor so the wall-clock time is preserved correctly.
+
+    Returns a list of dicts: [{"scheduled_at": "<UTC ISO8601>", "is_projected": True}, ...]
+    Returns [] if no occurrences fall in the window.
+    """
+    tz = pendulum.timezone(user_timezone)
+
+    # RRULE anchor: use the pending row's local wall-clock time as dtstart.
+    # e.g. a task at 07:00 every Monday stays at 07:00 even after DST.
+    naive_anchor = task_scheduled_at.in_timezone(user_timezone).naive()
+
+    # Convert UTC window bounds → naive local time for dateutil.between()
+    naive_ws = window_start.in_timezone(user_timezone).naive()
+    naive_we = window_end.in_timezone(user_timezone).naive()
+
+    rule = rrulestr(rrule_string, dtstart=naive_anchor)
+    result = []
+    for occ in rule.between(naive_ws, naive_we, inc=True):
+        utc_dt = pendulum.instance(occ, tz=tz).in_timezone("UTC")
+        result.append({"scheduled_at": utc_dt.isoformat(), "is_projected": True})
+    return result
+
+
 def next_occurrence_after(
     rrule_string: str,
     after_dt: pendulum.DateTime,
