@@ -555,8 +555,13 @@ run_docker() {
 
     if [[ -n "$running" ]]; then
         warn "Stopping existing containers..."
-        docker compose --project-directory "$REPO_ROOT" down --remove-orphans
+        docker compose \
+            --project-directory "$REPO_ROOT" \
+            --profile ngrok \
+            down --remove-orphans
         success "Stale containers stopped."
+        info "Waiting 3s for ngrok to release endpoint..."
+        sleep 3
     else
         info "No running containers found."
     fi
