@@ -75,3 +75,7 @@ docs/BIOME-CI-RISK-REPORT.md
 
 # ---------- Supabase ----------
 supabase/*
+
+# ---------- Lock files ----------
+uv.lock
+backend/uv.lock

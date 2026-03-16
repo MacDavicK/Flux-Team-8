@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import traceback
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from twilio.request_validator import RequestValidator
@@ -16,17 +17,37 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
+def _get_webhook_url_for_signature(request: Request) -> str:
+    """
+    Twilio signs with the public HTTPS URL. Behind ngrok, request.url is http://.
+    Reconstruct the URL Twilio used for signature validation.
+    """
+    url = str(request.url)
+    if url.startswith("http://") and settings.twilio_webhook_base_url.startswith("https://"):
+        base = settings.twilio_webhook_base_url.rstrip("/")
+        path = request.url.path
+        query = request.url.query
+        url = f"{base}{path}" + (f"?{query}" if query else "")
+    return url
+
+
 async def validate_twilio_signature(request: Request) -> dict:
     """17.7.1 — Reject with HTTP 403 on invalid Twilio signature."""
-    validator = RequestValidator(settings.twilio_auth_token)
-    signature = request.headers.get("X-Twilio-Signature", "")
-    url = str(request.url)
-    form_data = await request.form()
-    params = dict(form_data)
-    if not validator.validate(url, params, signature):
-        logger.warning("Twilio webhook: invalid signature for url=%s", url)
-        raise HTTPException(status_code=403, detail="Invalid Twilio signature")
-    return params
+    try:
+        validator = RequestValidator(settings.twilio_auth_token)
+        signature = request.headers.get("X-Twilio-Signature", "")
+        url = _get_webhook_url_for_signature(request)
+        form_data = await request.form()
+        params = {k: (v[0] if isinstance(v, list) else v) for k, v in dict(form_data).items()}
+        if not validator.validate(url, params, signature):
+            logger.warning("Twilio webhook: invalid signature for url=%s", url)
+            raise HTTPException(status_code=403, detail="Invalid Twilio signature")
+        return params
+    except HTTPException:
+        raise
+    except Exception:
+        logger.exception("Twilio webhook signature validation error: %s", traceback.format_exc())
+        raise
 
 
 @router.post("/twilio/whatsapp")
@@ -34,14 +55,31 @@ async def twilio_whatsapp_webhook(
     params: dict = Depends(validate_twilio_signature),
 ) -> Response:
     """17.7.2 — Parse WhatsApp reply and update task status."""
+    try:
+        return await _twilio_whatsapp_webhook_impl(params)
+    except Exception:
+        logger.exception("WhatsApp webhook error: %s", traceback.format_exc())
+        raise
+
+
+def _normalize_phone(phone: str) -> str:
+    """Normalize phone for matching: strip + and spaces, keep digits only."""
+    if not phone:
+        return ""
+    return "".join(c for c in phone if c.isdigit()) or phone
+
+
+async def _twilio_whatsapp_webhook_impl(params: dict) -> Response:
+    """Implementation of WhatsApp webhook handler."""
     body_text = (params.get("Body") or "").strip().lower()
-    sender_phone = params.get("WaId") or params.get("From", "").replace("whatsapp:", "")
+    sender_phone_raw = params.get("WaId") or params.get("From", "").replace("whatsapp:", "")
+    sender_phone = _normalize_phone(sender_phone_raw)
     message_sid = params.get("MessageSid", "")
 
     logger.info(
         "WhatsApp webhook received: MessageSid=%s From=%s Body=%r",
         message_sid,
-        sender_phone,
+        sender_phone_raw,
         body_text,
     )
 
@@ -56,9 +94,12 @@ async def twilio_whatsapp_webhook(
         logger.info("WhatsApp webhook: idempotent skip (already processed MessageSid=%s)", message_sid)
         return Response(content=str(twiml), media_type="application/xml")
 
-    # Find user by phone number
+    # Find user by phone number (match normalized: digits only, handles +91 vs 91 vs 919876543210)
     user_row = await db.fetchrow(
-        "SELECT id FROM users WHERE notification_preferences->>'phone_number' = $1",
+        """
+        SELECT id FROM users
+        WHERE REGEXP_REPLACE(COALESCE(notification_preferences->>'phone_number', ''), '[^0-9]', '', 'g') = $1
+        """,
         sender_phone,
     )
     if user_row is None:
@@ -112,7 +153,7 @@ async def twilio_whatsapp_webhook(
         response_label = "missed"
         twiml.message("Task marked as missed. We'll help you reschedule.")
     else:
-        response_label = "unknown"
+        response_label = "no_response"  # DB constraint: unknown replies stored as no_response
         twiml.message("Reply 1 (done), 2 (reschedule), or 3 (missed).")
 
     await db.execute(
@@ -170,7 +211,7 @@ async def twilio_voice_webhook(
         await db.execute("UPDATE tasks SET status = 'missed' WHERE id = $1", task_id)
         response_label = "missed"
     else:
-        response_label = "unknown"
+        response_label = "no_response"  # DB constraint: unknown digits stored as no_response
 
     await db.execute(
         "UPDATE notification_log SET response = $2, responded_at = now() WHERE external_id = $1 AND channel = 'call'",

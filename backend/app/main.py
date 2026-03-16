@@ -79,6 +79,25 @@ app = FastAPI(
 app.state.limiter = limiter
 app.add_exception_handler(RateLimitExceeded, _rate_limit_handler)
 
+
+async def _debug_500_handler(request, exc: Exception) -> JSONResponse:
+    """In development, return traceback in 500 response for easier debugging."""
+    import traceback
+
+    if settings.app_env == "development":
+        tb = "".join(traceback.format_exception(type(exc), exc, exc.__traceback__))
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": str(exc),
+                "traceback": tb,
+            },
+        )
+    return JSONResponse({"detail": "Internal Server Error"}, status_code=500)
+
+
+app.add_exception_handler(Exception, _debug_500_handler)
+
 # ── 18.4  Middleware ──────────────────────────────────────────────────────────
 
 app.add_middleware(StructlogMiddleware)

@@ -121,12 +121,19 @@ async def test_twilio_whatsapp_send_and_webhook():
     try:
         # 1. Ensure we have an eligible task
         row = await _get_eligible_task_and_user(db)
+        if row:
+            logger.info("Found eligible task for WhatsApp notification: task_id=%s user_id=%s", row["id"], row["user_id"])
         if not row:
+            logger.info("No notification found: no eligible task for WhatsApp escalation. Attempting to create test task.")
             task_id = await _create_test_task_if_needed(db)
             if not task_id:
+                logger.warning("No notification found: no user with phone_verified + whatsapp_opt_in. Skipping test.")
                 pytest.skip("No eligible user/task for WhatsApp. Set up a user with phone + whatsapp_opt_in.")
             row = await _get_eligible_task_and_user(db)
+            if row:
+                logger.info("Created and found eligible test task: task_id=%s", row["id"])
             if not row:
+                logger.warning("No notification found: could not find eligible task after create attempt. Skipping test.")
                 pytest.skip("Still no eligible task after create attempt.")
 
         task = {
@@ -136,7 +143,8 @@ async def test_twilio_whatsapp_send_and_webhook():
         }
         phone = row["phone"]
 
-        logger.info("=== Step 1: Sending WhatsApp ===")
+        logger.info("=== Step 1: Notification to send ===")
+        logger.info("Will send WhatsApp notification: channel=whatsapp to=%s task_id=%s title=%r", phone, task["id"], task["title"])
         logger.info("Task: %s", task)
         logger.info("User phone: %s", phone)
 
@@ -160,8 +168,11 @@ async def test_twilio_whatsapp_send_and_webhook():
             logger.info("notification_log inserted for task_id=%s external_id=%s", task["id"], message_sid)
 
         # 4. Simulate webhook: user replies "1" (done)
-        # Use localhost so we hit the running API; signature must match the exact URL
+        # POST to localhost to hit the running API
         webhook_url = "http://localhost:8000/api/v1/webhooks/twilio/whatsapp"
+        # Signature must match what the webhook validates: TWILIO_WEBHOOK_BASE_URL + path
+        # (handler reconstructs HTTPS URL when behind ngrok)
+        signature_url = f"{settings.twilio_webhook_base_url.rstrip('/')}/api/v1/webhooks/twilio/whatsapp"
 
         # Twilio sends the INCOMING message's MessageSid (different from our outbound)
         incoming_message_sid = f"SM{message_sid[-12:]}" if len(message_sid) > 12 else f"SM{message_sid}"
@@ -172,7 +183,7 @@ async def test_twilio_whatsapp_send_and_webhook():
             "WaId": phone,
             "Body": "1",
         }
-        signature = _compute_twilio_signature(webhook_url, params, settings.twilio_auth_token)
+        signature = _compute_twilio_signature(signature_url, params, settings.twilio_auth_token)
 
         logger.info("=== Step 2: Simulating webhook ===")
         logger.info("Webhook URL: %s", webhook_url)
@@ -186,8 +197,16 @@ async def test_twilio_whatsapp_send_and_webhook():
                 headers={"X-Twilio-Signature": signature},
             )
 
-        logger.info("Webhook response: status=%s body=%s", resp.status_code, resp.text[:200])
+        logger.info("Webhook response: status=%s body=%s", resp.status_code, resp.text[:500])
 
+        if resp.status_code != 200:
+            try:
+                err_json = resp.json()
+                logger.error("Webhook failed. detail=%s", err_json.get("detail"))
+                if "traceback" in err_json:
+                    logger.error("Traceback:\n%s", err_json["traceback"])
+            except Exception:
+                logger.error("Webhook failed. Full response: %s", resp.text)
         assert resp.status_code == 200, f"Webhook failed: {resp.status_code} {resp.text}"
 
         # 5. Verify task was updated
