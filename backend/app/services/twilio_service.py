@@ -6,7 +6,11 @@ WhatsApp + Voice call notifications via Twilio, plus OTP via Twilio Verify.
 
 from __future__ import annotations
 
+import logging
+
 from twilio.rest import Client
+
+logger = logging.getLogger(__name__)
 from twilio.twiml.voice_response import Gather, VoiceResponse
 
 from app.config import settings
@@ -56,11 +60,18 @@ async def dispatch_whatsapp(task: dict) -> str:
 
     body = _WHATSAPP_TEMPLATE.format(title=task.get("title", "Task"))
 
+    logger.info(
+        "Twilio WhatsApp: sending to=%s task_id=%s title=%r",
+        phone,
+        task.get("id"),
+        task.get("title"),
+    )
     msg = _client.messages.create(
         from_=f"whatsapp:{settings.twilio_whatsapp_from}",
         to=f"whatsapp:{phone}",
         body=body,
     )
+    logger.info("Twilio WhatsApp: sent MessageSid=%s to=%s", msg.sid, phone)
     return msg.sid
 
 
@@ -107,11 +118,18 @@ async def dispatch_call(task: dict) -> str:
     response.append(gather)
     response.say("We did not receive your input. Goodbye.")
 
+    logger.info(
+        "Twilio Voice: initiating call to=%s task_id=%s callback_url=%s",
+        phone,
+        task_id,
+        callback_url,
+    )
     call = _client.calls.create(
         from_=settings.twilio_voice_from,
         to=phone,
         twiml=str(response),
     )
+    logger.info("Twilio Voice: call initiated CallSid=%s to=%s", call.sid, phone)
     return call.sid
 
 

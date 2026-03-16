@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
 from twilio.request_validator import RequestValidator
 from twilio.twiml.messaging_response import MessagingResponse
@@ -10,6 +12,7 @@ from twilio.twiml.voice_response import VoiceResponse
 from app.config import settings
 from app.services.supabase import db
 
+logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/webhooks", tags=["webhooks"])
 
 
@@ -21,6 +24,7 @@ async def validate_twilio_signature(request: Request) -> dict:
     form_data = await request.form()
     params = dict(form_data)
     if not validator.validate(url, params, signature):
+        logger.warning("Twilio webhook: invalid signature for url=%s", url)
         raise HTTPException(status_code=403, detail="Invalid Twilio signature")
     return params
 
@@ -34,14 +38,22 @@ async def twilio_whatsapp_webhook(
     sender_phone = params.get("WaId") or params.get("From", "").replace("whatsapp:", "")
     message_sid = params.get("MessageSid", "")
 
+    logger.info(
+        "WhatsApp webhook received: MessageSid=%s From=%s Body=%r",
+        message_sid,
+        sender_phone,
+        body_text,
+    )
+
     twiml = MessagingResponse()
 
-    # Idempotency check
+    # Idempotency check (incoming MessageSid may differ from our outbound SID)
     existing_log = await db.fetchrow(
         "SELECT id, response FROM notification_log WHERE external_id = $1 AND channel = 'whatsapp'",
         message_sid,
     )
     if existing_log and existing_log["response"] is not None:
+        logger.info("WhatsApp webhook: idempotent skip (already processed MessageSid=%s)", message_sid)
         return Response(content=str(twiml), media_type="application/xml")
 
     # Find user by phone number
@@ -50,15 +62,35 @@ async def twilio_whatsapp_webhook(
         sender_phone,
     )
     if user_row is None:
+        logger.warning("WhatsApp webhook: user not found for phone=%s", sender_phone)
         twiml.message("Sorry, we could not find your account.")
         return Response(content=str(twiml), media_type="application/xml")
 
-    # Find task linked to this MessageSid
+    # Find task: first by MessageSid (our outbound SID), then fallback to most recent pending for this user
     log_row = await db.fetchrow(
         "SELECT task_id FROM notification_log WHERE external_id = $1 AND channel = 'whatsapp'",
         message_sid,
     )
     if log_row is None:
+        log_row = await db.fetchrow(
+            """
+            SELECT nl.task_id FROM notification_log nl
+            JOIN tasks t ON t.id = nl.task_id
+            WHERE nl.channel = 'whatsapp' AND nl.response IS NULL
+              AND t.user_id = $1 AND t.status = 'pending'
+            ORDER BY nl.sent_at DESC
+            LIMIT 1
+            """,
+            user_row["id"],
+        )
+        if log_row:
+            logger.info(
+                "WhatsApp webhook: matched task by user fallback (incoming MessageSid=%s)",
+                message_sid,
+            )
+
+    if log_row is None:
+        logger.warning("WhatsApp webhook: no pending task found for user phone=%s", sender_phone)
         twiml.message("Sorry, we could not find the task associated with this message.")
         return Response(content=str(twiml), media_type="application/xml")
 
@@ -84,11 +116,17 @@ async def twilio_whatsapp_webhook(
         twiml.message("Reply 1 (done), 2 (reschedule), or 3 (missed).")
 
     await db.execute(
-        "UPDATE notification_log SET response = $2, responded_at = now() WHERE external_id = $1 AND channel = 'whatsapp'",
-        message_sid,
+        "UPDATE notification_log SET response = $2, responded_at = now() WHERE task_id = $1 AND channel = 'whatsapp' AND response IS NULL",
+        task_id,
         response_label,
     )
 
+    logger.info(
+        "WhatsApp webhook: task_id=%s response_label=%s reply=%r",
+        task_id,
+        response_label,
+        body_text,
+    )
     return Response(content=str(twiml), media_type="application/xml")
 
 
@@ -99,6 +137,13 @@ async def twilio_voice_webhook(
     """17.7.3 — Parse DTMF digits and update task status."""
     digits = (params.get("Digits") or "").strip()
     call_sid = params.get("CallSid", "")
+
+    logger.info(
+        "Voice webhook received: CallSid=%s task_id=%s Digits=%r",
+        call_sid,
+        task_id,
+        digits,
+    )
 
     twiml = VoiceResponse()
 
@@ -133,6 +178,12 @@ async def twilio_voice_webhook(
         response_label,
     )
 
+    logger.info(
+        "Voice webhook: CallSid=%s task_id=%s response_label=%s",
+        call_sid,
+        task_id,
+        response_label,
+    )
     twiml.say("Thank you. Goodbye.")
     twiml.hangup()
     return Response(content=str(twiml), media_type="application/xml")

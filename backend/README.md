@@ -182,11 +182,17 @@ backend/
 ## Running Tests
 
 ```bash
+# Install dev deps (pytest, etc.)
+uv sync --extra dev
+
 # Unit tests
 uv run pytest tests/unit/ -v
 
 # Integration tests (requires test DB configured in .env)
 uv run pytest tests/integration/ -v
+
+# Twilio notification test (sends real WhatsApp, simulates webhook; API must be running)
+uv run pytest tests/integration/test_twilio_notification.py -v -s
 
 # All tests with coverage
 uv run pytest --cov=app tests/ -v
