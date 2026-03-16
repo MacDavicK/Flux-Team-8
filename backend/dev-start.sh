@@ -550,21 +550,14 @@ run_migrations() {
 run_docker() {
     step "Step 4 of 4 — Docker"
 
-    local running
-    running="$(docker compose --project-directory "$REPO_ROOT" ps --quiet 2>/dev/null || true)"
-
-    if [[ -n "$running" ]]; then
-        warn "Stopping existing containers..."
-        docker compose \
-            --project-directory "$REPO_ROOT" \
-            --profile ngrok \
-            down --remove-orphans
-        success "Stale containers stopped."
-        info "Waiting 3s for ngrok to release endpoint..."
-        sleep 3
-    else
-        info "No running containers found."
-    fi
+    # Always stop first (even if no containers) — ensures ngrok endpoint is released
+    info "Ensuring clean state..."
+    docker compose \
+        --project-directory "$REPO_ROOT" \
+        --profile ngrok \
+        down --remove-orphans 2>/dev/null || true
+    info "Waiting 5s for ngrok to release endpoint..."
+    sleep 5
 
     info "Starting stack with ngrok profile..."
     docker compose \
