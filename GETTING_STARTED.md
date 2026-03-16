@@ -90,6 +90,20 @@ npm --prefix frontend run dev
 
 ---
 
+## Twilio webhooks (local dev)
+
+For WhatsApp replies and voice call DTMF to reach your local app, configure Twilio to use your ngrok URL:
+
+1. **WhatsApp Sandbox:** In [Twilio Console → Messaging → WhatsApp Sandbox](https://console.twilio.com/us1/develop/sms/senders/whatsapp-sandbox), set **"When a message comes in"** to:
+   ```
+   https://<your-ngrok-domain>/api/v1/webhooks/twilio/whatsapp
+   ```
+   (Replace `<your-ngrok-domain>` with the value of `NGROK_DOMAIN` from `backend/.env`, e.g. `julianne-gonydial-quadrennially.ngrok-free.dev`.)
+
+2. **Voice callbacks:** The backend builds the DTMF callback URL from `TWILIO_WEBHOOK_BASE_URL`. Ensure it matches your ngrok domain (e.g. `https://julianne-gonydial-quadrennially.ngrok-free.dev`).
+
+---
+
 ## Troubleshooting: ngrok "endpoint already online" (ERR_NGROK_334)
 
 The setup script **reuses** an existing ngrok tunnel when possible: if the endpoint is already online (e.g. from a previous run where teardown didn't run), it starts only the API and Redis, skipping ngrok. No kill or restart.
