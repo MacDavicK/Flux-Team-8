@@ -65,8 +65,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // Dynamic import keeps this out of the SSR path.
       if (typeof window !== "undefined") {
         import("~/lib/pushNotifications").then(({ registerAndSubscribe }) => {
-          registerAndSubscribe().catch(() => {
-            /* non-critical */
+          registerAndSubscribe().catch((err) => {
+            console.warn("[push] Failed to register subscription:", err);
           });
         });
       }

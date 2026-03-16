@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+
+logger = logging.getLogger(__name__)
 
 from app.middleware.auth import get_current_user
 from app.middleware.rate_limit import limiter
@@ -178,10 +181,41 @@ async def save_push_subscription(
     body: PushSubscriptionRequest, request: Request, user=Depends(get_current_user)
 ) -> dict:
     """19.13.2 — Save browser Web Push subscription to users table."""
-    await db.execute(
-        "UPDATE users SET push_subscription = $2::jsonb WHERE id = $1",
-        str(user["sub"]),
-        json.dumps(body.subscription),
+    user_id = str(user["sub"])
+    # Empty subscription = unsubscribe; store NULL so notifier skips this user
+    has_valid_subscription = bool(
+        body.subscription and body.subscription.get("endpoint")
+    )
+    if has_valid_subscription:
+        result = await db.execute(
+            "UPDATE users SET push_subscription = $2::jsonb WHERE id = $1",
+            user_id,
+            json.dumps(body.subscription),
+        )
+    else:
+        result = await db.execute(
+            "UPDATE users SET push_subscription = NULL WHERE id = $1",
+            user_id,
+        )
+    # asyncpg returns "UPDATE N"; verify we actually updated a row
+    try:
+        n = int(result.split()[-1]) if result else 0
+    except (ValueError, IndexError):
+        n = 0
+    if n == 0:
+        logger.warning(
+            "push_subscription update affected 0 rows for user_id=%s (result=%r)",
+            user_id,
+            result,
+        )
+        raise HTTPException(
+            status_code=404,
+            detail="User not found. Ensure you are logged in and the account exists.",
+        )
+    logger.info(
+        "push_subscription %s for user_id=%s",
+        "saved" if has_valid_subscription else "cleared",
+        user_id,
     )
     return {"status": "saved"}
 

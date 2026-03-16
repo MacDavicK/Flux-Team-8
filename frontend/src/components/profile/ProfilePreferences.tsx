@@ -281,10 +281,13 @@ export function ProfilePreferences({
   const [callOptedIn, setCallOptedIn] = useState(!!notifPrefs?.call_opted_in);
   const [togglingWhatsapp, setTogglingWhatsapp] = useState(false);
   const [togglingCall, setTogglingCall] = useState(false);
-  const [pushEnabled, setPushEnabled] = useState(
-    () => getPermissionState() === "granted",
-  );
+  const [pushEnabled, setPushEnabled] = useState(false);
   const [togglingPush, setTogglingPush] = useState(false);
+
+  // Sync push state from browser permission after mount (SSR-safe)
+  useEffect(() => {
+    setPushEnabled(getPermissionState() === "granted");
+  }, []);
 
   async function handleTogglePush() {
     if (togglingPush) return;
@@ -297,6 +300,9 @@ export function ProfilePreferences({
         await unsubscribePush();
         setPushEnabled(false);
       }
+    } catch (err) {
+      console.error("[push] Toggle failed:", err);
+      // Don't update state on failure so the UI reflects reality
     } finally {
       setTogglingPush(false);
     }

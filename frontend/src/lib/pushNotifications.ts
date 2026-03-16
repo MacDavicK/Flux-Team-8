@@ -8,10 +8,16 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 async function saveSubscriptionToBackend(sub: PushSubscription): Promise<void> {
-  await apiFetch("/api/v1/account/push-subscription", {
+  const res = await apiFetch("/api/v1/account/push-subscription", {
     method: "POST",
     body: JSON.stringify({ subscription: sub.toJSON() }),
   });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }));
+    throw new Error(
+      `Failed to save push subscription: ${(err as { detail?: string }).detail ?? res.status}`,
+    );
+  }
 }
 
 /**
@@ -38,11 +44,26 @@ export async function registerAndSubscribe(): Promise<boolean> {
   const res = await fetch("/api/v1/account/push-subscription/vapid-key");
   if (!res.ok) return false;
   const { public_key } = (await res.json()) as { public_key: string };
+  const keyStr = (public_key ?? "").replace(/\s/g, "").trim();
+  if (!keyStr) return false;
+
+  // VAPID public key must be 65 bytes (uncompressed P-256). Pass Uint8Array directly;
+  // using .buffer can cause InvalidAccessError if byteOffset/length is wrong.
+  const keyBytes = urlBase64ToUint8Array(keyStr);
+  if (keyBytes.length !== 65) {
+    console.error(
+      "[push] Invalid VAPID key length: expected 65 bytes, got",
+      keyBytes.length,
+    );
+    return false;
+  }
 
   const sub = await reg.pushManager.subscribe({
     userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(public_key)
-      .buffer as ArrayBuffer,
+    applicationServerKey: keyBytes.buffer.slice(
+      keyBytes.byteOffset,
+      keyBytes.byteOffset + keyBytes.byteLength,
+    ) as ArrayBuffer,
   });
 
   await saveSubscriptionToBackend(sub);
@@ -70,9 +91,10 @@ export async function unsubscribe(): Promise<void> {
   });
 }
 
-/** Returns the current Notification permission state. */
+/** Returns the current Notification permission state. Safe for SSR. */
 export function getPermissionState(): NotificationPermission | "unsupported" {
-  if (!("Notification" in window)) return "unsupported";
+  if (typeof window === "undefined" || !("Notification" in window))
+    return "unsupported";
   return Notification.permission;
 }
 
@@ -89,7 +111,8 @@ export interface InAppPushPayload {
 export function listenForInAppPushes(
   onPush: (payload: InAppPushPayload) => void,
 ): () => void {
-  if (!("serviceWorker" in navigator)) return () => {};
+  if (typeof navigator === "undefined" || !("serviceWorker" in navigator))
+    return () => {};
 
   const handler = (event: MessageEvent) => {
     if (event.data?.type === "PUSH_RECEIVED") {
