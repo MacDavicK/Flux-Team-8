@@ -625,7 +625,7 @@ run_migrations() {
     info "Running migrations via Docker (postgres:15-alpine) — no local psql required."
 
     local raw_url
-    raw_url="$(get_env DATABASE_URL)"
+    raw_url="$(get_env MIGRATION_DATABASE_URL)"; [[ -z "$raw_url" ]] && raw_url="$(get_env DATABASE_URL)"
     if [[ -z "$raw_url" || "$raw_url" == \<* ]]; then
         err "DATABASE_URL is not set — cannot run migrations."
         exit 1

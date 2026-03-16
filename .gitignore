@@ -72,3 +72,6 @@ CURSOR-PROMPT-README.md
 .claude
 docs/BIOME-CI-RISK-REPORT.md
 /.vs
+
+# ---------- Supabase ----------
+supabase/*
