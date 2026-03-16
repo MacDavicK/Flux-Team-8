@@ -51,7 +51,7 @@ The script will walk you through five steps:
 | **1 — Dependency check** | Verifies Docker, Python, Node, and npm are available |
 | **2 — .env setup** | Creates `backend/.env` and `frontend/.env` from examples. Prompts for each service's credentials. Shared values (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `APP_ENV`) are entered once and automatically mirrored into `frontend/.env`. Already-configured values are skipped automatically. |
 | **3 — Migrations** | Applies all SQL files in `backend/migrations/` against your Supabase database (no local `psql` needed — runs inside a Docker container) |
-| **4 — Docker (backend)** | Builds and starts the API server, Redis, and ngrok in detached mode; waits for the API to be healthy |
+| **4 — Docker (backend)** | Builds and starts the API server, Redis, and ngrok (reuses existing tunnel if online); waits for the API to be healthy |
 | **5 — Frontend** | Runs `npm install` in `frontend/` then starts the Vite dev server in the foreground |
 
 Press **Enter** to accept any default shown in `[brackets]`. Values already present in your `.env` files are shown with a ✔ and skipped.
@@ -76,7 +76,7 @@ The script is fully idempotent:
 
 - **Existing `.env` values** are never overwritten — only placeholder values trigger prompts.
 - **Migrations** are written to be safe to apply more than once.
-- **Docker containers** are stopped and recreated cleanly on each run.
+- **ngrok** is reused when the endpoint is already online; otherwise a new tunnel is started.
 
 If you only need to restart the services (no env or migration changes), you can run the Docker and frontend steps individually:
 
@@ -87,6 +87,24 @@ docker compose --project-directory backend --profile ngrok up --build --detach
 # Frontend only
 npm --prefix frontend run dev
 ```
+
+---
+
+## Troubleshooting: ngrok "endpoint already online" (ERR_NGROK_334)
+
+The setup script **reuses** an existing ngrok tunnel when possible: if the endpoint is already online (e.g. from a previous run where teardown didn't run), it starts only the API and Redis, skipping ngrok. No kill or restart.
+
+If you still see ERR_NGROK_334, the endpoint is held by a zombie session (ngrok cloud hasn't released it). Fix:
+
+1. **Stop from ngrok dashboard:**
+   - Go to [dashboard.ngrok.com/endpoints](https://dashboard.ngrok.com/endpoints)
+   - Find your domain and stop the active tunnel
+   - Wait ~30 seconds, then run `bash setup.sh` again
+
+2. **Temporary workaround** (API and frontend work; Twilio webhooks won't):
+   ```bash
+   SKIP_NGROK=1 bash setup.sh
+   ```
 
 ---
 

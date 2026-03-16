@@ -547,30 +547,62 @@ run_migrations() {
 # STEP 4 — DOCKER
 # =============================================================================
 
+# Returns 0 if ngrok endpoint is online (tunnel exists), 1 otherwise.
+# Arg: domain from get_env NGROK_DOMAIN. Uses curl only; no ngrok binary needed.
+check_ngrok_endpoint_online() {
+    local domain="${1:-}"
+    [[ -z "$domain" ]] && return 1
+    local code
+    code=$(curl -s -o /dev/null -w "%{http_code}" --connect-timeout 5 --max-time 10 \
+        "https://${domain}/" 2>/dev/null || echo "000")
+    [[ "$code" != "000" ]]
+}
+
 run_docker() {
     step "Step 4 of 4 — Docker"
 
-    # Always stop first (even if no containers) — ensures ngrok endpoint is released
-    info "Ensuring clean state..."
-    docker compose \
-        --project-directory "$REPO_ROOT" \
-        --profile ngrok \
-        down --remove-orphans 2>/dev/null || true
-    info "Waiting 5s for ngrok to release endpoint..."
-    sleep 5
+    local ngrok_profile=()
+    local ngrok_domain
+    ngrok_domain="$(get_env NGROK_DOMAIN)"
 
-    info "Starting stack with ngrok profile..."
+    if [[ -n "${SKIP_NGROK:-}" ]]; then
+        ngrok_profile=()
+    elif [[ -z "$ngrok_domain" ]]; then
+        ngrok_profile=()
+    elif check_ngrok_endpoint_online "$ngrok_domain"; then
+        ngrok_profile=()
+        info "ngrok endpoint already online — reusing existing tunnel."
+    else
+        ngrok_profile=(--profile ngrok)
+    fi
+
+    info "Starting stack..."
     docker compose \
         --project-directory "$REPO_ROOT" \
-        --profile ngrok \
+        "${ngrok_profile[@]}" \
         up --build --detach --remove-orphans
+
+    # If we started ngrok, check for ERR_NGROK_334 (endpoint already online elsewhere)
+    if [[ ${#ngrok_profile[@]} -gt 0 ]]; then
+        sleep 5
+        if docker compose --project-directory "$REPO_ROOT" logs ngrok 2>&1 | grep -q "ERR_NGROK_334\|endpoint already online"; then
+            warn "ngrok endpoint held elsewhere — Twilio webhooks may not work."
+            info "Stop the tunnel at dashboard.ngrok.com/endpoints, then restart."
+        fi
+    fi
 
     echo
     success "Stack is up!"
     info "API:       http://localhost:8000"
     info "Docs:      http://localhost:8000/docs"
     info "Redis:     localhost:6379"
-    info "ngrok UI:  http://localhost:4040"
+    if [[ ${#ngrok_profile[@]} -gt 0 ]]; then
+        info "ngrok UI:  http://localhost:4040"
+    elif [[ -n "$ngrok_domain" ]]; then
+        info "ngrok:     reusing existing tunnel"
+    elif [[ -n "${SKIP_NGROK:-}" ]]; then
+        info "ngrok:     skipped (SKIP_NGROK=1)"
+    fi
     echo
 }
 
