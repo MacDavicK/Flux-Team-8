@@ -3,7 +3,7 @@ from pathlib import Path
 
 import pendulum
 
-from app.agents.state import AgentState
+from app.agents.state import AgentState, CLEAR
 from app.models.agent_outputs import OrchestratorOutput
 from app.services.llm import check_token_budget, validated_llm_call
 from app.services.supabase import db
@@ -125,9 +125,9 @@ async def orchestrator_node(state: AgentState) -> dict:
     out: dict = {
         "intent": result.intent,
         "clarification_question": result.clarification_question,
-        "classifier_output": None,
-        "scheduler_output": None,
-        "pattern_output": None,
+        "classifier_output": CLEAR,
+        "scheduler_output": CLEAR,
+        "pattern_output": CLEAR,
         "milestone_order": None,
         "error": None,
     }

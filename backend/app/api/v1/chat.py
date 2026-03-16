@@ -314,8 +314,8 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
     result_approval = result.get("approval_status")
     approval_pending = result_approval == "pending"
     awaiting_start_date = result_approval == "awaiting_start_date"
-    agent_node_value = result.get("intent") or (
-        "ask_start_date" if awaiting_start_date else None
+    agent_node_value = (
+        "ask_start_date" if awaiting_start_date else result.get("intent") or None
     )
     if goal_draft and (approval_pending or awaiting_start_date):
         metadata: dict | None = {

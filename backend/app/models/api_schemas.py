@@ -193,6 +193,7 @@ class AccountMeResponse(BaseModel):
     phone_verified: Optional[bool] = None
     notification_preferences: Optional[dict] = None
     monthly_token_usage: Optional[dict] = None
+    has_tasks: Optional[bool] = None
 
 
 class AccountPatchRequest(BaseModel):

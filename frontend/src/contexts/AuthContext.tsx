@@ -59,6 +59,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setInMemoryToken(token);
       setIsAuthenticated(true);
       setUser(serverUser);
+      setHasTasks(serverUser.hasTasks ?? false);
 
       // Silently re-register push subscription for users who already granted permission.
       // Dynamic import keeps this out of the SSR path.

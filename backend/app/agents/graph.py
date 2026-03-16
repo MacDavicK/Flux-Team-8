@@ -282,7 +282,7 @@ def _build_graph() -> StateGraph:
     # 10.9 — Terminal edges
     graph.add_edge("save_tasks", END)
     graph.add_edge("task_handler", "save_tasks")
-    graph.add_edge("goal_modifier", "save_tasks")
+    graph.add_edge("goal_modifier", "reschedule")
     # ask_start_date ends the turn; user's next message re-enters via orchestrator
     graph.add_edge("ask_start_date", END)
     # reschedule → save_tasks: fresh slots anchored to goal_start_date

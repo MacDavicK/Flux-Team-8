@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { X } from "lucide-react";
+import { ChevronLeft, X } from "lucide-react";
 import { useState } from "react";
 import type {
   GoalClarifierAnswer,
@@ -28,11 +28,13 @@ export function GoalClarifierView({
   const [answers, setAnswers] = useState<GoalClarifierAnswer[]>([]);
   const [customValue, setCustomValue] = useState("");
   const [customError, setCustomError] = useState<string | null>(null);
+  const [direction, setDirection] = useState<1 | -1>(1);
 
   if (questions.length === 0) return null;
 
   const current = questions[currentIndex];
   const isLast = currentIndex + 1 === questions.length;
+  const canGoBack = currentIndex > 0;
 
   function recordAnswer(answer: string) {
     const newAnswer: GoalClarifierAnswer = {
@@ -40,16 +42,40 @@ export function GoalClarifierView({
       question: current.question,
       answer,
     };
-    const updatedAnswers = [...answers, newAnswer];
+    // Upsert: replace existing answer for this question if going back changed it
+    const updatedAnswers = [...answers];
+    const existingIdx = updatedAnswers.findIndex(
+      (a) => a.question_id === current.id,
+    );
+    if (existingIdx >= 0) {
+      updatedAnswers[existingIdx] = newAnswer;
+    } else {
+      updatedAnswers.push(newAnswer);
+    }
 
     if (!isLast) {
       setAnswers(updatedAnswers);
+      setDirection(1);
       setCurrentIndex(currentIndex + 1);
-      setCustomValue("");
+      // Pre-fill custom input with existing answer for next question (if any)
+      const nextQ = questions[currentIndex + 1];
+      const nextAnswer = updatedAnswers.find((a) => a.question_id === nextQ.id);
+      setCustomValue(nextAnswer?.answer ?? "");
       setCustomError(null);
     } else {
       onSubmit(updatedAnswers);
     }
+  }
+
+  function handleBack() {
+    if (!canGoBack) return;
+    setDirection(-1);
+    const prevIndex = currentIndex - 1;
+    setCurrentIndex(prevIndex);
+    const prevQ = questions[prevIndex];
+    const prevAnswer = answers.find((a) => a.question_id === prevQ.id);
+    setCustomValue(prevAnswer?.answer ?? "");
+    setCustomError(null);
   }
 
   function handleCustomSubmit() {
@@ -97,7 +123,16 @@ export function GoalClarifierView({
 
         {/* Header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3">
-          <div>
+          <div className="flex items-center gap-2">
+            {canGoBack && (
+              <button
+                type="button"
+                onClick={handleBack}
+                className="w-8 h-8 flex items-center justify-center rounded-full bg-black/5 text-river hover:text-charcoal transition-colors"
+              >
+                <ChevronLeft className="w-4 h-4" />
+              </button>
+            )}
             <p className="text-xs text-river/60 font-medium uppercase tracking-wide">
               {questions.length > 1
                 ? `Question ${currentIndex + 1} of ${questions.length}`
@@ -114,12 +149,13 @@ export function GoalClarifierView({
         </div>
 
         {/* Question */}
-        <AnimatePresence mode="wait">
+        <AnimatePresence mode="wait" custom={direction}>
           <motion.div
             key={currentIndex}
-            initial={{ opacity: 0, x: 16 }}
+            custom={direction}
+            initial={{ opacity: 0, x: direction * 16 }}
             animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -16 }}
+            exit={{ opacity: 0, x: direction * -16 }}
             transition={{ duration: 0.18 }}
             className="px-5 pb-8 space-y-4"
           >
@@ -130,23 +166,29 @@ export function GoalClarifierView({
             {/* Pre-defined options */}
             {current.options.length > 0 && (
               <div className="flex flex-wrap gap-2">
-                {current.options.map((opt) => (
-                  <motion.button
-                    key={opt}
-                    type="button"
-                    onClick={() => !disabled && recordAnswer(opt)}
-                    disabled={disabled}
-                    whileTap={{ scale: 0.96 }}
-                    className={cn(
-                      "px-4 py-2 rounded-full text-sm font-medium border transition-colors",
-                      "bg-white border-charcoal/20 text-charcoal",
-                      "hover:bg-sage/10 hover:border-sage active:bg-sage/20",
-                      "disabled:opacity-40 disabled:cursor-not-allowed",
-                    )}
-                  >
-                    {opt}
-                  </motion.button>
-                ))}
+                {current.options.map((opt) => {
+                  const isSelected =
+                    answers.find((a) => a.question_id === current.id)
+                      ?.answer === opt;
+                  return (
+                    <motion.button
+                      key={opt}
+                      type="button"
+                      onClick={() => !disabled && recordAnswer(opt)}
+                      disabled={disabled}
+                      whileTap={{ scale: 0.96 }}
+                      className={cn(
+                        "px-4 py-2 rounded-full text-sm font-medium border transition-colors",
+                        isSelected
+                          ? "bg-sage text-white border-sage"
+                          : "bg-white border-charcoal/20 text-charcoal hover:bg-sage/10 hover:border-sage active:bg-sage/20",
+                        "disabled:opacity-40 disabled:cursor-not-allowed",
+                      )}
+                    >
+                      {opt}
+                    </motion.button>
+                  );
+                })}
               </div>
             )}
 

@@ -98,7 +98,13 @@ export const serverGetAccessToken = createServerFn({ method: "GET" }).handler(
 
 type ServerMe = {
   token: string | null;
-  user: (ServerUser & { onboarded: boolean; timezone?: string | null }) | null;
+  user:
+    | (ServerUser & {
+        onboarded: boolean;
+        timezone?: string | null;
+        hasTasks?: boolean;
+      })
+    | null;
   /** Set to true when the FastAPI backend rejected the token (401/403). */
   sessionInvalid?: boolean;
 };
@@ -146,6 +152,7 @@ export const serverGetMe = createServerFn({ method: "GET" }).handler(
           onboarded?: boolean | null;
           name?: string | null;
           timezone?: string | null;
+          has_tasks?: boolean | null;
         };
         return {
           token,
@@ -154,6 +161,7 @@ export const serverGetMe = createServerFn({ method: "GET" }).handler(
             onboarded: me.onboarded ?? false,
             ...(me.name ? { name: me.name } : {}),
             timezone: me.timezone ?? null,
+            hasTasks: me.has_tasks ?? false,
           },
         };
       }

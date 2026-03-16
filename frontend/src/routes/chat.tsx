@@ -227,7 +227,7 @@ const WELCOME_MESSAGE = (name?: string) => {
 
 function ChatPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, refreshAuthStatus } = useAuth();
   const { token } = Route.useLoaderData();
   useEffect(() => {
     setInMemoryToken(token);
@@ -514,6 +514,9 @@ function ChatPage() {
 
           setMessages((prev) => [...prev, aiMessage]);
 
+          // Refresh auth state so hasTasks flips when backend has persisted tasks.
+          refreshAuthStatus();
+
           if (result.questions?.length) {
             setActiveClarifier({
               questions: result.questions,
@@ -540,7 +543,7 @@ function ChatPage() {
         setMessages((prev) => [...prev, errorMessage]);
       }
     },
-    [scrollToBottom, router, voice],
+    [scrollToBottom, router, voice, refreshAuthStatus],
   );
 
   const loadConversation = useCallback(

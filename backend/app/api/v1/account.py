@@ -33,6 +33,11 @@ async def get_me(request: Request, user=Depends(get_current_user)) -> AccountMeR
     if row is None:
         raise HTTPException(status_code=404, detail="User not found")
 
+    task_count = await db.fetchval(
+        "SELECT COUNT(*) FROM tasks WHERE user_id = $1",
+        str(user["sub"]),
+    )
+
     def _parse_json(v):
         if isinstance(v, str):
             return json.loads(v)
@@ -52,6 +57,7 @@ async def get_me(request: Request, user=Depends(get_current_user)) -> AccountMeR
         phone_verified=row["phone_verified"],
         notification_preferences=_parse_json(row["notification_preferences"]),
         monthly_token_usage=_parse_json(row["monthly_token_usage"]),
+        has_tasks=(task_count or 0) > 0,
     )
 
 
