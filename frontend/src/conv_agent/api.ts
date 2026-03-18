@@ -2,9 +2,11 @@
  * Flux Conv Agent -- Voice API Client
  *
  * REST client for the voice control-plane endpoints on the FastAPI backend.
- * All functions are async and throw on non-2xx responses.
+ * Uses apiFetch so the Supabase JWT is sent; the backend uses it to resolve
+ * the user for session creation when present.
  */
 
+import { apiFetch } from "~/lib/apiClient";
 import type {
   CloseSessionResponse,
   CreateSessionResponse,
@@ -24,7 +26,7 @@ const API_BASE =
 // -- Helpers ----------------------------------------------------------------
 
 async function post<T>(path: string, body: unknown): Promise<T> {
-  const resp = await fetch(`${API_BASE}${path}`, {
+  const resp = await apiFetch(`${API_BASE}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
@@ -35,8 +37,8 @@ async function post<T>(path: string, body: unknown): Promise<T> {
   return resp.json() as Promise<T>;
 }
 
-async function _get<T>(path: string): Promise<T> {
-  const resp = await fetch(`${API_BASE}${path}`);
+async function get<T>(path: string): Promise<T> {
+  const resp = await apiFetch(`${API_BASE}${path}`);
   if (!resp.ok) {
     throw new Error(`GET ${path} failed: ${resp.status} ${resp.statusText}`);
   }
@@ -44,7 +46,7 @@ async function _get<T>(path: string): Promise<T> {
 }
 
 async function del<T>(path: string): Promise<T> {
-  const resp = await fetch(`${API_BASE}${path}`, { method: "DELETE" });
+  const resp = await apiFetch(`${API_BASE}${path}`, { method: "DELETE" });
   if (!resp.ok) {
     throw new Error(`DELETE ${path} failed: ${resp.status} ${resp.statusText}`);
   }

@@ -1,35 +1,42 @@
 # ============================================================
 # Flux — Docker Compose
-# Orchestrates the database, backend, and frontend services.
+# Orchestrates the DAO service, backend, and frontend.
+# Requires local Supabase to be running (supabase start).
+#
 # Usage:
-#   docker-compose up        — start all services
-#   docker-compose up db     — start only PostgreSQL
-#   docker-compose down -v   — stop all and remove volumes
+#   docker compose up --build   — build and start all services
+#   docker compose up           — start without rebuilding
+#   docker compose down         — stop all services
+#   docker compose logs backend — tail backend logs
 # ============================================================
 
 services:
-  # ---------- PostgreSQL Database ----------
-  # Persistent storage for users, goals, events, and agent state.
-  db:
-    image: postgres:15-alpine
+  # ---------- DAO Service ----------
+  # Data persistence microservice. Uses SQLAlchemy → Supabase PostgreSQL.
+  # Port 8001 is published to the host for standalone testing and build scripts.
+  dao:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "5432:5432"
+      - "8001:8001"
     environment:
-      POSTGRES_USER: flux
-      POSTGRES_PASSWORD: flux_dev_password
-      POSTGRES_DB: flux
-    volumes:
-      - pgdata:/var/lib/postgresql/data
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@host.docker.internal:54322/postgres
+      - SERVICE_API_KEYS=["goal-planner-key-abc","scheduler-key-def","observer-key-ghi"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U flux"]
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
+    command: uvicorn dao_service.main:app --host 0.0.0.0 --port 8001
 
   # ---------- FastAPI Backend ----------
-  # Python API server with AI agent orchestration.
-  # Waits for the database to be healthy before starting.
+  # Python API server with AI agent orchestration and conv_agent voice endpoints.
+  # Waits for the DAO service to be healthy before starting.
   backend:
     build:
       context: ./backend
@@ -40,6 +47,12 @@ services:
     env_file:
       - ./backend/.env
     environment:
+      # Override localhost URLs so they resolve from inside the container.
+      - SUPABASE_URL=http://host.docker.internal:54321
+      - DAO_SERVICE_URL=http://dao:8001
+    depends_on:
+      dao:
+        condition: service_healthy
       SUPABASE_URL: http://host.docker.internal:54321
       DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
       DAO_SERVICE_URL: http://host.docker.internal:8001
@@ -50,19 +63,27 @@ services:
       - ./backend:/app
     command: uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
-  # ---------- React Frontend (Production Preview) ----------
-  # Optional: builds and serves the frontend for production testing.
-  # For local development, use `npm run dev` directly instead.
+  # ---------- React Frontend ----------
+  # Vite/TanStack Start dev server. Auth runs server-side (SSR) inside this
+  # container, so SUPABASE_URL must point to the host via host.docker.internal.
+  # The Vite dev-server proxy runs inside this container, so VITE_API_URL must
+  # use the backend service name (not localhost) to reach the backend container.
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "5173:5173"
+      - "3000:3000"
     env_file:
       - ./frontend/.env
     environment:
+      # Override 127.0.0.1 so SSR auth calls reach the host's Supabase instance.
+      - SUPABASE_URL=http://host.docker.internal:54321
+      # The Vite dev-server proxy forwards /api/* from the browser to this URL.
+      # Inside Docker, "localhost" refers to the frontend container itself, so we
+      # must use the backend service name on the internal Docker network instead.
+      - VITE_API_URL=http://backend:8000
       VITE_API_URL: http://localhost:8010
       SUPABASE_URL: http://host.docker.internal:54321
       SUPABASE_ANON_KEY: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
@@ -71,6 +92,11 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - backend
+    volumes:
+      # Mount source for live reload during development
+      - ./frontend:/app
+      # Prevent the host node_modules from overriding the container's
+      - /app/node_modules
     command: npm run dev -- --host 0.0.0.0 --port 5173
 
 volumes:

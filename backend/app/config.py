@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     database_url: str = "postgresql://user:password@localhost:5432/flux"
     supabase_url: str = "http://127.0.0.1:54321"
     supabase_key: str = ""
+    # Service role key bypasses RLS; required for server-side writes (e.g. syncing auth user to public.users).
+    supabase_service_role_key: str = ""
 
     # AI / LLM — OpenRouter (chat + embeddings; single API key)
     # AI / LLM (all via OpenRouter)

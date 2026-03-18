@@ -142,7 +142,8 @@ Run before committing:
 
 ```bash
 cd backend
-make lint    # Check formatting and linting
+source venv/bin/activate    # or .\venv\Scripts\Activate.ps1 on Windows
+make lint    # Check formatting and linting (targets app/ and conv_agent/)
 make format  # Auto-fix formatting
 ```
 
@@ -159,8 +160,10 @@ make format  # Auto-fix formatting
 ### Backend
 
 - Write tests for all API endpoints and service functions.
-- Place tests in the `backend/tests/` directory.
-- Run tests with `make test`.
+- Core app tests go in `backend/tests/`.
+- Conv-agent tests go in `backend/conv_agent/tests/`.
+- Run the full suite with `pytest tests/ -v` (from `backend/` with venv active).
+- Supabase must be running locally for integration tests (`supabase start`).
 
 ---
 

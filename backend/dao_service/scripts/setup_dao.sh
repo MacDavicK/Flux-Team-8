@@ -89,14 +89,22 @@ else
         if supabase start 2>/dev/null; then
             success "Supabase started successfully"
         else
-            error "Failed to start Supabase automatically."
-            error "Please start it manually:"
-            error "  cd $PROJECT_ROOT"
-            error "  supabase start"
-            error ""
-            error "If Supabase CLI is not installed:"
-            error "  brew install supabase/tap/supabase"
-            exit 1
+            # 'supabase start' may report "already running" yet have an exited DB container.
+            # Recover by stopping all Supabase containers and restarting cleanly.
+            warn "Initial start failed (possibly stale containers). Stopping and retrying..."
+            supabase stop >/dev/null 2>&1 || true
+            if supabase start 2>/dev/null; then
+                success "Supabase started successfully (after recovery)"
+            else
+                error "Failed to start Supabase automatically."
+                error "Please start it manually:"
+                error "  cd $PROJECT_ROOT"
+                error "  supabase stop && supabase start"
+                error ""
+                error "If Supabase CLI is not installed:"
+                error "  brew install supabase/tap/supabase"
+                exit 1
+            fi
         fi
     else
         error "Cannot find supabase/config.toml in project root."
@@ -149,5 +157,5 @@ echo "  1. Run unit tests:        bash backend/dao_service/scripts/run_tests.sh 
 echo "  2. Run integration tests: bash backend/dao_service/scripts/run_tests.sh integration"
 echo "  3. Run full pipeline:     bash backend/dao_service/scripts/build_and_test.sh"
 echo "  4. Start dev server:      cd backend && uvicorn dao_service.main:app --reload"
-echo "  5. Open Swagger UI:       http://localhost:8000/docs"
+echo "  5. Open Swagger UI:       http://localhost:8001/docs"
 echo ""

@@ -81,6 +81,27 @@ supabase db reset
 
 This recreates local DB and reapplies migrations.
 
+## Backend .env Configuration
+
+After running `supabase start`, copy the values from `supabase status` into `backend/.env`:
+
+```env
+SUPABASE_URL=http://127.0.0.1:54321
+SUPABASE_KEY=<anon key from supabase status>
+SUPABASE_SERVICE_ROLE_KEY=<service_role key from supabase status>
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:54322/postgres
+```
+
+### Running inside Docker Compose
+
+When the backend runs in a Docker container (via `docker compose up`), `127.0.0.1` resolves to the container itself, not your host. Change `SUPABASE_URL` in `backend/.env` to use the Docker host gateway:
+
+```env
+SUPABASE_URL=http://host.docker.internal:54321
+```
+
+All other Supabase settings (`SUPABASE_KEY`, `SUPABASE_SERVICE_ROLE_KEY`) remain the same.
+
 ## Troubleshooting
 
 ### Docker connection errors
@@ -90,6 +111,20 @@ This recreates local DB and reapplies migrations.
 
 ```bash
 docker info
+```
+
+### Backend cannot reach Supabase when using Docker Compose
+
+If the backend container logs show connection refused to `127.0.0.1:54321`, update `SUPABASE_URL` in `backend/.env`:
+
+```env
+SUPABASE_URL=http://host.docker.internal:54321
+```
+
+Then restart the backend container:
+
+```bash
+docker compose restart backend
 ```
 
 ### Supabase CLI missing

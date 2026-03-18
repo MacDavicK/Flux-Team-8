@@ -10,23 +10,27 @@ The main application lives under `app/`:
 
 ```
 backend/
-├── app/
-│   ├── agents/          # AI agents
+├── app/                   # Main FastAPI application
+│   ├── agents/            # AI agents
 │   │   ├── goal_planner.py
 │   │   └── scheduler_agent.py
-│   ├── routers/         # API route handlers
+│   ├── routers/           # API route handlers
 │   │   ├── goals.py
 │   │   ├── rag.py
 │   │   └── scheduler.py
-│   ├── services/        # Business logic & DB access
-│   │   ├── goal_service.py
-│   │   ├── rag_service.py
-│   │   └── scheduler_service.py
-│   ├── models/          # Pydantic schemas
+│   ├── services/          # Business logic & DB access
+│   ├── models/            # Pydantic schemas
 │   ├── config.py
 │   ├── database.py
 │   └── main.py
-├── tests/               # pytest (unit + integration)
+├── conv_agent/            # Voice/conversational agent (REST control plane)
+├── dao_service/           # DAO microservice (separate container in docker-compose)
+│   ├── main.py
+│   ├── api/v1/
+│   ├── dao/, models/, schemas/, services/
+│   └── scripts/build_and_test.sh
+├── tests/                 # pytest (unit + integration)
+├── Dockerfile             # Builds main app; dao has its own in dao_service
 ├── .env.example
 ├── pytest.ini
 └── requirements.txt
@@ -53,6 +57,15 @@ API: [http://localhost:8000](http://localhost:8000). Docs: [http://localhost:800
 
 Optional: if `make dev` is configured to run `uvicorn app.main:app --reload`, you can use `make dev` instead.
 
+### Running via Docker
+
+From the project root, the main app runs as the `backend` service; the DAO microservice runs as `dao`:
+
+```bash
+docker compose up --build   # backend on 8000, dao on 8001, frontend on 3000
+docker compose up dao       # DAO only (e.g. for integration tests); health at http://localhost:8001/health
+```
+
 ---
 
 ## Environment variables
@@ -66,7 +79,7 @@ Copy from `.env.example`. Key variables (names match `app.config.Settings`; Pyda
 | `OPEN_ROUTER_API_KEY` | OpenRouter API key (Goal Planner + Scheduler + embeddings) |
 | `PINECONE_API_KEY` | Optional; required for RAG ingest/search |
 | `PINECONE_INDEX_NAME` | Default `flux-articles` |
-| `CORS_ORIGINS` | JSON array of allowed origins (e.g. http://localhost:5173) |
+| `CORS_ORIGINS` | JSON array of allowed origins (e.g. http://localhost:3000) |
 
 Scheduler: `SCHEDULER_CUTOFF_HOUR` (default 21), `SCHEDULER_BUFFER_MINUTES` (default 15), `SCHEDULER_USE_LLM_RATIONALE` (default false). RAG: `RAG_CHUNK_SIZE`, `RAG_TOP_K`, etc. See `app/config.py` for the full list.
 
@@ -110,7 +123,7 @@ source venv/bin/activate
 pytest
 ```
 
-Config: `pytest.ini` (asyncio_mode=auto, testpaths=tests). Unit and integration tests live under `tests/`.
+Config: `pytest.ini` (asyncio_mode=auto, testpaths=`tests conv_agent/tests`). Unit and integration tests live under `tests/`; conv_agent tests (unit + integration) live under `conv_agent/tests/`.
 
 ---
 

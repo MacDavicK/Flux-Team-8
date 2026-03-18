@@ -151,7 +151,7 @@ Flux uses a **multi-agent architecture**. The **Goal Planner** (implemented) dec
 
 ### Prerequisites
 
-- **Node.js 18+** — [Install](https://nodejs.org)
+- **Node.js 20+** — [Install](https://nodejs.org)
 - **Python 3.11+** — [Install](https://python.org)
 - **Docker Desktop** — [Install for Mac](https://docs.docker.com/desktop/install/mac-install/) (must be running)
 - **Supabase CLI** — Install via Homebrew:
@@ -159,7 +159,11 @@ Flux uses a **multi-agent architecture**. The **Goal Planner** (implemented) dec
   brew install supabase/tap/supabase
   ```
 
-### Quick Start (Recommended)
+### Option A: Docker Compose (Recommended)
+
+Docker Compose builds and starts the DAO service (port `8001`), backend (port `8000`), and frontend (port `3000`) in one command. Requires local Supabase running first (`supabase start`).
+
+> **Before running:** copy the example env files and fill in your API keys.
 
 See **[Getting Started](docs/getting-started.md)** for full steps. Summary:
 
@@ -167,24 +171,62 @@ See **[Getting Started](docs/getting-started.md)** for full steps. Summary:
 git clone https://github.com/MacDavicK/Flux-Team-8.git
 cd Flux-Team-8
 
-# 1. Install frontend & backend dependencies
-bash scripts/setup.sh
+# 1. Create backend env file and fill in your keys
+cp backend/.env.example backend/.env
 
-# 2. Set up Supabase (Docker Desktop must be running)
-bash scripts/supabase_setup.sh
+# 2. Create frontend env file
+cp frontend/.env.example frontend/.env
+
+# 3. Start Supabase locally (Docker Desktop must be running)
+supabase start
+supabase db reset          # applies all migrations; seeds test data
+
+# 4. Add the Supabase credentials to backend/.env
+#    Run: supabase status
+#    Copy the "anon key" → SUPABASE_KEY
+#    Copy the "service_role key" → SUPABASE_SERVICE_ROLE_KEY
+#    Set SUPABASE_URL=http://host.docker.internal:54321   <-- required so the backend
+#                                                             container can reach the
+#                                                             Supabase container on your host
+
+# 5. Build images and start all services
+docker compose up --build
 ```
 
-After setup:
+Once all services are healthy:
+
+| Service | URL |
+|---------|-----|
+| Frontend (Vite dev server) | http://localhost:3000 |
+| Backend API | http://localhost:8000 |
+| Backend API docs (Swagger) | http://localhost:8000/docs |
+| Health check | http://localhost:8000/health |
+
+> **Note:** The first Supabase run downloads ~2-3 GB of Docker images. Subsequent runs are fast.
+
+### Option B: Local Development (without Docker Compose)
+
+Run the backend and frontend directly on your host machine.
 
 ```bash
 # Terminal 1 — Frontend
-cd frontend && npm run dev
+cd frontend
+npm install
+cp .env.example .env          # edit if needed
+npm run dev
+# Opens at http://localhost:3000
 
 # Terminal 2 — Backend
-cd backend && source venv/bin/activate && uvicorn app.main:app --reload
+cd backend
+python3 -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
+pip install -r requirements.txt
+cp .env.example .env          # fill in your keys
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+# API available at http://localhost:8000
 ```
 
-Frontend: [http://localhost:5173](http://localhost:5173). Backend: [http://localhost:8000](http://localhost:8000). API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
+Frontend: [http://localhost:3000](http://localhost:3000). Backend: [http://localhost:8000](http://localhost:8000). API docs: [http://localhost:8000/docs](http://localhost:8000/docs).
 
 ### Connecting Frontend to Backend
 
