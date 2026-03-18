@@ -257,6 +257,8 @@ function ChatPage() {
   // Preserve reschedule_task_id across URL rewrites (it's cleared from search params
   // when conversation_id is substituted in, but we still need it for slot confirmation).
   const rescheduleTaskIdRef = useRef<string | undefined>(reschedule_task_id);
+  // "one" | "series" — set when user picks scope for a recurring task reschedule.
+  const rescheduleScope = useRef<string>("one");
   const lastInputWasVoiceRef = useRef<boolean>(false);
   const voice = useVoice();
 
@@ -391,6 +393,59 @@ function ChatPage() {
 
   const handleSendMessage = useCallback(
     async (text: string) => {
+      // Handle scope selection for recurring task reschedule ("scope:one" | "scope:series")
+      if (rescheduleTaskIdRef.current && text.startsWith("scope:")) {
+        const scope = text.slice("scope:".length); // "one" | "series"
+        rescheduleScope.current = scope;
+        const displayLabel =
+          scope === "series" ? "This one + all future" : "Just this one";
+        setMessages((prev) => [
+          ...prev.map((m) => ({ ...m, options: null })),
+          {
+            id: Date.now().toString(),
+            type: MessageVariant.USER,
+            content: displayLabel,
+          },
+        ]);
+        setIsThinking(true);
+        chatService
+          .sendMessage(
+            `Help me reschedule this task`,
+            conversationIdRef.current,
+            {
+              intent: "RESCHEDULE_TASK",
+              task_id: rescheduleTaskIdRef.current,
+              reschedule_scope: scope,
+            },
+          )
+          .then((result) => {
+            setIsThinking(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                type: MessageVariant.AI,
+                content: <MarkdownMessage>{result.message}</MarkdownMessage>,
+                options: result.options,
+              },
+            ]);
+            scrollToBottom();
+          })
+          .catch(() => {
+            setIsThinking(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                type: MessageVariant.AI,
+                content:
+                  "Sorry, I couldn't load reschedule options. Please try again.",
+              },
+            ]);
+          });
+        return;
+      }
+
       // Handle slot confirmation (ISO UTC string from reschedule options)
       if (rescheduleTaskIdRef.current && /^\d{4}-\d{2}-\d{2}T/.test(text)) {
         const slotLabel = formatSlotLabel(text);
@@ -404,23 +459,27 @@ function ChatPage() {
         ]);
         setIsThinking(true);
         tasksService
-          .confirmReschedule(rescheduleTaskIdRef.current, text)
-          .then(() => {
+          .confirmReschedule(
+            rescheduleTaskIdRef.current,
+            text,
+            rescheduleScope.current,
+          )
+          .then((result) => {
             setIsThinking(false);
             setProgressLabel(undefined);
             // Invalidate router cache so the home page re-fetches updated tasks.
             router.invalidate();
+            const count = result.updated_count ?? 1;
+            const successMsg =
+              count > 1
+                ? `Done! Moved ${count} upcoming sessions to the new time. You'll get reminders at the updated times.`
+                : `Done! Your task has been rescheduled. You'll get a reminder at the new time.`;
             setMessages((prev) => [
               ...prev,
               {
                 id: Date.now().toString(),
                 type: MessageVariant.AI,
-                content: (
-                  <MarkdownMessage>
-                    Done! Your task has been rescheduled. You'll get a reminder
-                    at the new time.
-                  </MarkdownMessage>
-                ),
+                content: <MarkdownMessage>{successMsg}</MarkdownMessage>,
               },
             ]);
             scrollToBottom();

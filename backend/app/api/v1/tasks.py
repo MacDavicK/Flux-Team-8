@@ -11,13 +11,13 @@ PATCH /api/v1/tasks/{task_id}/reschedule-confirm — Confirm a reschedule slot.
 from __future__ import annotations
 
 import asyncio
+import logging
 import uuid
 from datetime import datetime, timedelta, timezone
 
 import pendulum
-from fastapi import APIRouter, Body, Depends, HTTPException
-
 import pendulum as _pendulum
+from fastapi import APIRouter, Body, Depends, HTTPException
 
 from app.agents.graph import compiled_graph
 from app.middleware.auth import get_current_user
@@ -31,6 +31,8 @@ from app.models.api_schemas import (
 from app.services.recurrence import advance_recurring_task
 from app.services.rrule_expander import occurrence_on_date
 from app.services.supabase import db
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -85,6 +87,7 @@ async def get_tasks(
         SELECT t.id, t.user_id, t.goal_id, t.title, t.description, t.status,
                t.scheduled_at, t.duration_minutes, t.trigger_type, t.location_trigger,
                t.recurrence_rule, t.shared_with_goal_ids, t.escalation_policy, t.completed_at, t.created_at,
+               t.proposed_time,
                g.title AS goal_name
         FROM tasks t
         LEFT JOIN goals g ON g.id = t.goal_id
@@ -107,6 +110,7 @@ async def get_tasks(
             SELECT t.id, t.user_id, t.goal_id, t.title, t.description, t.status,
                    t.scheduled_at, t.duration_minutes, t.trigger_type, t.location_trigger,
                    t.recurrence_rule, t.shared_with_goal_ids, t.escalation_policy, t.completed_at, t.created_at,
+                   t.proposed_time,
                    g.title AS goal_name
             FROM tasks t
             LEFT JOIN goals g ON g.id = t.goal_id
@@ -134,6 +138,7 @@ async def get_tasks(
             SELECT t.id, t.user_id, t.goal_id, t.title, t.description, t.status,
                    t.scheduled_at, t.duration_minutes, t.trigger_type, t.location_trigger,
                    t.recurrence_rule, t.shared_with_goal_ids, t.escalation_policy, t.completed_at, t.created_at,
+                   t.proposed_time,
                    g.title AS goal_name
             FROM tasks t
             LEFT JOIN goals g ON g.id = t.goal_id
@@ -370,11 +375,54 @@ async def reschedule_confirm(
             status_code=422, detail="Invalid scheduled_at format; expected ISO 8601"
         )
 
-    if task["goal_id"] is None:
-        # Silent task (no goal) — mutate in place; no new row needed.
-        # Reset reminder_sent_at so the notifier fires again at the new time.
+    # ── Series reschedule: update scheduled_at + proposed_time in-place ─────
+    # There is always exactly one pending row per recurring series, so a single
+    # UPDATE is sufficient. Future occurrences are created by advance_recurring_task
+    # which reads proposed_time — so all future rows automatically use the new time.
+    if body.scope == "series":
+        if not task.get("recurrence_rule"):
+            raise HTTPException(
+                status_code=422,
+                detail="This task is not a recurring task",
+            )
+
+        user_tz_str = await _fetch_user_tz(user_uuid)
+        tz = pendulum.timezone(user_tz_str)
+        new_local = pendulum.instance(scheduled_at_dt).in_timezone(tz)
+        new_proposed_time = new_local.hour * 60 + new_local.minute
+
         await db.execute(
-            "UPDATE tasks SET scheduled_at = $1, status = 'pending', reminder_sent_at = NULL WHERE id = $2 AND user_id = $3",
+            """
+            UPDATE tasks
+            SET scheduled_at = $1, proposed_time = $2, reminder_sent_at = NULL
+            WHERE id = $3 AND user_id = $4
+            """,
+            scheduled_at_dt,
+            new_proposed_time,
+            task_uuid,
+            user_uuid,
+        )
+        return {
+            "original_task_id": task_id,
+            "new_task_id": task_id,
+            "status": "rescheduled",
+            "scheduled_at": scheduled_at_dt.isoformat(),
+            "updated_count": 1,
+        }
+
+    # ── Single-occurrence reschedule ─────────────────────────────────────────
+    # Only scheduled_at is updated — proposed_time is intentionally left intact
+    # so advance_recurring_task restores the original recurring time for all
+    # future occurrences after this one.
+
+    if task["goal_id"] is None:
+        # Silent task (no goal) — mutate in place.
+        await db.execute(
+            """
+            UPDATE tasks
+            SET scheduled_at = $1, status = 'pending', reminder_sent_at = NULL
+            WHERE id = $2 AND user_id = $3
+            """,
             scheduled_at_dt,
             task_uuid,
             user_uuid,
@@ -384,10 +432,13 @@ async def reschedule_confirm(
             "new_task_id": task_id,
             "status": "rescheduled",
             "scheduled_at": scheduled_at_dt.isoformat(),
+            "updated_count": 1,
         }
 
     # Goal-linked task — mark original missed (preserves pattern-observer data)
-    # and create a new pending task for the rescheduled slot.
+    # and create a new pending row at the rescheduled time.
+    # proposed_time is copied from the original so the chain returns to the
+    # original time once this exception row is consumed.
     await db.execute(
         "UPDATE tasks SET status = 'missed' WHERE id = $1 AND user_id = $2",
         task_uuid,
@@ -399,9 +450,9 @@ async def reschedule_confirm(
         INSERT INTO tasks (
             user_id, goal_id, title, description, status,
             scheduled_at, duration_minutes, trigger_type,
-            recurrence_rule, escalation_policy
+            recurrence_rule, escalation_policy, proposed_time
         )
-        VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9)
+        VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10)
         RETURNING id
         """,
         user_uuid,
@@ -413,6 +464,7 @@ async def reschedule_confirm(
         task["trigger_type"],
         task["recurrence_rule"],
         task["escalation_policy"],
+        task.get("proposed_time"),  # original recurring time — chain reverts here
     )
 
     return {
@@ -420,6 +472,7 @@ async def reschedule_confirm(
         "new_task_id": str(new_task_id),
         "status": "rescheduled",
         "scheduled_at": scheduled_at_dt.isoformat(),
+        "updated_count": 1,
     }
 
 
@@ -522,8 +575,13 @@ def _build_slot_options(
     slots: list[dict],
     user_tz: str,
     task_id: str,
+    series_mode: bool = False,
 ) -> list[OnboardingOptionSchema]:
-    """Convert up to 6 scheduler slots into button options, plus a date-time picker option."""
+    """Convert up to 6 scheduler slots into button options, plus a date-time picker option.
+
+    In series_mode the label shows only the time-of-day (e.g. "9:00 AM") rather
+    than a specific date, since the time will be applied to all future occurrences.
+    """
     options: list[OnboardingOptionSchema] = []
     tz = pendulum.timezone(user_tz)
 
@@ -534,7 +592,11 @@ def _build_slot_options(
         try:
             dt_utc = pendulum.parse(raw_at)
             dt_local = dt_utc.in_timezone(tz)  # type: ignore[union-attr]
-            label = dt_local.format("ddd, MMM D [at] h:mm A")
+            label = (
+                dt_local.format("h:mm A")
+                if series_mode
+                else dt_local.format("ddd, MMM D [at] h:mm A")
+            )
         except Exception:
             label = raw_at
 
@@ -626,7 +688,8 @@ async def _fetch_task_or_404(task_id: str, user_id: str) -> dict:
         """
         SELECT id, user_id, goal_id, title, description, status,
                scheduled_at, duration_minutes, trigger_type, location_trigger,
-               recurrence_rule, shared_with_goal_ids, escalation_policy, completed_at, created_at
+               recurrence_rule, shared_with_goal_ids, escalation_policy, completed_at, created_at,
+               proposed_time
         FROM tasks WHERE id = $1
         """,
         task_uuid,

@@ -7,7 +7,7 @@ import { cn } from "~/utils/cn";
 
 interface OnboardingOptionsProps {
   options: OnboardingOption[];
-  onSelect: (value: string) => void;
+  onSelect: (value: string, displayLabel?: string) => void;
   onChangeNumber?: () => void;
   disabled?: boolean;
   phoneNumber?: string; // required for the OTP resend button
@@ -257,7 +257,13 @@ export function OnboardingOptions({
   const specifyOption = options.find(
     (o) => o.value === null && o.input_type !== "datetime",
   );
-  const regularOptions = options.filter((o) => o.value !== null);
+  // Sentinel values wrapped in __ (e.g. __skip_phone__) are skip-type actions —
+  // rendered as subtle text links rather than primary pill buttons.
+  const isSentinel = (v: string | null) => v !== null && /^__\w+__$/.test(v);
+  const skipOptions = options.filter((o) => isSentinel(o.value));
+  const regularOptions = options.filter(
+    (o) => o.value !== null && !isSentinel(o.value),
+  );
 
   function handleOptionClick(option: OnboardingOption) {
     if (disabled) return;
@@ -267,7 +273,7 @@ export function OnboardingOptions({
       setSpecifyValue("");
       setSpecifyError(null);
     } else {
-      onSelect(option.value);
+      onSelect(option.value, option.label);
     }
   }
 
@@ -368,6 +374,25 @@ export function OnboardingOptions({
           </motion.button>
         )}
       </div>
+
+      {skipOptions.length > 0 && (
+        <div className="flex gap-4 pt-0.5">
+          {skipOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleOptionClick(opt)}
+              disabled={disabled}
+              className={cn(
+                "text-xs text-river/50 hover:text-river/80 transition-colors underline underline-offset-2",
+                "disabled:opacity-40 disabled:cursor-not-allowed",
+              )}
+            >
+              Skip for now
+            </button>
+          ))}
+        </div>
+      )}
 
       <AnimatePresence>
         {specifyStep && (

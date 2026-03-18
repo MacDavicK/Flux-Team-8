@@ -24,6 +24,9 @@ class ChatMessageRequest(BaseModel):
     conversation_id: Optional[str] = None
     intent: Optional[str] = None  # Pre-set intent — skips orchestrator LLM call
     task_id: Optional[str] = None  # Required when intent == "RESCHEDULE_TASK"
+    reschedule_scope: Optional[str] = (
+        None  # "one" | "series" — set after scope selection
+    )
     answers: Optional[list[GoalClarifierAnswer]] = (
         None  # Structured answers for GOAL_CLARIFY
     )
@@ -227,6 +230,7 @@ class RescheduleRequest(BaseModel):
 
 class RescheduleConfirmRequest(BaseModel):
     scheduled_at: str  # ISO 8601 UTC datetime string
+    scope: str = "one"  # "one" | "series"
 
 
 # ─────────────────────────────────────────────────────────────────

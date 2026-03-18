@@ -183,7 +183,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
     });
   }, []);
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, displayLabel?: string) => {
     setAutoOpenSpecify(false);
     if (/^\+[1-9]\d{1,14}$/.test(text.trim())) {
       setOnboardingPhone(text.trim());
@@ -192,21 +192,23 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: MessageVariant.USER,
-      content: /^\d{4}-\d{2}-\d{2}T/.test(text)
-        ? (() => {
-            try {
-              return new Intl.DateTimeFormat(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              }).format(new Date(text));
-            } catch {
-              return text;
-            }
-          })()
-        : text,
+      content:
+        displayLabel ??
+        (/^\d{4}-\d{2}-\d{2}T/.test(text)
+          ? (() => {
+              try {
+                return new Intl.DateTimeFormat(undefined, {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                }).format(new Date(text));
+              } catch {
+                return text;
+              }
+            })()
+          : text),
     };
 
     setMessages((prev) => [

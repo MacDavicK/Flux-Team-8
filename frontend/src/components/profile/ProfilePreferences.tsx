@@ -1,6 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
-  AlertCircle,
   Bell,
   CheckCircle2,
   Clock,
@@ -10,7 +9,6 @@ import {
   Phone,
   Sun,
   Sunrise,
-  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "~/lib/apiClient";
@@ -285,7 +283,6 @@ export function ProfilePreferences({
   const [togglingCall, setTogglingCall] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [togglingPush, setTogglingPush] = useState(false);
-  const [phoneBannerDismissed, setPhoneBannerDismissed] = useState(false);
 
   const needsPhoneSetup = !phoneVerified && !savedPhone;
 
@@ -476,22 +473,11 @@ export function ProfilePreferences({
       >
         <SectionLabel>Notifications</SectionLabel>
         <div className="glass-card p-4 space-y-4">
-          {/* Phone setup nudge banner */}
-          {needsPhoneSetup && !phoneBannerDismissed && (
-            <div className="flex items-start gap-3 rounded-xl bg-amber-400/10 border border-amber-400/20 px-3 py-2.5">
-              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
-              <p className="text-xs text-white/70 flex-1">
-                Set up your phone number to enable SMS and WhatsApp reminders.
-              </p>
-              <button
-                type="button"
-                onClick={() => setPhoneBannerDismissed(true)}
-                className="text-white/40 hover:text-white/70 transition-colors shrink-0"
-                aria-label="Dismiss"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
+          {/* Phone setup nudge */}
+          {needsPhoneSetup && (
+            <p className="text-xs text-river/50 leading-relaxed">
+              Add a phone number to receive SMS and WhatsApp reminders.
+            </p>
           )}
 
           {/* Phone verification row */}

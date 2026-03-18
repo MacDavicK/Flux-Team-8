@@ -86,6 +86,7 @@ class ChatService {
     options?: {
       intent?: string;
       task_id?: string;
+      reschedule_scope?: string;
       answers?: GoalClarifierAnswer[];
     },
     onProgress?: (label: string) => void,
@@ -97,6 +98,9 @@ class ChatService {
         conversation_id: conversationId ?? null,
         ...(options?.intent ? { intent: options.intent } : {}),
         ...(options?.task_id ? { task_id: options.task_id } : {}),
+        ...(options?.reschedule_scope
+          ? { reschedule_scope: options.reschedule_scope }
+          : {}),
         ...(options?.answers ? { answers: options.answers } : {}),
       }),
     });

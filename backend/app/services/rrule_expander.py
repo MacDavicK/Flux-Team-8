@@ -173,3 +173,84 @@ def next_occurrence_after(
 
     local_dt = pendulum.instance(occ, tz=tz)
     return local_dt.in_timezone("UTC").isoformat()
+
+
+# ─────────────────────────────────────────────────────────────────
+# Sleep-window utilities
+# ─────────────────────────────────────────────────────────────────
+
+
+def parse_sleep_window(sleep_window: dict | None) -> tuple[int, int] | None:
+    """
+    Parse {"start": "HH:MM", "end": "HH:MM"} into (start_min, end_min) as
+    minutes since midnight, or None if the dict is missing or malformed.
+    """
+    if not sleep_window:
+        return None
+    try:
+        sh, sm = (int(x) for x in str(sleep_window["start"]).split(":"))
+        eh, em = (int(x) for x in str(sleep_window["end"]).split(":"))
+        return sh * 60 + sm, eh * 60 + em
+    except Exception:
+        return None
+
+
+def _in_sleep(minutes: int, start_min: int, end_min: int) -> bool:
+    """Return True if minutes-since-midnight falls inside the sleep window."""
+    if start_min >= end_min:  # wraps midnight, e.g. 21:30–07:00
+        return minutes >= start_min or minutes < end_min
+    return start_min <= minutes < end_min
+
+
+def advance_past_sleep(
+    utc_iso: str,
+    sleep_window: dict | None,
+    user_timezone: str,
+    rrule_string: str | None = None,
+    dtstart: pendulum.DateTime | None = None,
+) -> str:
+    """
+    If *utc_iso* falls inside *sleep_window*, return the UTC ISO8601 string of
+    the first valid moment after the sleep window ends.
+
+    For recurring tasks pass *rrule_string* (and optionally *dtstart*) so that
+    the returned time is an actual occurrence of the rule rather than the bare
+    sleep-end wall-clock time.
+
+    Returns *utc_iso* unchanged when:
+      - no sleep_window is configured, or
+      - the time is already outside the sleep window.
+    """
+    parsed = parse_sleep_window(sleep_window)
+    if parsed is None:
+        return utc_iso
+
+    start_min, end_min = parsed
+    tz = pendulum.timezone(user_timezone)
+    try:
+        local_dt = pendulum.parse(utc_iso).in_timezone(tz)
+    except Exception:
+        return utc_iso
+
+    tod = local_dt.hour * 60 + local_dt.minute
+    if not _in_sleep(tod, start_min, end_min):
+        return utc_iso
+
+    # Build the next sleep-end wall-clock time.
+    end_h, end_m = divmod(end_min, 60)
+    sleep_end = local_dt.set(hour=end_h, minute=end_m, second=0, microsecond=0)
+    if sleep_end <= local_dt:
+        sleep_end = sleep_end.add(days=1)
+
+    if rrule_string:
+        # Find the next RRULE occurrence at or after sleep_end.
+        # Subtract 1 s so that rule.after(..., inc=False) includes the exact sleep-end time.
+        next_utc = next_occurrence_after(
+            rrule_string=rrule_string,
+            after_dt=sleep_end.subtract(seconds=1).in_timezone("UTC"),
+            user_timezone=user_timezone,
+            dtstart=dtstart,
+        )
+        return next_utc if next_utc else utc_iso
+    else:
+        return sleep_end.in_timezone("UTC").isoformat()

@@ -16,7 +16,7 @@ import logging
 
 import pendulum
 
-from app.services.rrule_expander import next_occurrence_after
+from app.services.rrule_expander import advance_past_sleep, next_occurrence_after
 from app.services.supabase import db
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ async def advance_recurring_task(task_id: str) -> bool:
         """
         SELECT id, recurrence_rule, scheduled_at, user_id, title, description,
                duration_minutes, trigger_type, location_trigger,
-               goal_id, shared_with_goal_ids, escalation_policy
+               goal_id, shared_with_goal_ids, escalation_policy, proposed_time
         FROM tasks WHERE id = $1
         """,
         task_id,
@@ -46,8 +46,14 @@ async def advance_recurring_task(task_id: str) -> bool:
 
     user_id = str(task_row["user_id"])
 
-    tz_row = await db.fetchrow("SELECT timezone FROM users WHERE id = $1", user_id)
+    tz_row = await db.fetchrow(
+        "SELECT timezone, profile FROM users WHERE id = $1", user_id
+    )
     user_tz = (tz_row["timezone"] if tz_row else None) or "UTC"
+    sleep_window = None
+    if tz_row and tz_row["profile"]:
+        profile_data = tz_row["profile"] if isinstance(tz_row["profile"], dict) else {}
+        sleep_window = profile_data.get("sleep_window")
 
     scheduled_at = task_row["scheduled_at"]
     ref_dt = (
@@ -64,6 +70,42 @@ async def advance_recurring_task(task_id: str) -> bool:
     if next_utc is None:
         logger.info("No further occurrences for recurring task %s", task_id)
         return False
+
+    # If proposed_time is set, override the time component of next_utc with the
+    # canonical wall-clock time. This ensures a single-occurrence reschedule
+    # (which only changed scheduled_at, not proposed_time) reverts correctly.
+    proposed_time = task_row["proposed_time"]
+    if proposed_time is not None:
+        try:
+            proposed_hour, proposed_minute = divmod(proposed_time, 60)
+            next_local = pendulum.parse(next_utc).in_timezone(user_tz)
+            next_local = next_local.set(
+                hour=proposed_hour, minute=proposed_minute, second=0, microsecond=0
+            )
+            next_utc = next_local.in_timezone("UTC").isoformat()
+        except Exception as exc:
+            logger.warning(
+                "Could not apply proposed_time to next occurrence of task %s: %s",
+                task_id,
+                exc,
+            )
+
+    # Sleep-window guard: advance next_utc past sleep if it lands during sleep.
+    # Applied after proposed_time so the restored wall-clock time is also checked.
+    if sleep_window and next_utc:
+        try:
+            dt_for_dtstart = pendulum.parse(next_utc)
+            next_utc = advance_past_sleep(
+                utc_iso=next_utc,
+                sleep_window=sleep_window,
+                user_timezone=user_tz,
+                rrule_string=task_row["recurrence_rule"],
+                dtstart=dt_for_dtstart,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Sleep-window advance failed for recurring task %s: %s", task_id, exc
+            )
 
     # Goal timeframe guard
     goal_id = task_row["goal_id"]
@@ -101,8 +143,8 @@ async def advance_recurring_task(task_id: str) -> bool:
         INSERT INTO tasks (
             user_id, goal_id, title, description, status,
             scheduled_at, duration_minutes, trigger_type, location_trigger,
-            recurrence_rule, shared_with_goal_ids, escalation_policy
-        ) VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11)
+            recurrence_rule, shared_with_goal_ids, escalation_policy, proposed_time
+        ) VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12)
         """,
         user_id,
         goal_id,
@@ -115,6 +157,7 @@ async def advance_recurring_task(task_id: str) -> bool:
         task_row["recurrence_rule"],
         shared_ids,
         task_row["escalation_policy"],
+        task_row["proposed_time"],
     )
     logger.info("Advanced recurring task %s → next occurrence at %s", task_id, next_utc)
     return True

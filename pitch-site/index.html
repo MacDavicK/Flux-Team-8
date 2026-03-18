@@ -10,6 +10,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,400;0,9..144,500;1,9..144,300;1,9..144,400&display=swap" rel="stylesheet" />
   <link href="https://api.fontshare.com/v2/css?f[]=satoshi@400,500,600,700,900&display=swap" rel="stylesheet" />
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
 
   <style>
     /* ─── Design Tokens ─── */
@@ -346,34 +347,77 @@
       margin-top: 28px;
     }
 
-    /* Phone mockup */
+    /* Hero video */
     .hero-phone-wrap {
       display: flex; justify-content: center; align-items: center;
     }
-    .phone-frame {
-      width: 265px;
-      background: var(--glass);
-      backdrop-filter: var(--blur-glass);
-      -webkit-backdrop-filter: var(--blur-glass);
-      border: 1px solid var(--glass-border);
-      border-radius: 44px;
-      box-shadow: 0 32px 80px -8px rgba(45,51,47,0.2), 0 0 30px rgba(92,124,102,0.1);
-      overflow: hidden;
-      animation: float-phone 6s ease-in-out infinite;
-    }
-    @keyframes float-phone {
-      0%,100% { transform: translateY(0); }
-      50%      { transform: translateY(-12px); }
-    }
-    .phone-notch {
-      width: 80px; height: 26px;
-      background: var(--glass-solid);
-      border: 1px solid var(--glass-border);
-      border-radius: 0 0 18px 18px;
-      border-top: none;
+
+    /* ─── iPhone Frame Mockup ─── */
+    .iphone-frame {
+      position: relative;
+      width: 100%;
+      max-width: 260px;
       margin: 0 auto;
+      background: linear-gradient(160deg, #2c2c2e 0%, #1c1c1e 100%);
+      border-radius: 52px;
+      padding: 11px;
+      box-shadow:
+        0 0 0 1.5px #48484a,
+        inset 0 0 0 1px rgba(255,255,255,0.07),
+        0 28px 72px -8px rgba(0,0,0,0.45),
+        0 0 32px rgba(92,124,102,0.06);
     }
-    .phone-screen { padding: 12px 16px 20px; }
+    /* Volume buttons on left */
+    .iphone-frame::before {
+      content: '';
+      position: absolute;
+      left: -3px; top: 88px;
+      width: 3px; height: 30px;
+      background: #3a3a3c;
+      border-radius: 2px 0 0 2px;
+      box-shadow: 0 44px 0 #3a3a3c, 0 84px 0 #3a3a3c;
+    }
+    /* Power button on right */
+    .iphone-frame::after {
+      content: '';
+      position: absolute;
+      right: -3px; top: 110px;
+      width: 3px; height: 56px;
+      background: #3a3a3c;
+      border-radius: 0 2px 2px 0;
+    }
+    .iphone-frame.hero-size { max-width: 300px; }
+
+    .iphone-screen {
+      position: relative;
+      aspect-ratio: 9/19.5;
+      border-radius: 42px;
+      overflow: hidden;
+      background: #000;
+    }
+    .iphone-screen video {
+      width: 100%; height: 100%; object-fit: cover; display: block;
+    }
+    .iphone-dynamic-island {
+      position: absolute;
+      top: 0; left: 50%;
+      transform: translateX(-50%);
+      width: 36%; height: 24px;
+      background: #000;
+      border-radius: 0 0 16px 16px;
+      z-index: 10;
+      pointer-events: none;
+    }
+    .iphone-home-bar {
+      position: absolute;
+      bottom: 8px; left: 50%;
+      transform: translateX(-50%);
+      width: 120px; height: 5px;
+      background: rgba(255,255,255,0.28);
+      border-radius: 3px;
+      z-index: 10;
+      pointer-events: none;
+    }
     .phone-status {
       display: flex; justify-content: space-between;
       font-size: 11px; font-weight: 600; color: var(--river);
@@ -627,7 +671,7 @@
     }
     .tier-name { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: var(--charcoal); margin-bottom: 10px; }
     .tier-name.terra { color: var(--terra); }
-    .tier-icons { font-size: 17px; line-height: 2; }
+    .tier-icons { display: flex; flex-direction: column; align-items: center; gap: 7px; margin: 10px 0; }
     .tier-desc { font-size: 11px; color: var(--river); margin-top: 8px; line-height: 1.4; }
 
     /* Escalation ladder */
@@ -771,10 +815,11 @@
 
     .roadmap-grid {
       display: grid;
-      grid-template-columns: repeat(2,1fr);
+      grid-template-columns: repeat(3,1fr);
       gap: 16px;
       margin-top: 48px;
     }
+    @media (max-width: 900px) { .roadmap-grid { grid-template-columns: repeat(2,1fr); } }
     @media (max-width: 640px) { .roadmap-grid { grid-template-columns: 1fr; } }
 
     .rm-item { padding: 26px 24px; position: relative; }
@@ -850,6 +895,82 @@
     .d3 { transition-delay: 0.24s; }
     .d4 { transition-delay: 0.32s; }
     .d5 { transition-delay: 0.40s; }
+
+    /* ═══════════════════════════
+       DEMO VIDEOS
+    ═══════════════════════════ */
+    #demos { padding: var(--space-2xl) 0; }
+
+    .demos-list { display: flex; flex-direction: column; gap: 88px; margin-top: 72px; }
+
+    .demo-row {
+      display: grid;
+      grid-template-columns: 1fr 1.5fr;
+      grid-template-areas: "video text";
+      gap: 72px;
+      align-items: center;
+    }
+    .demo-row--reverse {
+      grid-template-columns: 1.5fr 1fr;
+      grid-template-areas: "text video";
+    }
+    .demo-row-video { grid-area: video; }
+    .demo-row-text  { grid-area: text; }
+    @media (max-width: 900px) {
+      .demo-row, .demo-row--reverse {
+        grid-template-columns: 1fr;
+        grid-template-areas: "video" "text";
+        gap: 32px;
+      }
+    }
+
+    /* .demo-phone-frame replaced by .iphone-frame */
+
+    .demo-row-eyebrow { margin-bottom: 10px; }
+    .demo-row-title {
+      font-family: var(--font-display);
+      font-size: clamp(26px, 2.8vw, 38px);
+      font-weight: 400; line-height: 1.15;
+      letter-spacing: -0.02em; color: var(--charcoal);
+      margin: 8px 0 16px;
+    }
+    .demo-row-title em { font-style: italic; font-weight: 300; color: var(--sage); }
+    .demo-row-desc {
+      font-size: clamp(15px, 1.5vw, 17px);
+      line-height: 1.7; color: var(--river);
+    }
+    .demo-row-bullets {
+      list-style: none; margin-top: 22px;
+      display: flex; flex-direction: column; gap: 10px;
+    }
+    .demo-row-bullets li {
+      display: flex; align-items: center; gap: 10px;
+      font-size: 14px; color: var(--charcoal); font-weight: 500;
+    }
+    .demo-row-bullets li::before {
+      content: ''; width: 6px; height: 6px;
+      border-radius: 50%; background: var(--sage); flex-shrink: 0;
+    }
+
+    /* Shipped badge for roadmap */
+    .rm-badge.shipped {
+      background: rgba(92,124,102,0.1);
+      color: var(--sage);
+      border: 1px solid rgba(92,124,102,0.25);
+    }
+
+    /* ─── Lucide Icons ─── */
+    [data-lucide] { display: inline-block; stroke-width: 1.75; vertical-align: middle; }
+    .usp-icon [data-lucide]   { width: 22px; height: 22px; }
+    .usp-icon.sage  [data-lucide] { color: var(--sage); }
+    .usp-icon.terra [data-lucide] { color: var(--terra); }
+    .usp-icon.river [data-lucide] { color: var(--river); }
+    .tech-emoji [data-lucide]  { width: 20px; height: 20px; color: var(--sage); }
+    .ladder-icon [data-lucide] { width: 20px; height: 20px; color: var(--charcoal); }
+    .tier-icons [data-lucide]  { width: 18px; height: 18px; color: var(--river); }
+    .tier-card.aggressive .tier-icons [data-lucide]:last-child { color: var(--terra); }
+    .rm-icon [data-lucide]     { width: 24px; height: 24px; color: var(--sage); }
+    .glass-pill [data-lucide]  { width: 13px; height: 13px; color: var(--sage); display: inline-block; vertical-align: -1px; }
   </style>
 </head>
 <body>
@@ -869,11 +990,13 @@
         <a href="#" class="nav-logo">Flux<span>.</span></a>
         <ul class="nav-links">
           <li><a href="#how">How it works</a></li>
+          <li><a href="#demos">Experience</a></li>
           <li><a href="#notifications">Notifications</a></li>
+          <li><a href="#roadmap">Roadmap</a></li>
           <li><a href="#ai">AI Engine</a></li>
           <li><a href="#tech">Stack</a></li>
         </ul>
-        <a href="#cta" class="btn-primary" style="padding:10px 22px;font-size:13px;">Get early access</a>
+        <a href="#demos" class="btn-primary" style="padding:10px 22px;font-size:13px;">Watch demos</a>
       </div>
     </div>
   </nav>
@@ -900,54 +1023,24 @@
           </p>
 
           <div class="hero-cta reveal d3">
-            <a href="#cta" class="btn-primary">Start for free &rarr;</a>
+            <a href="#demos" class="btn-primary">Watch demos &rarr;</a>
             <a href="#how" class="btn-secondary">See how it works</a>
           </div>
 
           <div class="hero-trust reveal d4">
-            <span class="glass-pill"><span>🧠</span> LangGraph multi-agent AI</span>
-            <span class="glass-pill"><span>📱</span> Push &middot; WhatsApp &middot; Voice</span>
+            <span class="glass-pill"><i data-lucide="brain"></i> LangGraph multi-agent AI</span>
+            <span class="glass-pill"><i data-lucide="smartphone"></i> Push &middot; WhatsApp &middot; Voice</span>
           </div>
         </div>
 
         <div class="hero-phone-wrap reveal d2">
-          <div class="phone-frame">
-            <div class="phone-notch"></div>
-            <div class="phone-screen">
-              <div class="phone-status"><span>9:41</span><span>●●●</span></div>
-              <div class="phone-greeting">Good morning.</div>
-              <div class="phone-date">Tuesday, 17 Mar &nbsp;·&nbsp; 3 tasks today</div>
-
-              <div class="ctl">
-                <div class="ctl-dot"></div>
-                <div class="ctl-bar"></div>
-                <span class="ctl-label">Now</span>
-              </div>
-
-              <div class="tl-item">
-                <div class="tl-time">9:00</div>
-                <div class="tl-card sage">
-                  <div class="tl-dot sage"></div>
-                  <div class="tl-title">Morning run &middot; 30 min</div>
-                  <div class="tl-sub">Run a 5K &middot; Week 2</div>
-                </div>
-              </div>
-              <div class="tl-item">
-                <div class="tl-time">11:00</div>
-                <div class="tl-card terra">
-                  <div class="tl-dot terra"></div>
-                  <div class="tl-title">Japanese flashcards</div>
-                  <div class="tl-sub">Learn Japanese &middot; N5 vocab</div>
-                </div>
-              </div>
-              <div class="tl-item">
-                <div class="tl-time">14:00</div>
-                <div class="tl-card stone">
-                  <div class="tl-dot stone"></div>
-                  <div class="tl-title">Write landing page copy</div>
-                  <div class="tl-sub">Ship side project &middot; Sprint 1</div>
-                </div>
-              </div>
+          <div class="iphone-frame hero-size">
+            <div class="iphone-screen">
+              <div class="iphone-dynamic-island"></div>
+              <video autoplay loop muted playsinline>
+                <source src="./videos/202603190000-Flux-Landing.mp4" type="video/mp4">
+              </video>
+              <div class="iphone-home-bar"></div>
             </div>
           </div>
         </div>
@@ -1008,7 +1101,7 @@
 
       <div class="usp-grid">
         <div class="usp-card glass-card reveal d1">
-          <div class="usp-icon sage">💬</div>
+          <div class="usp-icon sage"><i data-lucide="message-circle"></i></div>
           <div>
             <div class="usp-meta">
               <span class="usp-number">01</span>
@@ -1019,7 +1112,7 @@
         </div>
 
         <div class="usp-card glass-card reveal d2">
-          <div class="usp-icon terra">🗺</div>
+          <div class="usp-icon terra"><i data-lucide="map"></i></div>
           <div>
             <div class="usp-meta">
               <span class="usp-number">02</span>
@@ -1030,7 +1123,7 @@
         </div>
 
         <div class="usp-card glass-card reveal d1">
-          <div class="usp-icon river">📊</div>
+          <div class="usp-icon river"><i data-lucide="bar-chart-2"></i></div>
           <div>
             <div class="usp-meta">
               <span class="usp-number">03</span>
@@ -1041,7 +1134,7 @@
         </div>
 
         <div class="usp-card glass-card reveal d2">
-          <div class="usp-icon terra">🔔</div>
+          <div class="usp-icon terra"><i data-lucide="bell"></i></div>
           <div>
             <div class="usp-meta">
               <span class="usp-number">04</span>
@@ -1052,7 +1145,7 @@
         </div>
 
         <div class="usp-card glass-card reveal d1">
-          <div class="usp-icon sage">✨</div>
+          <div class="usp-icon sage"><i data-lucide="sparkles"></i></div>
           <div>
             <div class="usp-meta">
               <span class="usp-number">05</span>
@@ -1062,31 +1155,24 @@
           </div>
         </div>
 
-        <!-- Voice card — visually demoted as roadmap -->
-        <div class="usp-card glass-card roadmap reveal d2">
-          <div class="usp-icon sage">🎙</div>
+        <div class="usp-card glass-card reveal d2">
+          <div class="usp-icon sage"><i data-lucide="mic"></i></div>
           <div>
             <div class="usp-meta">
-              <span class="usp-number">Coming soon</span>
-              <span class="tag tag-terra" style="font-size:9px; padding:2px 8px;">Roadmap</span>
+              <span class="usp-number">06</span>
+              <span class="tag tag-sage" style="font-size:9px; padding:2px 8px;">Shipped in MVP</span>
             </div>
             <h3 class="usp-title">Talk to it. Hear back.</h3>
-            <p class="usp-body">Push-to-talk voice input via Deepgram STT and spoken AI responses. The infrastructure is already built — launching soon.</p>
+            <p class="usp-body">Push-to-talk voice input via Deepgram STT. Flux reads responses aloud via TTS. Speak a goal while commuting — the plan is ready when you arrive.</p>
           </div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ SCREENS ═══ -->
-  <section id="screens">
+  <!-- ═══ SCREENS — removed, header moved to demos ═══ -->
+  <section id="screens" style="display:none;">
     <div class="container">
-      <div class="section-header reveal">
-        <span class="label">The experience</span>
-        <h2 class="section-title">Every screen, <em>intentional</em></h2>
-        <p class="body-lg">Glassmorphic, mobile-first, animated. Designed to be used every day without friction.</p>
-      </div>
-
       <div class="screens-grid">
 
         <!-- Chat -->
@@ -1227,6 +1313,196 @@
     </div>
   </section>
 
+  <!-- ═══ DEMO VIDEOS ═══ -->
+  <section id="demos">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="label">The experience</span>
+        <h2 class="section-title">Every screen, <em>intentional</em></h2>
+        <p class="body-lg">Not a prototype. The live app — recorded on device.</p>
+      </div>
+
+      <div class="demos-list">
+
+        <!-- 1. Login & Logout — video left, text right -->
+        <div class="demo-row reveal">
+          <div class="demo-row-video">
+            <div class="iphone-frame">
+              <div class="iphone-screen">
+                <div class="iphone-dynamic-island"></div>
+                <video controls preload="none" playsinline>
+                  <source src="./videos/202603190000-Flux-Login-Logout.mp4" type="video/mp4">
+                </video>
+                <div class="iphone-home-bar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-row-text">
+            <span class="label demo-row-eyebrow">Authentication</span>
+            <h3 class="demo-row-title">Login &amp; <em>Logout</em></h3>
+            <p class="demo-row-desc">JWT stored in an httpOnly cookie — never in localStorage, never exposed to JavaScript. Google OAuth and email login both land on the same secure session.</p>
+            <ul class="demo-row-bullets">
+              <li>httpOnly cookie — XSS-immune by design</li>
+              <li>Supabase JWKS validation on every request</li>
+              <li>Instant session restore on page reload</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 2. Sign Up — text left, video right -->
+        <div class="demo-row demo-row--reverse reveal">
+          <div class="demo-row-video">
+            <div class="iphone-frame">
+              <div class="iphone-screen">
+                <div class="iphone-dynamic-island"></div>
+                <video controls preload="none" playsinline>
+                  <source src="./videos/202603190000-Flux-Signup.mp4" type="video/mp4">
+                </video>
+                <div class="iphone-home-bar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-row-text">
+            <span class="label demo-row-eyebrow">First impression</span>
+            <h3 class="demo-row-title">Sign <em>Up</em></h3>
+            <p class="demo-row-desc">Zero-friction account creation. Email or Google OAuth — either way you're in the app in under 30 seconds, dropped straight into onboarding with no extra gates.</p>
+            <ul class="demo-row-bullets">
+              <li>Email or Google OAuth in one tap</li>
+              <li>No verification wall before onboarding</li>
+              <li>Onboarding state persisted server-side</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 3. Onboarding — video left, text right -->
+        <div class="demo-row reveal">
+          <div class="demo-row-video">
+            <div class="iphone-frame">
+              <div class="iphone-screen">
+                <div class="iphone-dynamic-island"></div>
+                <video controls preload="none" playsinline>
+                  <source src="./videos/202603190000-Flux-Onboarding.mp4" type="video/mp4">
+                </video>
+                <div class="iphone-home-bar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-row-text">
+            <span class="label demo-row-eyebrow">Know your user</span>
+            <h3 class="demo-row-title">On<em>boarding</em></h3>
+            <p class="demo-row-desc">Before scheduling anything, Flux has a conversation. Sleep window, work hours, chronotype — done in under 2 minutes. Every scheduling decision from here uses this profile.</p>
+            <ul class="demo-row-bullets">
+              <li>Sleep window, work hours &amp; chronotype</li>
+              <li>Under 2 minutes to complete</li>
+              <li>Informs every task slot from day one</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 4. Goal Planning — text left, video right -->
+        <div class="demo-row demo-row--reverse reveal">
+          <div class="demo-row-video">
+            <div class="iphone-frame">
+              <div class="iphone-screen">
+                <div class="iphone-dynamic-island"></div>
+                <video controls preload="none" playsinline>
+                  <source src="./videos/202603190000-Flux-GoalPlanning.mp4" type="video/mp4">
+                </video>
+                <div class="iphone-home-bar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-row-text">
+            <span class="label demo-row-eyebrow">The magic moment</span>
+            <h3 class="demo-row-title">Goal <em>Planning</em></h3>
+            <p class="demo-row-desc">Say "I want to run a 5K in 6 weeks." Flux runs a multi-agent pipeline — clarifies the goal, builds a milestone roadmap, and slots recurring tasks into your real free time.</p>
+            <ul class="demo-row-bullets">
+              <li>Multi-agent LangGraph pipeline</li>
+              <li>Milestone breakdown with realistic durations</li>
+              <li>Tasks appear in your daily flow immediately</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 5. Reschedule — video left, text right -->
+        <div class="demo-row reveal">
+          <div class="demo-row-video">
+            <div class="iphone-frame">
+              <div class="iphone-screen">
+                <div class="iphone-dynamic-island"></div>
+                <video controls preload="none" playsinline>
+                  <source src="./videos/202603190000-Flux-Reschedule.mp4" type="video/mp4">
+                </video>
+                <div class="iphone-home-bar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-row-text">
+            <span class="label demo-row-eyebrow">Life happens</span>
+            <h3 class="demo-row-title"><em>Reschedule</em></h3>
+            <p class="demo-row-desc">Missed a task or something came up? Tell Flux in plain language — it finds the next available slot around your existing day and reschedules without conflicts.</p>
+            <ul class="demo-row-bullets">
+              <li>Natural language rescheduling</li>
+              <li>Conflict-aware slot finding</li>
+              <li>Miss logged — plan adapts over time</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 6. Reflect & Profile — text left, video right -->
+        <div class="demo-row demo-row--reverse reveal">
+          <div class="demo-row-video">
+            <div class="iphone-frame">
+              <div class="iphone-screen">
+                <div class="iphone-dynamic-island"></div>
+                <video controls preload="none" playsinline>
+                  <source src="./videos/202603190000-Flux-Reflect-And-Profile.mp4" type="video/mp4">
+                </video>
+                <div class="iphone-home-bar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-row-text">
+            <span class="label demo-row-eyebrow">Close the loop</span>
+            <h3 class="demo-row-title">Reflect &amp; <em>Profile</em></h3>
+            <p class="demo-row-desc">A weekly analytics view with your energy aura heatmap, task completion streaks, and focus time by goal category — plus notification preferences and profile settings.</p>
+            <ul class="demo-row-bullets">
+              <li>Energy aura heatmap by day &amp; time</li>
+              <li>Weekly stats &amp; streak tracking</li>
+              <li>Per-task notification preferences</li>
+            </ul>
+          </div>
+        </div>
+
+        <!-- 7. Reminder Task — video left, text right -->
+        <div class="demo-row reveal">
+          <div class="demo-row-video">
+            <div class="iphone-frame">
+              <div class="iphone-screen">
+                <div class="iphone-dynamic-island"></div>
+                <video controls preload="none" playsinline>
+                  <source src="./videos/202603190000-Flux-Reminder-Task.mp4" type="video/mp4">
+                </video>
+                <div class="iphone-home-bar"></div>
+              </div>
+            </div>
+          </div>
+          <div class="demo-row-text">
+            <span class="label demo-row-eyebrow">Quick capture</span>
+            <h3 class="demo-row-title">Reminder <em>Tasks</em></h3>
+            <p class="demo-row-desc">Not every task needs a 6-week plan. Say "Remind me to call the dentist at 3pm" — Flux creates a one-off reminder, schedules it, and sends a silent push when it's time.</p>
+            <ul class="demo-row-bullets">
+              <li>Natural language time parsing</li>
+              <li>Silent push — no escalation chain</li>
+              <li>Lives alongside your goal-based tasks</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ NOTIFICATIONS ═══ -->
   <section id="notifications">
     <div class="container">
@@ -1246,17 +1522,17 @@
           <div class="tier-grid">
             <div class="tier-card">
               <div class="tier-name">Silent</div>
-              <div class="tier-icons">📲</div>
+              <div class="tier-icons"><i data-lucide="bell"></i></div>
               <div class="tier-desc">Push notification only</div>
             </div>
             <div class="tier-card">
               <div class="tier-name">Standard</div>
-              <div class="tier-icons">📲<br>💬</div>
+              <div class="tier-icons"><i data-lucide="bell"></i><i data-lucide="message-circle"></i></div>
               <div class="tier-desc">Push + WhatsApp</div>
             </div>
             <div class="tier-card aggressive">
               <div class="tier-name terra">Aggressive</div>
-              <div class="tier-icons">📲<br>💬<br>📞</div>
+              <div class="tier-icons"><i data-lucide="bell"></i><i data-lucide="message-circle"></i><i data-lucide="phone"></i></div>
               <div class="tier-desc">Push + WA + voice call</div>
             </div>
           </div>
@@ -1266,7 +1542,7 @@
           <div class="ladder-title">Escalation sequence</div>
 
           <div class="ladder-step">
-            <div class="ladder-icon">📲</div>
+            <div class="ladder-icon"><i data-lucide="bell"></i></div>
             <div class="ladder-content">
               <div class="ladder-title-step">Push Notification</div>
               <div class="ladder-desc">Sent 10 minutes before the task is due. Tap to mark done, reschedule, or dismiss.</div>
@@ -1275,7 +1551,7 @@
           </div>
 
           <div class="ladder-step">
-            <div class="ladder-icon">💬</div>
+            <div class="ladder-icon"><i data-lucide="message-circle"></i></div>
             <div class="ladder-content">
               <div class="ladder-title-step">WhatsApp Message</div>
               <div class="ladder-desc">Triggers if there's no response within 2 minutes of the push. Includes task context and quick-reply options.</div>
@@ -1284,7 +1560,7 @@
           </div>
 
           <div class="ladder-step">
-            <div class="ladder-icon">📞</div>
+            <div class="ladder-icon"><i data-lucide="phone"></i></div>
             <div class="ladder-content">
               <div class="ladder-title-step">Voice Call</div>
               <div class="ladder-desc">A Twilio call with DTMF options — press 1 (done), 2 (reschedule), 3 (missed). Works on any phone. No app required.</div>
@@ -1293,7 +1569,7 @@
           </div>
 
           <div class="ladder-step">
-            <div class="ladder-icon" style="font-size:16px;">✓</div>
+            <div class="ladder-icon"><i data-lucide="check"></i></div>
             <div class="ladder-content" style="padding-bottom:0;">
               <div class="ladder-title-step">Auto-mark Missed</div>
               <div class="ladder-desc">After the grace window, the task is automatically marked missed. Recurring tasks auto-advance. The miss is logged and improves your next plan.</div>
@@ -1424,63 +1700,63 @@
 
       <div class="tech-grid">
         <div class="tech-item glass-bubble reveal d1">
-          <div class="tech-emoji">⚡</div>
+          <div class="tech-emoji"><i data-lucide="zap"></i></div>
           <div>
             <div class="tech-name">TanStack Start + React 19</div>
             <div class="tech-desc">SSR-first, mobile-first. Loaders fetch data before the page paints — zero client waterfall.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d2">
-          <div class="tech-emoji">🐍</div>
+          <div class="tech-emoji"><i data-lucide="code-2"></i></div>
           <div>
             <div class="tech-name">FastAPI + Python 3.12</div>
             <div class="tech-desc">Async REST with SSE streaming. Rate limiting, structured logging, and Sentry built in.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d3">
-          <div class="tech-emoji">🧠</div>
+          <div class="tech-emoji"><i data-lucide="brain"></i></div>
           <div>
             <div class="tech-name">LangGraph + LiteLLM</div>
             <div class="tech-desc">13-node stateful agent graph. Routes to GPT-4o, Claude Sonnet 4, and GPT-4o-mini with automatic fallback.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d1">
-          <div class="tech-emoji">🐘</div>
+          <div class="tech-emoji"><i data-lucide="database"></i></div>
           <div>
             <div class="tech-name">PostgreSQL + asyncpg</div>
             <div class="tech-desc">Raw async SQL with parameterized queries. LangGraph state persisted via AsyncPostgresSaver.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d2">
-          <div class="tech-emoji">🔐</div>
+          <div class="tech-emoji"><i data-lucide="lock"></i></div>
           <div>
             <div class="tech-name">Supabase Auth + httpOnly cookies</div>
             <div class="tech-desc">JWT in httpOnly cookie — XSS-immune. Keys are server-only, never in the browser bundle.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d3">
-          <div class="tech-emoji">📡</div>
+          <div class="tech-emoji"><i data-lucide="radio"></i></div>
           <div>
             <div class="tech-name">Twilio + Web Push (VAPID)</div>
             <div class="tech-desc">Three-tier escalation. VAPID push, WhatsApp messages, and voice calls via Twilio.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d1">
-          <div class="tech-emoji">🎨</div>
+          <div class="tech-emoji"><i data-lucide="palette"></i></div>
           <div>
             <div class="tech-name">Tailwind CSS v4 + Framer Motion</div>
             <div class="tech-desc">Glassmorphic design system with custom @theme tokens. Spring-physics animations. Fraunces + Satoshi fonts.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d2">
-          <div class="tech-emoji">🔍</div>
+          <div class="tech-emoji"><i data-lucide="eye"></i></div>
           <div>
             <div class="tech-name">Sentry + LangSmith + Structlog</div>
             <div class="tech-desc">Error tracking, LLM tracing, and structured JSON logs per request. Full observability stack.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d3">
-          <div class="tech-emoji">🐳</div>
+          <div class="tech-emoji"><i data-lucide="box"></i></div>
           <div>
             <div class="tech-name">Docker Compose</div>
             <div class="tech-desc">API + Notifier + Redis + Postgres + ngrok in one file. One-command local setup.</div>
@@ -1494,45 +1770,57 @@
   <section id="roadmap">
     <div class="container">
       <div class="section-header reveal">
-        <span class="label">What's next</span>
-        <h2 class="section-title"><em>Coming soon</em></h2>
-        <p class="body-lg">The infrastructure is already built. These are the features shipping next.</p>
+        <span class="label">MVP &amp; beyond</span>
+        <h2 class="section-title">Shipped — and <em>what's next</em></h2>
+        <p class="body-lg">The core product is live. Phase 2 expands to native mobile and deeper integrations.</p>
       </div>
 
       <div class="roadmap-grid">
         <div class="rm-item glass-card reveal d1">
-          <span class="rm-badge infra">Infrastructure ready</span>
-          <div class="rm-icon">🎙</div>
-          <div class="rm-title">Voice Input &amp; Output</div>
-          <div class="rm-desc">Push-to-talk via Deepgram STT. AI responds with spoken audio via TTS. Talk to Flux hands-free.</div>
+          <span class="rm-badge shipped">Shipped in MVP</span>
+          <div class="rm-icon"><i data-lucide="mic"></i></div>
+          <div class="rm-title">Voice Input &amp; TTS Response</div>
+          <div class="rm-desc">Push-to-talk via Deepgram nova-3 STT. AI responds with spoken audio via Deepgram aura TTS. Fully live.</div>
         </div>
         <div class="rm-item glass-card reveal d2">
-          <span class="rm-badge soon">Coming soon</span>
-          <div class="rm-icon">📍</div>
-          <div class="rm-title">Location Triggers</div>
-          <div class="rm-desc">Tasks triggered by geofence — "Review flashcards when I arrive at the gym."</div>
+          <span class="rm-badge shipped">Shipped in MVP</span>
+          <div class="rm-icon"><i data-lucide="link"></i></div>
+          <div class="rm-title">Goal Pipeline &amp; Micro-Goals</div>
+          <div class="rm-desc">Sequential milestone chains — complete Goal A to unlock Goal B. Built for multi-year ambitions. Fully live.</div>
         </div>
         <div class="rm-item glass-card reveal d1">
-          <span class="rm-badge soon">Coming soon</span>
-          <div class="rm-icon">🔗</div>
-          <div class="rm-title">Goal Pipeline</div>
-          <div class="rm-desc">Sequential milestone goals — complete Goal A to unlock Goal B. Built for multi-year ambitions.</div>
+          <span class="rm-badge soon">Phase 2</span>
+          <div class="rm-icon"><i data-lucide="smartphone"></i></div>
+          <div class="rm-title">React Native App</div>
+          <div class="rm-desc">Native iOS &amp; Android app reusing the same FastAPI backend — PWA becomes a full native experience.</div>
         </div>
         <div class="rm-item glass-card reveal d2">
-          <span class="rm-badge soon">Coming soon</span>
-          <div class="rm-icon">📅</div>
-          <div class="rm-title">Calendar Sync</div>
-          <div class="rm-desc">Two-way sync with Google Calendar and Apple Calendar. True availability awareness before scheduling.</div>
+          <span class="rm-badge soon">Phase 2</span>
+          <div class="rm-icon"><i data-lucide="calendar"></i></div>
+          <div class="rm-title">Google Calendar Sync</div>
+          <div class="rm-desc">Two-way sync — Flux reads your real calendar before scheduling. No more conflicts with existing events.</div>
+        </div>
+        <div class="rm-item glass-card reveal d1">
+          <span class="rm-badge soon">Phase 2</span>
+          <div class="rm-icon"><i data-lucide="map-pin"></i></div>
+          <div class="rm-title">GPS Geofencing</div>
+          <div class="rm-desc">Tasks triggered by location — "Review flashcards when I arrive at the gym." Replaces the current demo toggle.</div>
+        </div>
+        <div class="rm-item glass-card reveal d2">
+          <span class="rm-badge soon">Phase 2</span>
+          <div class="rm-icon"><i data-lucide="users"></i></div>
+          <div class="rm-title">Collaborative Goals</div>
+          <div class="rm-desc">Shared goals with accountability partners. Two people, one plan — mutual progress tracking.</div>
         </div>
       </div>
     </div>
   </section>
 
-  <!-- ═══ CTA ═══ -->
+  <!-- ═══ CLOSING ═══ -->
   <section id="cta">
     <div class="container">
       <div class="cta-card glass-card reveal">
-        <span class="label">Join the beta</span>
+        <span class="label">Built at Flux</span>
         <h2 class="cta-title">
           Stop planning.<br>
           Start <em>achieving</em>.
@@ -1540,12 +1828,6 @@
         <p class="cta-sub">
           Not a to-do list. Not another reminder app. A coaching system that plans with you, adapts to you, and holds you accountable — every single day.
         </p>
-        <div class="cta-actions">
-          <a href="#" class="btn-primary" style="padding:18px 48px;font-size:16px;">
-            Get early access &rarr;
-          </a>
-        </div>
-        <p class="cta-micro">No credit card required &nbsp;&middot;&nbsp; Mobile-first &nbsp;&middot;&nbsp; Free to start</p>
       </div>
     </div>
   </section>
@@ -1558,6 +1840,7 @@
         <span class="footer-copy">Built with LangGraph &middot; FastAPI &middot; TanStack Start</span>
         <ul class="footer-links">
           <li><a href="#how">Features</a></li>
+          <li><a href="#demos">Experience</a></li>
           <li><a href="#ai">AI Engine</a></li>
           <li><a href="#tech">Stack</a></li>
         </ul>
@@ -1568,6 +1851,9 @@
 </div>
 
 <script>
+  // Lucide icons
+  lucide.createIcons();
+
   // Scroll reveal
   const observer = new IntersectionObserver(entries => {
     entries.forEach(e => {
@@ -1594,6 +1880,20 @@
     });
   }, { threshold: 0.4 });
   sections.forEach(s => secObs.observe(s));
+
+  // Auto-play demo videos on viewport entry, pause on exit
+  const demoVideos = document.querySelectorAll('.iphone-screen video[controls]');
+  const videoObs = new IntersectionObserver(entries => {
+    entries.forEach(e => {
+      if (e.isIntersecting) {
+        e.target.muted = true;
+        e.target.play().catch(() => {});
+      } else {
+        e.target.pause();
+      }
+    });
+  }, { threshold: 0.4 });
+  demoVideos.forEach(v => videoObs.observe(v));
 
   // Mouse users: suppress outline
   document.addEventListener('mousedown', () => document.documentElement.classList.add('using-mouse'));
