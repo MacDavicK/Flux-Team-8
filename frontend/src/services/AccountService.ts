@@ -22,7 +22,7 @@ class AccountService {
       throw new Error("Failed to update account");
     }
 
-    return response.json();
+    return this.getMe();
   }
 
   async getOverview(): Promise<{ [key: string]: unknown }> {

@@ -6,11 +6,10 @@ import {
   useEffect,
   useState,
 } from "react";
-import { setInMemoryToken } from "~/lib/apiClient";
-import { serverGetAccessToken } from "~/lib/authServerFns";
+import { apiFetch, setInMemoryToken } from "~/lib/apiClient";
+import { serverGetMe } from "~/lib/authServerFns";
 import { authService } from "~/services/AuthService";
 import type { User } from "~/types";
-import { api } from "~/utils/api";
 
 interface AuthContextType {
   isAuthenticated: boolean;
@@ -26,6 +25,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   refreshAuthStatus: () => Promise<User | undefined>;
   loginWithGoogle: () => Promise<void>;
+  patchUser: (patch: Partial<User>) => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -39,66 +39,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [hasTasks, setHasTasks] = useState(false);
 
   /**
-   * Reads the session from the httpOnly cookie (via server function), hydrates
-   * the in-memory token, then fetches the onboarded flag from the backend.
+   * Reads the session from the httpOnly cookie and fetches the authoritative
+   * profile from the FastAPI backend — all in a single server-side round-trip
+   * via serverGetMe. Hydrates the in-memory token on the client.
    */
   const refreshAuthStatus = useCallback(async (): Promise<User | undefined> => {
     setIsLoading(true);
     try {
-      const { token, user: serverUser } = await serverGetAccessToken();
-      setInMemoryToken(token);
-      api.setToken(token);
+      const { token, user: serverUser, sessionInvalid } = await serverGetMe();
 
-      if (!token || !serverUser) {
+      if (sessionInvalid || !token || !serverUser) {
+        setInMemoryToken(null);
         setIsAuthenticated(false);
         setUser(undefined);
         setHasTasks(false);
         return undefined;
       }
 
-      // Fetch authoritative onboarded flag from the backend.
-      // A 401 here means the session is invalid/expired — treat as logged out.
-      // Token is now available in memory so apiFetch would work, but using raw
-      // fetch here avoids a circular import with apiClient.
-      let onboarded = false;
-      let profileName: string | null = null;
-      try {
-        const res = await fetch("/api/v1/account/me", {
-          headers: { Authorization: `Bearer ${token}` },
+      setInMemoryToken(token);
+      setIsAuthenticated(true);
+      setUser(serverUser);
+      setHasTasks(serverUser.hasTasks ?? false);
+
+      // Silently re-register push subscription for users who already granted permission.
+      // Dynamic import keeps this out of the SSR path.
+      if (typeof window !== "undefined") {
+        import("~/lib/pushNotifications").then(({ registerAndSubscribe }) => {
+          registerAndSubscribe().catch((err) => {
+            console.warn("[push] Failed to register subscription:", err);
+          });
         });
-        if (res.status === 401 || res.status === 403) {
-          // Session rejected by the backend — clear everything.
-          setInMemoryToken(null);
-          api.setToken(null);
-          setIsAuthenticated(false);
-          setUser(undefined);
-          setHasTasks(false);
-          return undefined;
-        }
-        if (res.ok) {
-          const meData = (await res.json()) as {
-            onboarded: boolean;
-            name?: string | null;
-          };
-          onboarded = meData.onboarded ?? false;
-          profileName = meData.name ?? null;
-        }
-      } catch {
-        // Backend unavailable — keep onboarded: false as safe default.
-        // Do not log out; the backend may just be temporarily down.
       }
 
-      const resolvedUser: User = {
-        ...serverUser,
-        onboarded,
-        ...(profileName ? { name: profileName } : {}),
-      };
-      setIsAuthenticated(true);
-      setUser(resolvedUser);
-      return resolvedUser;
+      return serverUser;
     } catch {
       setInMemoryToken(null);
-      api.setToken(null);
       setIsAuthenticated(false);
       setUser(undefined);
       setHasTasks(false);
@@ -112,6 +87,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   useEffect(() => {
     refreshAuthStatus();
   }, [refreshAuthStatus]);
+
+  // Silently sync browser timezone to backend if it differs from stored value.
+  useEffect(() => {
+    if (!user) return;
+    const browserTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (browserTz && browserTz !== user.timezone) {
+      apiFetch("/api/v1/account/me", {
+        method: "PATCH",
+        body: JSON.stringify({ timezone: browserTz }),
+      })
+        .then(() => {
+          setUser((prev) => (prev ? { ...prev, timezone: browserTz } : prev));
+        })
+        .catch(() => {
+          /* silent — non-critical */
+        });
+    }
+  }, [user?.id, user]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Periodically refresh to keep the in-memory token fresh before it expires.
   // Supabase JWTs expire after 1 hour; refresh every 45 minutes.
@@ -143,9 +136,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 
   const logout = useCallback(async () => {
+    // Unsubscribe from push notifications before signing out so the backend
+    // stops sending notifications to this device.
+    try {
+      const { unsubscribe } = await import("~/lib/pushNotifications");
+      await unsubscribe();
+    } catch {
+      // Non-fatal — proceed with logout even if unsubscribe fails.
+    }
     await authService.logout();
     setInMemoryToken(null);
-    api.setToken(null);
     setIsAuthenticated(false);
     setUser(undefined);
     setHasTasks(false);
@@ -155,6 +155,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     await authService.loginWithGoogle();
     // Browser navigates away — no state update needed here.
     // State is restored when /auth/callback completes and refreshAuthStatus() runs.
+  }, []);
+
+  const patchUser = useCallback((patch: Partial<User>) => {
+    setUser((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
 
   return (
@@ -169,6 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         logout,
         refreshAuthStatus,
         loginWithGoogle,
+        patchUser,
       }}
     >
       {children}

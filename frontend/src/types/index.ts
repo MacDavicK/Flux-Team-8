@@ -35,16 +35,6 @@ export {
   ColorTheme,
   SortDirection,
 } from "./common";
-// Demo domain
-export type {
-  DemoModeType,
-  DemoPanelState,
-  DemoToggleState,
-  RescheduleOption,
-  SimulationEvent,
-  TimeWarpSettings,
-  TravelModeSettings,
-} from "./demo";
 // Event domain
 export type {
   Event,
@@ -77,8 +67,11 @@ export type {
   ChatMessageRequest,
   ChatMessageResponse,
   ChatSession,
+  GoalClarifierAnswer,
+  GoalClarifierQuestion,
   MessageContent,
   NotificationMessage,
+  OnboardingOption,
   PlanMessage,
   TaskSuggestionMessage,
   TextMessage,
@@ -105,7 +98,6 @@ export type {
   RescheduleRequest,
   Task,
   TaskFilter,
-  TaskRailItem,
   TaskSuggestion,
 } from "./task";
 export {

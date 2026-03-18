@@ -98,16 +98,3 @@ export interface TaskFilter {
 export interface RescheduleRequest {
   message: string;
 }
-
-/**
- * Simplified task item for UI display in TaskRail
- * Uses boolean completed instead of TaskStatus for UI convenience
- */
-export interface TaskRailItem {
-  /** Unique identifier */
-  id: string;
-  /** Task title */
-  title: string;
-  /** Whether the task is completed */
-  completed: boolean;
-}

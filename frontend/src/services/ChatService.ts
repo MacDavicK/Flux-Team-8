@@ -1,10 +1,10 @@
 import { apiFetch } from "~/lib/apiClient";
-import type { ChatMessageResponse } from "~/types";
-
-const API_BASE =
-  (import.meta as ImportMeta & { env?: { VITE_API_URL?: string } }).env
-    ?.VITE_API_URL || "http://localhost:8002";
-const DEMO_USER_ID = "a1000000-0000-0000-0000-000000000001";
+import { getNodeLabel } from "~/lib/nodeLabels";
+import type {
+  ChatMessageResponse,
+  GoalClarifierAnswer,
+  OnboardingOption,
+} from "~/types";
 
 export interface HistoryMessage {
   id: string;
@@ -12,13 +12,24 @@ export interface HistoryMessage {
   content: string;
   agent_node: string | null;
   created_at: string;
+  metadata?: {
+    proposed_plan?: Record<string, unknown>;
+    options?: OnboardingOption[];
+  } | null;
 }
 
 export interface ConversationSummary {
   id: string;
   last_message_at: string | null;
   created_at: string;
+  title: string | null;
   preview: string | null;
+}
+
+export interface ConversationListPage {
+  conversations: ConversationSummary[];
+  has_more: boolean;
+  next_cursor: string | null;
 }
 
 class ChatService {
@@ -37,30 +48,56 @@ class ChatService {
     return response.json();
   }
 
-  async getConversations(limit = 20): Promise<ConversationSummary[]> {
-    const response = await apiFetch(
-      `/api/v1/chat/conversations?limit=${limit}`,
-    );
+  async getConversations(cursor?: string): Promise<ConversationListPage> {
+    const params = new URLSearchParams();
+    if (cursor) params.set("cursor", cursor);
+    const response = await apiFetch(`/api/v1/chat/conversations?${params}`);
     if (!response.ok) {
       throw new Error("Failed to fetch conversations");
     }
-    const data = (await response.json()) as {
-      conversations: ConversationSummary[];
-    };
-    return data.conversations;
+    return response.json() as Promise<ConversationListPage>;
+  }
+
+  async startOnboarding(): Promise<ChatMessageResponse> {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const response = await apiFetch("/api/v1/chat/onboarding/start", {
+      method: "POST",
+      body: JSON.stringify({ timezone }),
+    });
+    if (!response.ok && response.status !== 409) {
+      throw new Error("Failed to start onboarding");
+    }
+    return response.json();
+  }
+
+  async resendOtp(phoneNumber: string): Promise<void> {
+    const response = await apiFetch("/api/v1/account/phone/verify/send", {
+      method: "POST",
+      body: JSON.stringify({ phone_number: phoneNumber }),
+    });
+    if (!response.ok) {
+      throw new Error("Failed to resend verification code");
+    }
   }
 
   async sendMessage(
     message: string,
     conversationId?: string,
+    options?: {
+      intent?: string;
+      task_id?: string;
+      answers?: GoalClarifierAnswer[];
+    },
+    onProgress?: (label: string) => void,
   ): Promise<ChatMessageResponse> {
-    const response = await fetch(`${API_BASE}/orchestrator/message`, {
+    const response = await apiFetch("/api/v1/chat/message", {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         message,
         conversation_id: conversationId ?? null,
-        user_id: DEMO_USER_ID,
+        ...(options?.intent ? { intent: options.intent } : {}),
+        ...(options?.task_id ? { task_id: options.task_id } : {}),
+        ...(options?.answers ? { answers: options.answers } : {}),
       }),
     });
 
@@ -68,22 +105,48 @@ class ChatService {
       throw new Error("Failed to send chat message");
     }
 
-    const data = (await response.json()) as {
-      conversation_id?: string | null;
-      message: string;
-      route?: string;
-      proposed_plan?: { [key: string]: unknown }[] | null;
-      requires_user_action?: boolean;
-      suggested_action?: string | null;
-    };
+    // Parse SSE stream
+    const reader = response.body!.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
 
-    return {
-      conversation_id: data.conversation_id ?? conversationId ?? "",
-      message: data.message,
-      agent_node: data.route ?? null,
-      proposed_plan: data.proposed_plan ?? null,
-      requires_user_action: Boolean(data.requires_user_action),
-    };
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split("\n");
+      // Keep incomplete last line in buffer
+      buffer = lines.pop() ?? "";
+
+      for (const line of lines) {
+        if (!line.startsWith("data: ")) continue;
+        const raw = line.slice(6).trim();
+        if (!raw) continue;
+
+        let event: {
+          type: string;
+          node?: string;
+          data?: unknown;
+          message?: string;
+        };
+        try {
+          event = JSON.parse(raw);
+        } catch {
+          continue;
+        }
+
+        if (event.type === "progress" && event.node && onProgress) {
+          onProgress(getNodeLabel(event.node));
+        } else if (event.type === "complete") {
+          return event.data as ChatMessageResponse;
+        } else if (event.type === "error") {
+          throw new Error(event.message ?? "Stream error");
+        }
+      }
+    }
+
+    throw new Error("Stream ended without a complete event");
   }
 }
 

@@ -4,41 +4,64 @@
  * Text input bar for the chat page.
  * Shows a send button when text is present, or a mic button when empty
  * (to start a voice session).
+ *
+ * Voice state is owned by the parent (ChatPage) via useVoice and passed in
+ * as the `voice` prop, so the same instance can also drive TTS playback.
  */
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Send, Sparkles } from "lucide-react";
+import { Loader2, Send, Sparkles } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { VoiceFAB } from "~/conv_agent/components/VoiceFAB";
-import type { VoiceStatus } from "~/conv_agent/types";
+import { MicButton } from "~/components/chat/MicButton";
+import { VoiceWaveform } from "~/components/chat/VoiceWaveform";
+import type { UseVoiceReturn } from "~/hooks/useVoice";
 import { cn } from "~/utils/cn";
 
 interface ChatInputProps {
   onSend: (message: string) => void;
+  onVoiceSend?: () => void;
   placeholder?: string;
   disabled?: boolean;
-  /** Current voice session status — controls VoiceFAB appearance. */
-  voiceStatus?: VoiceStatus;
-  /** Called when the mic button is tapped. */
-  onVoiceToggle?: () => void;
+  voice: UseVoiceReturn;
 }
 
 export function ChatInput({
   onSend,
+  onVoiceSend,
   placeholder = "What is on your mind?",
   disabled = false,
-  voiceStatus = "idle",
-  onVoiceToggle,
+  voice,
 }: ChatInputProps) {
   const [message, setMessage] = useState("");
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const {
+    startRecording,
+    stopRecording,
+    transcript,
+    isConnecting,
+    isRecording,
+    isProcessing,
+    error,
+    reset,
+    stream,
+  } = voice;
 
   useEffect(() => {
     if (!disabled) {
       inputRef.current?.focus();
     }
   }, [disabled]);
+
+  // Consume transcript → send as message
+  useEffect(() => {
+    if (transcript) {
+      onVoiceSend?.();
+      onSend(transcript);
+      reset();
+    }
+  }, [transcript, onSend, onVoiceSend, reset]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -54,7 +77,7 @@ export function ChatInput({
   return (
     <motion.form
       onSubmit={handleSubmit}
-      className="px-5 pb-24 pt-4"
+      className="px-5 pb-32 pt-4"
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: 0.3 }}
@@ -62,29 +85,72 @@ export function ChatInput({
       <div
         className={cn(
           "glass-bubble flex items-center gap-3 px-4 py-3 min-h-[52px]",
-          "transition-shadow duration-200",
+          "transition-shadow duration-200 !rounded-full",
           isFocused && "shadow-lg ring-2 ring-sage/20",
         )}
       >
         <Sparkles className="w-5 h-5 text-sage/50 flex-shrink-0" />
 
-        <input
-          ref={inputRef}
-          type="text"
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-          placeholder={placeholder}
-          disabled={disabled}
-          className={cn(
-            "flex-1 bg-transparent border-none outline-none",
-            "text-charcoal placeholder:text-river/60",
-            "text-body text-[15px]",
-            disabled && "opacity-50",
+        <AnimatePresence mode="wait" initial={false}>
+          {isConnecting ? (
+            <motion.div
+              key="connecting"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex-1 flex items-center gap-2 min-w-0"
+            >
+              <Loader2 className="w-4 h-4 text-sage animate-spin flex-shrink-0" />
+              <span
+                className="text-river/60 text-[15px] italic truncate"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Connecting...
+              </span>
+            </motion.div>
+          ) : isRecording ? (
+            <motion.div
+              key="waveform"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className="flex-1 flex items-center gap-3 min-w-0"
+            >
+              <VoiceWaveform stream={stream} />
+              <span
+                className="text-red-400 text-[15px] italic truncate"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Listening...
+              </span>
+            </motion.div>
+          ) : (
+            <motion.input
+              key="text-input"
+              ref={inputRef}
+              type="text"
+              value={message}
+              onChange={(e) => setMessage(e.target.value)}
+              onFocus={() => setIsFocused(true)}
+              onBlur={() => setIsFocused(false)}
+              placeholder={placeholder}
+              disabled={disabled}
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.15 }}
+              className={cn(
+                "flex-1 bg-transparent border-none outline-none",
+                "text-charcoal placeholder:text-river/60",
+                "text-body text-[15px]",
+                disabled && "opacity-50",
+              )}
+              style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}
+            />
           )}
-          style={{ fontFamily: "var(--font-display)", fontStyle: "italic" }}
-        />
+        </AnimatePresence>
 
         <AnimatePresence mode="wait">
           {hasContent ? (
@@ -104,22 +170,31 @@ export function ChatInput({
             >
               <Send className="w-4 h-4" />
             </motion.button>
-          ) : onVoiceToggle ? (
-            <motion.div
+          ) : (
+            <MicButton
               key="mic"
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.5 }}
-            >
-              <VoiceFAB
-                status={voiceStatus}
-                onClick={onVoiceToggle}
-                disabled={disabled}
-              />
-            </motion.div>
-          ) : null}
+              onClick={isRecording ? stopRecording : startRecording}
+              isRecording={isRecording}
+              isProcessing={isConnecting || isProcessing}
+              disabled={disabled}
+            />
+          )}
         </AnimatePresence>
       </div>
+
+      {error && (
+        <motion.p
+          initial={{ opacity: 0, y: -4 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+          className="mt-2 px-1 text-xs text-red-400"
+          onAnimationComplete={() => {
+            setTimeout(() => reset(), 3000);
+          }}
+        >
+          {error}
+        </motion.p>
+      )}
     </motion.form>
   );
 }

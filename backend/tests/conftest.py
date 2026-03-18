@@ -1,62 +1,33 @@
 """
-Shared fixtures for legacy app/ tests.
-
-Uses real OpenRouter LLM calls (key loaded from backend/.env).
-Mocks Supabase only since DB may not be running.
+Pytest configuration. Runs before any tests.
 """
+from __future__ import annotations
 
+import os
 from pathlib import Path
-from unittest.mock import MagicMock, patch
 
-import pytest
-from dotenv import load_dotenv
-from fastapi.testclient import TestClient
-
-load_dotenv(Path(__file__).resolve().parents[1] / ".env")
-
-
-@pytest.fixture()
-def sample_user_data():
-    """Simple sample user payload for smoke/infrastructure tests."""
-    return {
-        "email": "testuser@flux.dev",
-        "name": "Test User",
-    }
-
-
-@pytest.fixture()
-def mock_supabase():
-    """
-    Patch get_supabase_client in goal_service so no real DB calls happen.
-    Returns the mock client so tests can configure return values.
-    """
-    with patch("app.services.goal_service.get_supabase_client") as mock_get_sb:
-        mock_sb = MagicMock()
-        mock_get_sb.return_value = mock_sb
-
-        mock_result = MagicMock()
-        mock_result.data = [{"id": "00000000-0000-0000-0000-000000000001"}]
-
-        mock_table = MagicMock()
-        mock_table.insert.return_value.execute.return_value = mock_result
-        mock_table.update.return_value.eq.return_value.execute.return_value = mock_result
-        mock_table.select.return_value.eq.return_value.single.return_value.execute.return_value = MagicMock(data=None)
-
-        mock_sb.table.return_value = mock_table
-        yield mock_sb
-
-
-@pytest.fixture()
-def agent():
-    """Fresh GoalPlannerAgent instance using real OpenRouter from .env."""
-    from app.agents.goal_planner import GoalPlannerAgent
-    return GoalPlannerAgent(conversation_id="test-conv-1", user_id="test-user-1")
-
-
-@pytest.fixture()
-def app_client(mock_supabase):
-    """Sync FastAPI TestClient for legacy app/ tests (DB mocked, real OpenRouter)."""
-    from app.main import app as legacy_app
-    from app.routers.goals import _active_agents
-    _active_agents.clear()
-    return TestClient(legacy_app)
+# Fix host.docker.internal resolution when running tests from host (not in Docker).
+# pydantic-settings reads .env but doesn't populate os.environ, so we load .env
+# and set overrides before app.config is loaded.
+def pytest_configure(config):
+    env_path = Path(config.rootpath) / ".env"
+    if not env_path.exists():
+        return
+    env_vars = {}
+    with open(env_path) as f:
+        for line in f:
+            line = line.strip()
+            if line and not line.startswith("#") and "=" in line:
+                key, _, val = line.partition("=")
+                key, val = key.strip(), val.strip().strip('"').strip("'")
+                env_vars[key] = val
+    # Prefer MIGRATION_DATABASE_URL for DB when running from host
+    if "MIGRATION_DATABASE_URL" in env_vars:
+        os.environ["DATABASE_URL"] = env_vars["MIGRATION_DATABASE_URL"]
+    # Replace host.docker.internal with 127.0.0.1 (Supabase, and DATABASE_URL if not overridden)
+    for key in ("SUPABASE_URL", "DATABASE_URL"):
+        if key == "DATABASE_URL" and "DATABASE_URL" in os.environ:
+            continue  # Already set from MIGRATION_DATABASE_URL
+        val = env_vars.get(key, "")
+        if val and "host.docker.internal" in val:
+            os.environ[key] = val.replace("host.docker.internal", "127.0.0.1")

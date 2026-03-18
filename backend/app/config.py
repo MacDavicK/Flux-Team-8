@@ -1,78 +1,74 @@
-"""
-Flux Backend — Application Configuration
-
-Reads environment variables from .env and exposes them as typed settings.
-"""
-
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    # Database
-    database_url: str = "postgresql://user:password@localhost:5432/flux"
-    supabase_url: str = "http://127.0.0.1:54321"
-    supabase_key: str = ""
+    model_config = SettingsConfigDict(
+        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+    )
 
-    # AI / LLM — OpenRouter (chat + embeddings; single API key)
-    # AI / LLM (all via OpenRouter)
-    goal_planner_model: str = "openai/gpt-4o-mini"
+    # App
+    app_env: str = "development"
+    secret_key: str
+    log_level: str = "INFO"
 
-    # RAG — OpenRouter (embedding proxy)
-    open_router_api_key: str = ""
+    # Supabase
+    supabase_url: str
+    supabase_anon_key: str
+    supabase_service_role_key: str
+    database_url: str  # asyncpg direct connection
+
+    # LLMs — all via OpenRouter
+    openrouter_api_key: str
     openrouter_base_url: str = "https://openrouter.ai/api/v1"
-    openai_model: str = "openai/gpt-4o-mini"  # OpenRouter model id
-    embedding_model: str = "openai/text-embedding-3-small"
+    openrouter_app_name: str = "Flux"
+    openrouter_app_url: str = ""
 
-    # RAG — Pinecone (vector store)
-    pinecone_api_key: str = ""
-    pinecone_index_name: str = "flux-articles"
+    # LangSmith
+    langchain_tracing_v2: bool = True
+    langchain_api_key: str
+    langchain_project: str = "flux-development"
 
-    # RAG — Chunking & retrieval
-    rag_chunk_size: int = 2000
-    rag_chunk_overlap: int = 200
-    rag_top_k: int = 5
-    rag_relevance_threshold: float = 0.2
+    # Sentry
+    sentry_dsn: str
+    sentry_traces_sample_rate: float = 0.2
+    sentry_environment: str = "development"
 
-    # Scheduler Agent
-    scheduler_model: str = "openai/gpt-4o-mini"
-    scheduler_use_llm_rationale: bool = False  # True = LLM rationale, False = template
-    scheduler_cutoff_hour: int = 21  # Don't suggest same-day slots after 9 PM
-    scheduler_buffer_minutes: int = 15  # Buffer between tasks
+    # Twilio
+    twilio_account_sid: str
+    twilio_auth_token: str
+    twilio_whatsapp_from: str
+    twilio_voice_from: str
+    twilio_verify_service_sid: str
+    twilio_webhook_base_url: str
 
-    # Orchestrator
-    use_langgraph_orchestrator: bool = False
-
-    # Deepgram Voice Agent
+    # Deepgram (Voice)
     deepgram_api_key: str = ""
-    deepgram_voice_model: str = "aura-2-thalia-en"
-    deepgram_listen_model: str = "nova-3"
-    deepgram_llm_model: str = "gpt-4o-mini"
-    deepgram_token_ttl: int = 3600
-    voice_prompt_file: str = "backend/app/conv_agent/config/voice_prompt.md"
-    voice_intents_file: str = "backend/app/conv_agent/config/intents.yaml"
-    voice_daily_session_limit: int = 20
 
-    # DAO Service (inter-service communication)
-    dao_service_url: str = "http://localhost:8001"
-    dao_service_key: str = "goal-planner-key-abc"
+    # Web Push
+    vapid_private_key: str
+    vapid_public_key: str
+    vapid_claims_email: str
 
-    # Server
-    host: str = "0.0.0.0"
-    port: int = 8000
-    debug: bool = True
+    # Redis
+    redis_url: str = "redis://localhost:6379/0"
 
-    # CORS — allowed origins for the frontend
-    cors_origins: list[str] = [
-        "http://localhost:3000",
-        "http://localhost:3001",
-        "http://localhost:5173",
-    ]
+    # Notification defaults
+    reminder_lead_minutes: int = 10
+    escalation_window_minutes: int = 2
+    notification_poll_interval_seconds: int = 60
+    auto_miss_grace_minutes: int = 90
 
-    model_config = {
-        "env_file": ".env",
-        "env_file_encoding": "utf-8",
-        "extra": "ignore",
-    }
+    # Cost controls
+    monthly_token_soft_limit: int = 500_000
+    monthly_token_hard_limit: int = 1_000_000
+    max_conversation_messages: int = 20
+    max_conversation_tokens: int = 8_000
+
+    # Business logic
+    max_active_goals: int = 3
+    goal_sprint_weeks: int = 6
+    pattern_miss_threshold: int = 3
+    pattern_min_datapoints: int = 3
 
 
 settings = Settings()

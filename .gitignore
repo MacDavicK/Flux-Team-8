@@ -61,8 +61,6 @@ supabase/.temp
 # ---------- Docker ----------
 docker-compose.override.yml
 
-# ---------- PWA dev artifacts ----------
-dev-dist/
 
 # ---------- Files ----------
 *.pdf
@@ -74,3 +72,7 @@ CURSOR-PROMPT-README.md
 .claude
 docs/BIOME-CI-RISK-REPORT.md
 /.vs
+
+# ---------- Supabase ----------
+supabase/*
+

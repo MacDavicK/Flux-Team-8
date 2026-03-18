@@ -1,48 +1,16 @@
 import { Link, useLocation } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { BarChart2, Home, MessageCircle, User } from "lucide-react";
+import { Home, MessageCircle, Sparkles, UserRound } from "lucide-react";
+import { useState } from "react";
 import { useAuth } from "~/contexts/AuthContext";
 import { cn } from "~/utils/cn";
-
-interface NavItem {
-  to: string;
-  icon: React.ReactNode;
-  label: string;
-  position: "left" | "center" | "right";
-}
-
-const navItems: NavItem[] = [
-  {
-    to: "/",
-    icon: <Home className="w-5 h-5" />,
-    label: "Flow",
-    position: "left",
-  },
-  {
-    to: "/chat",
-    icon: <MessageCircle className="w-6 h-6" />,
-    label: "Chat",
-    position: "center",
-  },
-  {
-    to: "/analytics",
-    icon: <BarChart2 className="w-5 h-5" />,
-    label: "Progress",
-    position: "right",
-  },
-  {
-    to: "/reflection",
-    icon: <User className="w-5 h-5" />,
-    label: "Profile",
-    position: "right",
-  },
-];
 
 const HIDDEN_ROUTES = ["/login"];
 
 export function BottomNav() {
   const location = useLocation();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, hasTasks } = useAuth();
+  const [showTooltip, setShowTooltip] = useState(false);
 
   const isNotOnboarded = isAuthenticated && user && !user.onboarded;
 
@@ -50,59 +18,94 @@ export function BottomNav() {
     return null;
   }
 
+  const flowDisabled = isAuthenticated && user && user.onboarded && !hasTasks;
+
+  // Right nav item: Profile when tasks not yet created, Reflect otherwise
+  const rightItem = flowDisabled
+    ? {
+        to: "/profile",
+        icon: <UserRound className="w-5 h-5" />,
+        label: "Profile",
+      }
+    : {
+        to: "/reflection",
+        icon: <Sparkles className="w-5 h-5" />,
+        label: "Reflect",
+      };
+
+  const sideItems = [
+    {
+      to: "/",
+      icon: <Home className="w-5 h-5" />,
+      label: "Flow",
+      position: "left" as const,
+    },
+    rightItem,
+  ];
+
   return (
     <nav className="fixed bottom-8 left-1/2 transform -translate-x-1/2 w-auto z-50">
       <div className="glass-card px-4 py-3 rounded-full flex items-center gap-4 shadow-ambient">
-        {navItems.map((item) => {
-          const isActive = location.pathname === item.to;
-          const isCenter = item.position === "center";
+        {/* Flow (left) */}
+        {(() => {
+          const item = sideItems[0];
+          const isActive = location.pathname === item.to && !flowDisabled;
+
+          if (flowDisabled) {
+            return (
+              <div className="relative">
+                <button
+                  type="button"
+                  className="relative flex flex-col items-center justify-center w-14 h-10 rounded-2xl opacity-35 cursor-not-allowed touch-manipulation"
+                  onClick={() => {
+                    setShowTooltip(true);
+                    setTimeout(() => setShowTooltip(false), 2000);
+                  }}
+                >
+                  <div className="relative z-10 flex flex-col items-center gap-1">
+                    <span className="text-river transition-colors duration-300">
+                      {item.icon}
+                    </span>
+                    <span className="text-[9px] font-black leading-none uppercase tracking-[0.12em] text-river/60">
+                      {item.label}
+                    </span>
+                  </div>
+                </button>
+                {showTooltip && (
+                  <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 whitespace-nowrap bg-black/80 text-white text-[10px] font-medium px-2 py-1 rounded-md pointer-events-none">
+                    Create a goal first
+                  </div>
+                )}
+              </div>
+            );
+          }
 
           return (
             <Link
-              key={item.to}
               to={item.to}
               className={cn(
-                "relative flex flex-col items-center justify-center transition-all duration-300 outline-none",
-                isCenter
-                  ? "w-14 h-14 fab-gradient text-white rounded-full shadow-glow flex items-center justify-center transform group -my-4 translate-y-[-6px]"
-                  : "w-14 h-10 rounded-2xl",
-                isCenter && isActive && "animate-pulse-glow scale-105",
-                !isCenter && "hover:bg-white/10",
-                "active:scale-95 touch-manipulation",
+                "relative flex flex-col items-center justify-center w-14 h-10 rounded-2xl transition-all duration-300 outline-none hover:bg-white/10 active:scale-95 touch-manipulation",
               )}
             >
-              {/* Side Items Content */}
               <div className="relative z-10 flex flex-col items-center gap-1">
                 <motion.span
-                  animate={{
-                    y: isCenter ? 0 : isActive ? -1 : 0,
-                    scale: isActive ? 1.1 : 1,
-                  }}
+                  animate={{ y: isActive ? -1 : 0, scale: isActive ? 1.1 : 1 }}
                   className={cn(
                     "transition-colors duration-300",
-                    isCenter
-                      ? "text-white"
-                      : isActive
-                        ? "text-sage"
-                        : "text-river hover:text-sage-dark",
+                    isActive ? "text-sage" : "text-river hover:text-sage-dark",
                   )}
                 >
                   {item.icon}
                 </motion.span>
-
-                {!isCenter && (
-                  <span
-                    className={cn(
-                      "text-[9px] font-black leading-none uppercase tracking-[0.12em] transition-colors duration-300",
-                      isActive ? "text-sage" : "text-river/60",
-                    )}
-                  >
-                    {item.label}
-                  </span>
-                )}
-
-                {/* Active Indicator Underline */}
-                {!isCenter && isActive && (
+                <span
+                  className={cn(
+                    "text-[9px] font-black leading-none uppercase tracking-[0.12em] transition-colors duration-300",
+                    isActive ? "text-sage" : "text-river/60",
+                  )}
+                >
+                  {item.label}
+                </span>
+                {isActive && (
                   <motion.div
                     layoutId="activeIndicator"
                     className="w-4 h-[1.5px] bg-sage rounded-full absolute -bottom-1.5"
@@ -110,14 +113,72 @@ export function BottomNav() {
                   />
                 )}
               </div>
-
-              {/* Center Button Glow for Hover/Active */}
-              {isCenter && (
-                <div className="absolute inset-0 rounded-full bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
-              )}
             </Link>
           );
-        })}
+        })()}
+
+        {/* Chat (center FAB) */}
+        {(() => {
+          const isActive = location.pathname === "/chat";
+          return (
+            <Link
+              to="/chat"
+              className={cn(
+                "relative flex flex-col items-center justify-center w-14 h-14 fab-gradient text-white rounded-full shadow-glow transform group -my-4 translate-y-[-6px] transition-all duration-300 outline-none active:scale-95 touch-manipulation",
+                isActive && "animate-pulse-glow scale-105",
+              )}
+            >
+              <motion.span
+                animate={{ scale: isActive ? 1.1 : 1 }}
+                className="text-white"
+              >
+                <MessageCircle className="w-6 h-6" />
+              </motion.span>
+              <div className="absolute inset-0 rounded-full bg-white opacity-0 group-hover:opacity-10 transition-opacity duration-300" />
+            </Link>
+          );
+        })()}
+
+        {/* Right item: Reflect or Profile */}
+        {(() => {
+          const item = sideItems[1];
+          const isActive = location.pathname === item.to;
+          return (
+            <Link
+              to={item.to}
+              className={cn(
+                "relative flex flex-col items-center justify-center w-14 h-10 rounded-2xl transition-all duration-300 outline-none hover:bg-white/10 active:scale-95 touch-manipulation",
+              )}
+            >
+              <div className="relative z-10 flex flex-col items-center gap-1">
+                <motion.span
+                  animate={{ y: isActive ? -1 : 0, scale: isActive ? 1.1 : 1 }}
+                  className={cn(
+                    "transition-colors duration-300",
+                    isActive ? "text-sage" : "text-river hover:text-sage-dark",
+                  )}
+                >
+                  {item.icon}
+                </motion.span>
+                <span
+                  className={cn(
+                    "text-[9px] font-black leading-none uppercase tracking-[0.12em] transition-colors duration-300",
+                    isActive ? "text-sage" : "text-river/60",
+                  )}
+                >
+                  {item.label}
+                </span>
+                {isActive && (
+                  <motion.div
+                    layoutId="activeIndicator"
+                    className="w-4 h-[1.5px] bg-sage rounded-full absolute -bottom-1.5"
+                    transition={{ type: "spring", stiffness: 500, damping: 30 }}
+                  />
+                )}
+              </div>
+            </Link>
+          );
+        })()}
       </div>
     </nav>
   );

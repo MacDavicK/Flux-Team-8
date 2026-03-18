@@ -1,5 +1,4 @@
 import { motion } from "framer-motion";
-import { Shuffle } from "lucide-react";
 import { cn } from "~/utils/cn";
 
 export type EventType = "sage" | "terra" | "stone";
@@ -12,9 +11,9 @@ interface TimelineEventProps {
   type: EventType;
   avatars?: string[];
   isLast?: boolean;
-  isDrifted?: boolean;
-  eventId?: string;
-  onShuffleClick?: (eventId: string, taskTitle: string) => void;
+  status?: string;
+  goalName?: string;
+  onClick?: () => void;
 }
 
 export function TimelineEvent({
@@ -23,10 +22,9 @@ export function TimelineEvent({
   time,
   period,
   type,
-  avatars: _avatars,
-  isDrifted,
-  eventId,
-  onShuffleClick,
+  status,
+  goalName,
+  onClick,
 }: TimelineEventProps) {
   const typeClasses = {
     sage: "glass-pebble-sage rounded-tl-md",
@@ -34,7 +32,13 @@ export function TimelineEvent({
     stone: "glass-pebble-stone rounded-tr-md",
   };
 
-  const showShuffle = isDrifted && eventId && onShuffleClick;
+  // Status-based left border accent
+  const statusBorder =
+    status === "missed"
+      ? "border-l-4 border-l-red-400"
+      : status === "done" || status === "completed"
+        ? "border-l-4 border-l-green-400"
+        : "";
 
   return (
     <div className="flex gap-4 group">
@@ -47,40 +51,21 @@ export function TimelineEvent({
         animate={{ opacity: 1, x: 0 }}
         transition={{ duration: 0.3, ease: "easeOut" }}
         whileHover={{ scale: 1.02 }}
+        onClick={onClick}
         className={cn(
           "flex-1 p-5 rounded-[1.5rem] transition-transform relative",
           typeClasses[type],
-          isDrifted &&
-            "ring-2 ring-terracotta/50 shadow-lg shadow-terracotta/10",
+          statusBorder,
+          onClick && "cursor-pointer",
         )}
       >
-        {isDrifted && (
-          <span
-            className="absolute top-4 right-4 w-2 h-2 rounded-full bg-terracotta animate-pulse"
-            aria-hidden
-          />
+        <h3 className="text-lg font-semibold text-charcoal mb-1 pt-0">
+          {title}
+        </h3>
+        <p className="text-sm text-river leading-snug">{description}</p>
+        {goalName && (
+          <p className="text-xs text-river/50 mt-2 font-medium">{goalName}</p>
         )}
-        <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0 flex-1">
-            <h3 className="text-lg font-semibold text-charcoal mb-1 pt-0">
-              {title}
-            </h3>
-            <p className="text-sm text-river leading-snug">{description}</p>
-          </div>
-          {showShuffle && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onShuffleClick(eventId, title);
-              }}
-              className="shrink-0 px-3 py-1.5 rounded-full text-xs font-medium bg-terracotta/20 text-terracotta hover:bg-terracotta/30 transition-colors flex items-center gap-1.5"
-            >
-              <Shuffle className="w-3.5 h-3.5" />
-              Shuffle?
-            </button>
-          )}
-        </div>
       </motion.div>
     </div>
   );

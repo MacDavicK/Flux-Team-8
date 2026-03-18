@@ -113,4 +113,14 @@ export interface TimelineEvent {
   avatars?: string[];
   /** Whether the event is in the past */
   isPast?: boolean;
+  /** Raw task status from backend (pending | done | missed | rescheduled | in_progress) */
+  status?: string;
+  /** Duration in minutes */
+  durationMinutes?: number;
+  /** Goal name if this task is linked to a goal */
+  goalName?: string;
+  /** Whether this event is a projected RRULE occurrence (not yet a real DB row) */
+  isProjected?: boolean;
+  /** YYYY-MM-DD of the projected occurrence in the user's local timezone */
+  occurrenceDate?: string;
 }
