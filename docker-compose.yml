@@ -43,7 +43,7 @@ services:
       dockerfile: Dockerfile
     restart: unless-stopped
     ports:
-      - "8000:8000"
+      - "8010:8000"
     env_file:
       - ./backend/.env
     environment:
@@ -53,6 +53,9 @@ services:
     depends_on:
       dao:
         condition: service_healthy
+      SUPABASE_URL: http://host.docker.internal:54321
+      DATABASE_URL: postgresql://postgres:postgres@host.docker.internal:54322/postgres
+      DAO_SERVICE_URL: http://host.docker.internal:8001
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
@@ -81,6 +84,10 @@ services:
       # Inside Docker, "localhost" refers to the frontend container itself, so we
       # must use the backend service name on the internal Docker network instead.
       - VITE_API_URL=http://backend:8000
+      VITE_API_URL: http://localhost:8010
+      SUPABASE_URL: http://host.docker.internal:54321
+      SUPABASE_ANON_KEY: sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH
+      APP_URL: http://localhost:5173
     extra_hosts:
       - "host.docker.internal:host-gateway"
     depends_on:
@@ -90,3 +97,8 @@ services:
       - ./frontend:/app
       # Prevent the host node_modules from overriding the container's
       - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0 --port 5173
+
+volumes:
+  # Named volume for PostgreSQL data persistence across restarts
+  pgdata:
