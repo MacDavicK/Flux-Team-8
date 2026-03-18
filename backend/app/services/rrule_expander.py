@@ -139,6 +139,7 @@ def next_occurrence_after(
     rrule_string: str,
     after_dt: pendulum.DateTime,
     user_timezone: str,
+    dtstart: pendulum.DateTime | None = None,
 ) -> str | None:
     """
     Return the next occurrence of an RRULE strictly after after_dt, as a UTC ISO8601 string.
@@ -150,12 +151,22 @@ def next_occurrence_after(
         after_dt:      Reference datetime (UTC or timezone-aware). The next occurrence
                        will be strictly after this point.
         user_timezone: IANA timezone string for wall-clock expansion.
+        dtstart:       Optional anchor datetime whose time-of-day is used as the rrule
+                       dtstart.  Pass the task's original scheduled_at so that weekly
+                       rules preserve the intended hour/minute instead of inheriting
+                       the current wall-clock time.  Defaults to after_dt when omitted.
     """
     tz = pendulum.timezone(user_timezone)
     local_after = after_dt.in_timezone(user_timezone)
     naive_after = local_after.naive()
 
-    rule = rrulestr(rrule_string, dtstart=naive_after)
+    # Use provided dtstart (preserves intended time-of-day) or fall back to after_dt.
+    if dtstart is not None:
+        naive_dtstart = dtstart.in_timezone(user_timezone).naive()
+    else:
+        naive_dtstart = naive_after
+
+    rule = rrulestr(rrule_string, dtstart=naive_dtstart)
     occ = rule.after(naive_after, inc=False)  # strictly after
     if occ is None:
         return None

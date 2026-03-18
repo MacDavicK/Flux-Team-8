@@ -239,6 +239,7 @@ async def save_tasks_node(state: AgentState) -> dict:
                             rrule_string=recurrence_rule,
                             after_dt=pendulum.now("UTC"),
                             user_timezone=user_tz,
+                            dtstart=dt_scheduled,
                         )
                         scheduled_at_utc = next_utc if next_utc else scheduled_at_utc
                     else:

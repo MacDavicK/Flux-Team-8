@@ -51,7 +51,8 @@ get_env() {
         | sed -E "s/^${key}=//" \
         | sed 's/[[:space:]]*#.*//' \
         | tr -d '"'"'" \
-        | tr -d '[:space:]'
+        | tr -d '[:space:]' \
+        || true
 }
 
 set_env() {
@@ -651,36 +652,38 @@ run_migrations() {
         exit 1
     fi
 
-    local count=0
+    local count=${#files[@]}
+    info "Applying ${count} migration(s) in a single pass..."
+
+    # Build -v and -f args for all files so we only spin up one container.
+    local vol_args=() file_args=()
     for f in "${files[@]}"; do
         local name
         name="$(basename "$f")"
-        info "Applying $name ..."
+        vol_args+=(-v "${f}:/migrations/${name}:ro")
+        file_args+=(-f "/migrations/${name}")
+    done
 
         # Docker's internal DNS resolver can fail to resolve external hostnames like
         # Supabase's db.<project>.supabase.co. Forcing Google DNS (8.8.8.8) fixes this.
-        if docker run --rm \
-            --dns 8.8.8.8 \
-            --network host \
-            -v "${f}:/migration/${name}:ro" \
-            postgres:15-alpine \
+    if docker run --rm \
+        --dns 8.8.8.8 \
+        --network host \
+        "${vol_args[@]}" \
+        postgres:15-alpine \
             psql "$conn_url" \
-                --no-password \
-                --single-transaction \
-                --set ON_ERROR_STOP=on \
-                --quiet \
-                -f "/migration/${name}"; then
-            success "$name"
-            (( count++ )) || true
-        else
-            err "Failed on $name — migration halted."
-            err "Fix the error above, then re-run this script."
-            exit 1
-        fi
-    done
-
-    echo
-    success "${count} migration(s) applied."
+            --no-password \
+            --single-transaction \
+            --set ON_ERROR_STOP=on \
+            --quiet \
+            "${file_args[@]}"; then
+        echo
+        success "${count} migration(s) applied."
+    else
+        err "Migration failed — see error above."
+        err "Fix the issue, then re-run this script."
+        exit 1
+    fi
 }
 
 # =============================================================================
