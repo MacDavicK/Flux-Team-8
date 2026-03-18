@@ -319,6 +319,11 @@ async def checkpointer_lifespan() -> AsyncIterator[AsyncPostgresSaver]:
         min_size=1,
         max_size=5,
         kwargs={"autocommit": True},
+        reconnect_failed=None,
+        max_waiting=30,
+        max_lifetime=300,
+        max_idle=60,
+        reconnect_timeout=5,
     ) as pool:
         cp = AsyncPostgresSaver(conn=pool)
         await cp.setup()

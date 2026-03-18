@@ -1,5 +1,6 @@
 import { AnimatePresence, motion } from "framer-motion";
 import {
+  AlertCircle,
   Bell,
   CheckCircle2,
   Clock,
@@ -9,6 +10,7 @@ import {
   Phone,
   Sun,
   Sunrise,
+  X,
 } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "~/lib/apiClient";
@@ -283,6 +285,9 @@ export function ProfilePreferences({
   const [togglingCall, setTogglingCall] = useState(false);
   const [pushEnabled, setPushEnabled] = useState(false);
   const [togglingPush, setTogglingPush] = useState(false);
+  const [phoneBannerDismissed, setPhoneBannerDismissed] = useState(false);
+
+  const needsPhoneSetup = !phoneVerified && !savedPhone;
 
   // Sync push state from browser permission after mount (SSR-safe)
   useEffect(() => {
@@ -381,7 +386,6 @@ export function ProfilePreferences({
               void email;
             }}
             disabled
-            hint="Managed by your auth provider"
           />
         </div>
       </motion.section>
@@ -472,6 +476,24 @@ export function ProfilePreferences({
       >
         <SectionLabel>Notifications</SectionLabel>
         <div className="glass-card p-4 space-y-4">
+          {/* Phone setup nudge banner */}
+          {needsPhoneSetup && !phoneBannerDismissed && (
+            <div className="flex items-start gap-3 rounded-xl bg-amber-400/10 border border-amber-400/20 px-3 py-2.5">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-xs text-white/70 flex-1">
+                Set up your phone number to enable SMS and WhatsApp reminders.
+              </p>
+              <button
+                type="button"
+                onClick={() => setPhoneBannerDismissed(true)}
+                className="text-white/40 hover:text-white/70 transition-colors shrink-0"
+                aria-label="Dismiss"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+
           {/* Phone verification row */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl glass-bubble flex items-center justify-center shrink-0">
@@ -525,21 +547,6 @@ export function ProfilePreferences({
             )}
           </AnimatePresence>
 
-          {/* Phone number field (when verified) */}
-          {phoneVerified && savedPhone && (
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl glass-bubble flex items-center justify-center shrink-0">
-                <Phone className="w-5 h-5 text-river/60" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-[10px] font-semibold uppercase tracking-widest text-river/70 mb-0.5">
-                  Phone number
-                </p>
-                <p className="text-sm text-charcoal">{savedPhone}</p>
-              </div>
-            </div>
-          )}
-
           {/* Push notifications */}
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl glass-bubble flex items-center justify-center shrink-0">
@@ -583,7 +590,7 @@ export function ProfilePreferences({
           <div
             className={cn(
               "flex items-center gap-3",
-              !phoneVerified && "opacity-50",
+              needsPhoneSetup && "opacity-40 pointer-events-none",
             )}
           >
             <div className="w-10 h-10 rounded-2xl glass-bubble flex items-center justify-center shrink-0">
@@ -627,7 +634,7 @@ export function ProfilePreferences({
           <div
             className={cn(
               "flex items-center gap-3",
-              !phoneVerified && "opacity-50",
+              needsPhoneSetup && "opacity-40 pointer-events-none",
             )}
           >
             <div className="w-10 h-10 rounded-2xl glass-bubble flex items-center justify-center shrink-0">
@@ -664,6 +671,11 @@ export function ProfilePreferences({
               />
             </button>
           </div>
+          {needsPhoneSetup && (
+            <p className="text-xs text-white/40 pl-1">
+              Verify your phone number above to enable these.
+            </p>
+          )}
         </div>
       </motion.section>
 

@@ -114,6 +114,10 @@ _STEP_OPTIONS: dict[str, Optional[list[OnboardingOption]]] = {
                 '"Enter your number in international format, e.g. +15551234567")'
             ),
         ),
+        OnboardingOption(
+            label="Skip — I'll set SMS/WhatsApp notifications up later",
+            value="__skip_phone__",
+        ),
     ],
     "whatsapp_opt_in": [
         OnboardingOption(label="Yes", value="Yes"),
@@ -207,10 +211,16 @@ def _apply_extraction(profile: dict, step: str, value: Any) -> dict:
     elif step == "chronotype":
         p["chronotype"] = str(value)
     elif step == "phone_number":
-        p["phone_number"] = str(value)  # Already E.164 from frontend validation
-        p["_phone_collected"] = True
-        # Reset OTP attempt counter so a re-entered number gets a fresh 3 attempts
-        p.pop("_otp_attempts", None)
+        if str(value) == "__skip_phone__":
+            # User chose to skip phone setup — mark all three phone steps done
+            p["_phone_collected"] = True
+            p["_otp_done"] = True
+            p["_whatsapp_answered"] = True
+        else:
+            p["phone_number"] = str(value)  # Already E.164 from frontend validation
+            p["_phone_collected"] = True
+            # Reset OTP attempt counter so a re-entered number gets a fresh 3 attempts
+            p.pop("_otp_attempts", None)
     elif step == "otp_verification":
         # OTP result is set by onboarding_node after async confirm_otp call
         p["_otp_verified"] = True
@@ -459,7 +469,10 @@ async def onboarding_node(state: AgentState) -> dict:
         if new_step != step:
             # Step advanced — check if done
             if new_step is None:
-                canned = "Got it! Let me wrap things up."
+                if step == "phone_number" and user_msg == "__skip_phone__":
+                    canned = "No problem — you can enable SMS and WhatsApp reminders anytime from your profile settings."
+                else:
+                    canned = "Got it! Let me wrap things up."
                 updated_history = history + [{"role": "assistant", "content": canned}]
                 return await _complete_onboarding(user_id, profile, updated_history)
 
@@ -486,7 +499,10 @@ async def onboarding_node(state: AgentState) -> dict:
             next_question = _get_question(new_step, profile)
             name = profile.get("name", "")
             name_part = f", {name}" if name else ""
-            canned = f"Got it{name_part}! {next_question}"
+            if step == "phone_number" and user_msg == "__skip_phone__":
+                canned = f"No problem — you can enable SMS and WhatsApp reminders anytime from your profile settings. {next_question}"
+            else:
+                canned = f"Got it{name_part}! {next_question}"
             next_options = _STEP_OPTIONS.get(new_step)
             updated_history = history + [{"role": "assistant", "content": canned}]
             return {

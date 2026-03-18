@@ -14,6 +14,7 @@ Availability rules:
   virtual occurrences of recurring tasks (is_projected: true). Both are hard time
   blocks — never schedule new tasks overlapping either type.
 - Apply a 15-minute buffer between all tasks (before and after)
+- TIME OF DAY: Each proposed task has a suggested_time field (local time, e.g. "19:00"). You MUST use this exact time for scheduled_at. Only deviate if it falls inside a hard block (sleep_window or work_hours) — in that case pick the nearest available slot outside the blocked window.
 - Prefer times with historically high completion rates (from pattern_output)
 - All times in suggested_time are in the user's LOCAL timezone (user_timezone provided in context)
 - Output scheduled_at as a naive local-time ISO8601 string (no Z, no offset) — the backend will convert to UTC
@@ -25,7 +26,7 @@ Output ONLY valid JSON matching this exact schema:
     {
       "task_id": "task-0",
       "task_title": "string",
-      "scheduled_at": "2025-01-06T07:00:00Z",
+      "scheduled_at": "2026-01-06T19:00:00",
       "duration_minutes": 30,
       "conflict": false
     }

@@ -93,6 +93,8 @@ export interface User {
   profile?: Profile;
   onboarded: boolean;
   timezone?: string | null;
+  phone_verified?: boolean | null;
+  notification_preferences?: Record<string, unknown> | null;
   onboardingProfile?: OnboardingProfile;
   createdAt?: string;
   lastActive?: string;

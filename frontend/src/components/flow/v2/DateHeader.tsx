@@ -1,11 +1,13 @@
-import { Link } from "@tanstack/react-router";
-import { ChevronLeft, ChevronRight, User } from "lucide-react";
-import { useCallback, useRef } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import { CalendarPicker } from "~/components/ui/CalendarPicker";
 import { format } from "~/utils/date";
 
 interface DateHeaderProps {
   date?: string;
   greeting?: string;
+  name?: string;
   selectedDate?: string | null;
   onDateChange?: (date: string | null) => void;
 }
@@ -35,14 +37,14 @@ function addDays(dateStr: string, days: number): string {
 export function DateHeader({
   date: _date,
   greeting,
+  name,
   selectedDate,
   onDateChange,
 }: DateHeaderProps) {
-  const inputRef = useRef<HTMLInputElement>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   const activeDate = selectedDate ?? todayString();
-  const isToday = activeDate === todayString();
 
   const today = todayString();
   const minDate = addDays(today, -42);
@@ -74,78 +76,105 @@ export function DateHeader({
   const atMin = activeDate <= minDate;
   const atMax = activeDate >= maxDate;
 
+  const displayDayShort = parseLocalDate(activeDate).toLocaleDateString(
+    "en-US",
+    { weekday: "short" },
+  );
+
+  function handlePickerChange(dateStr: string) {
+    setPickerOpen(false);
+    onDateChange?.(dateStr === today ? null : dateStr);
+  }
+
   return (
-    <header className="pt-10 px-6 pb-6 relative z-10 flex justify-between items-end">
-      <div className="flex-1">
-        {greeting && (
-          <p className="text-sm text-charcoal/50 mb-1">{greeting}</p>
-        )}
-        <div className="flex items-center gap-2">
-          <button
-            type="button"
-            onClick={() => go(-1)}
-            disabled={atMin}
-            className="w-7 h-7 flex items-center justify-center rounded-full text-charcoal/50 hover:text-charcoal hover:bg-charcoal/10 active:scale-95 transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
-            aria-label="Previous day"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-
-          <button
-            type="button"
-            onClick={() => inputRef.current?.showPicker()}
-            className="text-display italic text-4xl text-charcoal leading-tight hover:text-river transition-colors duration-150"
-            aria-label="Pick a date"
-          >
-            {displayDate}
-          </button>
-
-          <button
-            type="button"
-            onClick={() => go(1)}
-            disabled={atMax}
-            className="w-7 h-7 flex items-center justify-center rounded-full text-charcoal/50 hover:text-charcoal hover:bg-charcoal/10 active:scale-95 transition-all duration-150 disabled:opacity-30 disabled:pointer-events-none"
-            aria-label="Next day"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-
-          {/* Hidden native date input for the calendar picker */}
-          <input
-            ref={inputRef}
-            type="date"
-            value={activeDate}
-            min={minDate}
-            max={maxDate}
-            onChange={(e) => {
-              const val = e.target.value;
-              if (!val) return;
-              onDateChange?.(val === today ? null : val);
-            }}
-            className="sr-only"
-            aria-hidden="true"
-            tabIndex={-1}
-          />
-        </div>
-
-        {!isToday && (
-          <button
-            type="button"
-            onClick={() => onDateChange?.(null)}
-            className="text-xs text-river mt-1 hover:underline"
-          >
-            Back to today
-          </button>
+    <header
+      className="px-5 pb-4 relative z-10"
+      style={{ paddingTop: "max(env(safe-area-inset-top, 0px), 44px)" }}
+    >
+      {/* Row 1: greeting */}
+      <div className="flex items-center justify-between mb-3">
+        {greeting ? (
+          <p className="text-display italic text-sm text-charcoal/40 leading-none">
+            {greeting}
+            {name && (
+              <span className="font-semibold bg-gradient-to-r from-sage to-terracotta bg-clip-text text-transparent text-lg">
+                {" "}
+                {name}
+              </span>
+            )}
+          </p>
+        ) : (
+          <span />
         )}
       </div>
 
-      <Link
-        to="/profile"
-        className="w-10 h-10 glass-bubble flex items-center justify-center text-river hover:text-sage transition-colors duration-200 active:scale-95 shrink-0 mb-1"
-        aria-label="Profile settings"
-      >
-        <User className="w-[18px] h-[18px]" />
-      </Link>
+      {/* Row 2: ‹ [day, date] › */}
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={() => go(-1)}
+          disabled={atMin}
+          className="w-8 h-8 flex items-center justify-center rounded-full border border-charcoal/12 text-charcoal/40 hover:text-charcoal hover:border-charcoal/25 active:scale-95 transition-all duration-150 disabled:opacity-20 disabled:pointer-events-none shrink-0"
+          aria-label="Previous day"
+        >
+          <ChevronLeft className="w-4 h-4" />
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setPickerOpen((o) => !o)}
+          className="flex items-start gap-1 group"
+          aria-label="Pick a date"
+          aria-expanded={pickerOpen}
+        >
+          <span className="text-display italic text-sm text-charcoal/50 leading-none mt-[5px] group-hover:text-river/60 transition-colors duration-150 whitespace-nowrap">
+            {displayDayShort},
+          </span>
+          <span className="text-display italic text-[1.7rem] leading-none text-charcoal group-hover:text-river transition-colors duration-150 whitespace-nowrap">
+            {displayDate}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => go(1)}
+          disabled={atMax}
+          className="w-8 h-8 flex items-center justify-center rounded-full border border-charcoal/12 text-charcoal/40 hover:text-charcoal hover:border-charcoal/25 active:scale-95 transition-all duration-150 disabled:opacity-20 disabled:pointer-events-none shrink-0"
+          aria-label="Next day"
+        >
+          <ChevronRight className="w-4 h-4" />
+        </button>
+      </div>
+
+      {/* Calendar picker popover */}
+      <AnimatePresence>
+        {pickerOpen && (
+          <>
+            {/* Backdrop — tap outside to close */}
+            <div
+              className="fixed inset-0 z-40"
+              onClick={() => setPickerOpen(false)}
+              aria-hidden="true"
+            />
+            <motion.div
+              initial={{ opacity: 0, y: -8, scale: 0.97 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -8, scale: 0.97 }}
+              transition={{ duration: 0.18, ease: "easeOut" }}
+              className="absolute left-4 right-4 z-50 mt-2"
+            >
+              <CalendarPicker
+                value={activeDate}
+                onChange={handlePickerChange}
+                minDate={minDate}
+                maxDate={maxDate}
+                showChips={false}
+                className="shadow-lg"
+              />
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
     </header>
   );
 }
