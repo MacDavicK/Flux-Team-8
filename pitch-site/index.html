@@ -884,6 +884,68 @@
     .footer-links a { font-size: 13px; color: var(--river); text-decoration: none; transition: color 0.2s; }
     .footer-links a:hover { color: var(--charcoal); }
 
+    /* ─── Team ─── */
+    .team-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+    }
+    @media (max-width: 900px) { .team-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (max-width: 560px) { .team-grid { grid-template-columns: 1fr; } }
+
+    .team-card {
+      padding: 32px 28px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      text-align: center;
+      gap: 10px;
+    }
+    .team-avatar {
+      width: 80px;
+      height: 80px;
+      border-radius: 50%;
+      object-fit: cover;
+      border: 2px solid var(--glass-border);
+      box-shadow: 0 4px 16px rgba(92,124,102,0.18);
+    }
+    .team-name {
+      font-family: var(--font-display);
+      font-size: 18px;
+      font-weight: 500;
+      color: var(--charcoal);
+      margin-top: 4px;
+    }
+    .team-role {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--sage);
+    }
+    .team-ownership {
+      font-size: 13.5px;
+      line-height: 1.6;
+      color: var(--river);
+      flex: 1;
+    }
+    .team-gh {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12.5px;
+      font-weight: 600;
+      color: var(--river);
+      text-decoration: none;
+      border: 1px solid var(--stone-dark);
+      border-radius: var(--r-pill);
+      padding: 5px 14px;
+      transition: color 0.2s, border-color 0.2s;
+      margin-top: 4px;
+    }
+    .team-gh:hover { color: var(--charcoal); border-color: var(--charcoal); }
+    .gh-icon { width: 14px; height: 14px; flex-shrink: 0; }
+
     /* ─── Scroll reveal ─── */
     .reveal {
       opacity: 0; transform: translateY(26px);
@@ -992,9 +1054,10 @@
           <li><a href="#how">How it works</a></li>
           <li><a href="#demos">Experience</a></li>
           <li><a href="#notifications">Notifications</a></li>
-          <li><a href="#roadmap">Roadmap</a></li>
           <li><a href="#ai">AI Engine</a></li>
           <li><a href="#tech">Stack</a></li>
+          <li><a href="#roadmap">Roadmap</a></li>
+          <li><a href="#team">Team</a></li>
         </ul>
         <a href="#demos" class="btn-primary" style="padding:10px 22px;font-size:13px;">Watch demos</a>
       </div>
@@ -1816,6 +1879,87 @@
     </div>
   </section>
 
+  <!-- ═══ TEAM ═══ -->
+  <section id="team">
+    <div class="container">
+      <div class="section-header reveal">
+        <span class="label">The people behind it</span>
+        <h2 class="section-title">Meet the <em>team</em></h2>
+        <p class="body-lg">Six people. One cohesive product. Each owned a slice of the system.</p>
+      </div>
+
+      <div class="team-grid">
+
+        <div class="team-card glass-card reveal d1">
+          <img class="team-avatar" src="https://github.com/harshalkale.png" alt="Harshal Kale" />
+          <div class="team-name">Harshal Kale</div>
+          <div class="team-role">Frontend Developer · Leader</div>
+          <div class="team-ownership">Frontend architecture &amp; integration of all agents and services with the UI</div>
+          <a class="team-gh" href="https://github.com/harshalkale" target="_blank" rel="noopener">
+            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            @harshalkale
+          </a>
+        </div>
+
+        <div class="team-card glass-card reveal d2">
+          <img class="team-avatar" src="avatars/session.jpg" alt="Session Mwamufiya" />
+          <div class="team-name">Session Mwamufiya</div>
+          <div class="team-role">Frontend Developer</div>
+          <div class="team-ownership">Notification system, Notifier agent &amp; Pattern Observer agent</div>
+          <a class="team-gh" href="https://github.com/Session-SOS" target="_blank" rel="noopener">
+            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            @Session-SOS
+          </a>
+        </div>
+
+        <div class="team-card glass-card reveal d3">
+          <img class="team-avatar" src="https://github.com/kiyer1974.png" alt="Krishnan Iyer" />
+          <div class="team-name">Krishnan Iyer</div>
+          <div class="team-role">Backend Developer</div>
+          <div class="team-ownership">Database design, relationships &amp; DAOs + conversational abilities (Deepgram)</div>
+          <a class="team-gh" href="https://github.com/kiyer1974" target="_blank" rel="noopener">
+            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            @kiyer1974
+          </a>
+        </div>
+
+        <div class="team-card glass-card reveal d1">
+          <img class="team-avatar" src="avatars/sathish.jpg" alt="Sathish Kulal" />
+          <div class="team-name">Sathish Kulal</div>
+          <div class="team-role">Backend Developer</div>
+          <div class="team-ownership">Orchestrator agent &amp; integration of all sub-agents with the orchestrator</div>
+          <a class="team-gh" href="https://github.com/kulalking" target="_blank" rel="noopener">
+            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            @kulalking
+          </a>
+        </div>
+
+        <div class="team-card glass-card reveal d2">
+          <img class="team-avatar" src="avatars/hima.jpg" alt="Hima" />
+          <div class="team-name">Hima</div>
+          <div class="team-role">Backend Developer</div>
+          <div class="team-ownership">Scheduler agent &amp; task reschedule flow</div>
+          <a class="team-gh" href="https://github.com/aug13post" target="_blank" rel="noopener">
+            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            @aug13post
+          </a>
+        </div>
+
+        <div class="team-card glass-card reveal d3">
+          <img class="team-avatar" src="https://github.com/MacDavicK.png" alt="Kavish Jaiswal" />
+          <div class="team-name">Kavish Jaiswal</div>
+          <div class="team-role">Full-Stack Developer</div>
+          <div class="team-ownership">RAG pipeline for Health &amp; Fitness goals + onboarding flow</div>
+          <a class="team-gh" href="https://github.com/MacDavicK" target="_blank" rel="noopener">
+            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            @MacDavicK
+          </a>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
   <!-- ═══ CLOSING ═══ -->
   <section id="cta">
     <div class="container">
@@ -1843,6 +1987,7 @@
           <li><a href="#demos">Experience</a></li>
           <li><a href="#ai">AI Engine</a></li>
           <li><a href="#tech">Stack</a></li>
+          <li><a href="#team">Team</a></li>
         </ul>
       </div>
     </div>
@@ -1878,7 +2023,7 @@
         });
       }
     });
-  }, { threshold: 0.4 });
+  }, { threshold: 0, rootMargin: '-40% 0px -55% 0px' });
   sections.forEach(s => secObs.observe(s));
 
   // Auto-play demo videos on viewport entry, pause on exit
