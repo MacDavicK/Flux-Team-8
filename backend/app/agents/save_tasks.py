@@ -95,7 +95,7 @@ def _row_to_tuple(row: dict) -> tuple:
         row.get("shared_with_goal_ids") or [],
         row.get("escalation_policy", "standard"),
         row.get("conversation_id"),
-        row.get("proposed_time"),
+        row.get("canonical_scheduled_at"),
     )
 
 
@@ -104,7 +104,7 @@ INSERT INTO tasks (
     user_id, goal_id, title, description, status,
     scheduled_at, duration_minutes, trigger_type, location_trigger,
     recurrence_rule, shared_with_goal_ids, escalation_policy, conversation_id,
-    proposed_time
+    canonical_scheduled_at
 ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 """
 
@@ -308,25 +308,16 @@ async def save_tasks_node(state: AgentState) -> dict:
             # All recurring tasks: insert only the first occurrence.
             # The notifier/task-completion handler advances to the next occurrence
             # (via the recurrence_rule) when the current one is done/missed/rescheduled.
-            # Capture proposed_time (minutes since midnight, user local) so that
-            # advance_recurring_task can restore the original wall-clock time after
-            # a single-occurrence reschedule.
-            proposed_time: Optional[int] = None
-            try:
-                local_dt = pendulum.parse(scheduled_at_utc).in_timezone(
-                    pendulum.timezone(user_tz)
-                )
-                proposed_time = local_dt.hour * 60 + local_dt.minute
-            except Exception:
-                pass
-
+            # canonical_scheduled_at = scheduled_at_utc at creation (the LLM-chosen
+            # time after all guards is the first canonical position in the series).
+            # It is never changed on single-occurrence reschedule.
             await _insert_task(
                 {
                     **base_row,
                     "scheduled_at": scheduled_at_utc,
                     "recurrence_rule": recurrence_rule,
                     "escalation_policy": escalation_policy,
-                    "proposed_time": proposed_time,
+                    "canonical_scheduled_at": scheduled_at_utc,
                 }
             )
             rows_inserted += 1
