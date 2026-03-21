@@ -25,6 +25,7 @@ def _make_task(
     scheduled_at: datetime,
     canonical_scheduled_at: datetime | None,
     goal_id=None,
+    proposed_time=None,
 ) -> dict:
     """Build a minimal task row dict matching the new schema."""
     return {
@@ -41,6 +42,7 @@ def _make_task(
         "goal_id": goal_id,
         "shared_with_goal_ids": [],
         "escalation_policy": "standard",
+        "proposed_time": proposed_time,
     }
 
 
@@ -76,6 +78,9 @@ async def test_daily_no_reschedule():
         result = await advance_recurring_task("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
 
     assert result is True
+    # NOTE (Task 4): call_args[0][5] assumes scheduled_at is the 5th positional arg to
+    # db.execute (SQL=0, user_id=1, goal_id=2, title=3, description=4, scheduled_at=5).
+    # When Task 4 adds canonical_scheduled_at to the INSERT, verify this index is still correct.
     inserted_at = mock_db.execute.call_args[0][5]
     inserted_local = pendulum.instance(inserted_at).in_timezone("America/New_York")
     assert inserted_local.day == 24
@@ -354,3 +359,40 @@ async def test_null_canonical_falls_back_to_scheduled_at():
     assert inserted_local.day == 24
     assert inserted_local.hour == 9
     assert inserted_local.minute == 0
+
+
+# ── Test 12: Goal guard — abandoned goal → returns False ────────────────────
+
+
+@pytest.mark.asyncio
+async def test_goal_guard_abandoned_goal_stops_advance():
+    """advance_recurring_task returns False when the goal is abandoned."""
+    scheduled = _ny(2026, 3, 23, 9)
+    task = _make_task("FREQ=DAILY", scheduled, scheduled, goal_id="goal-uuid-9999")
+    user = _make_user()
+    goal = {"activated_at": None, "target_weeks": None, "status": "abandoned"}
+
+    with patch("app.services.recurrence.db") as mock_db:
+        mock_db.fetchrow = AsyncMock(side_effect=[task, user, goal])
+        mock_db.execute = AsyncMock()
+
+        result = await advance_recurring_task("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+    assert result is False
+    mock_db.execute.assert_not_called()
+
+
+# ── Test 13: Non-existent task (db.fetchrow returns None) → returns False ───
+
+
+@pytest.mark.asyncio
+async def test_nonexistent_task_returns_false():
+    """advance_recurring_task returns False when the task row doesn't exist."""
+    with patch("app.services.recurrence.db") as mock_db:
+        mock_db.fetchrow = AsyncMock(return_value=None)
+        mock_db.execute = AsyncMock()
+
+        result = await advance_recurring_task("nonexistent-task-id")
+
+    assert result is False
+    mock_db.execute.assert_not_called()
