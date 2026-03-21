@@ -54,6 +54,11 @@ class ClarifierQuestionSchema(BaseModel):
     required: bool = True
 
 
+class RagSource(BaseModel):
+    title: str
+    url: Optional[str] = None
+
+
 class ChatMessageResponse(BaseModel):
     conversation_id: str
     message: str
@@ -63,6 +68,8 @@ class ChatMessageResponse(BaseModel):
     options: Optional[list[OnboardingOptionSchema]] = None
     questions: Optional[list[ClarifierQuestionSchema]] = None
     spoken_summary: Optional[str] = None
+    rag_used: bool = False
+    rag_sources: list[RagSource] = []
 
 
 # ─────────────────────────────────────────────────────────────────

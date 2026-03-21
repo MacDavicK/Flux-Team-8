@@ -15,6 +15,8 @@ export interface HistoryMessage {
   metadata?: {
     proposed_plan?: Record<string, unknown>;
     options?: OnboardingOption[];
+    rag_used?: boolean;
+    rag_sources?: { title: string; url: string | null }[];
   } | null;
 }
 

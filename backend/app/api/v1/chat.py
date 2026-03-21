@@ -30,6 +30,7 @@ from app.models.api_schemas import (
     MessageSchema,
     OnboardingOptionSchema,
     OnboardingStartRequest,
+    RagSource,
 )
 from app.services.context_manager import window_conversation_history
 from app.services.supabase import db
@@ -380,11 +381,24 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
     agent_node_value = (
         "ask_start_date" if awaiting_start_date else result.get("intent") or None
     )
+    # Extract RAG provenance upfront — used in both metadata and resp below
+    _rag_output = result.get("rag_output") or {}
+    _rag_used = bool(_rag_output.get("retrieved"))
+    _rag_sources = (
+        [
+            RagSource(title=s.get("title", ""), url=s.get("url") or None)
+            for s in _rag_output.get("sources", [])
+        ]
+        if _rag_used
+        else []
+    )
     if goal_draft and (approval_pending or awaiting_start_date):
         metadata: dict | None = {
             "proposed_plan": goal_draft,
             "classifier_output": result.get("classifier_output"),
             "approval_status": result_approval,
+            "rag_used": _rag_used,
+            "rag_sources": [s.model_dump() for s in _rag_sources],
         }
     elif agent_node_value == "ONBOARDING" and result.get("options"):
         metadata = {"options": result.get("options")}
@@ -437,6 +451,8 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
         requires_user_action=approval_pending,
         options=None if is_clarifier else raw_options,
         questions=raw_options if is_clarifier else None,
+        rag_used=_rag_used,
+        rag_sources=_rag_sources,
     )
     resp.spoken_summary = build_spoken_summary(resp)
     yield f"data: {json.dumps({'type': 'complete', 'data': resp.model_dump(mode='json')})}\n\n"

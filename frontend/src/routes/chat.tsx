@@ -14,6 +14,7 @@ import {
 } from "~/components/chat/MilestoneRoadmapView";
 import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { PlanView } from "~/components/chat/PlanView";
+import { ProvenanceIndicator } from "~/components/chat/ProvenanceIndicator";
 import { StartDatePicker } from "~/components/chat/StartDatePicker";
 import { type ProposedTask, TasksView } from "~/components/chat/TasksView";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
@@ -569,6 +570,12 @@ function ChatPage() {
               </div>
             ),
             options: result.options,
+            provenance: result.proposed_plan
+              ? {
+                  rag_used: result.rag_used,
+                  rag_sources: result.rag_sources,
+                }
+              : undefined,
           };
 
           setMessages((prev) => [...prev, aiMessage]);
@@ -653,6 +660,13 @@ function ChatPage() {
               ) : (
                 m.content
               ),
+            provenance:
+              m.role === "assistant" && m.metadata?.proposed_plan
+                ? {
+                    rag_used: m.metadata.rag_used ?? false,
+                    rag_sources: m.metadata.rag_sources ?? [],
+                  }
+                : undefined,
           };
         });
 
@@ -726,6 +740,12 @@ function ChatPage() {
                 <ChatBubble variant={message.type} animate={false}>
                   {message.content}
                 </ChatBubble>
+                {message.type === MessageVariant.AI && message.provenance && (
+                  <ProvenanceIndicator
+                    ragUsed={message.provenance.rag_used}
+                    ragSources={message.provenance.rag_sources}
+                  />
+                )}
                 {message.type === MessageVariant.AI &&
                   message.options &&
                   message.options.length > 0 && (
@@ -949,6 +969,12 @@ function ChatPage() {
                           </div>
                         ),
                         options: result.options,
+                        provenance: result.proposed_plan
+                          ? {
+                              rag_used: result.rag_used,
+                              rag_sources: result.rag_sources,
+                            }
+                          : undefined,
                       },
                     ]);
                     scrollToBottom();

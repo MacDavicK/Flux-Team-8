@@ -212,6 +212,8 @@ export interface ChatMessageResponse {
   options?: OnboardingOption[] | null;
   questions?: GoalClarifierQuestion[] | null;
   spoken_summary?: string | null;
+  rag_used: boolean;
+  rag_sources: { title: string; url: string | null }[];
 }
 
 /**
@@ -229,4 +231,9 @@ export interface ChatMessage {
   options?: OnboardingOption[] | null;
   /** Structured clarifying questions for GOAL_CLARIFY flow */
   questions?: GoalClarifierQuestion[] | null;
+  /** RAG provenance metadata */
+  provenance?: {
+    rag_used: boolean;
+    rag_sources: { title: string; url: string | null }[];
+  };
 }
