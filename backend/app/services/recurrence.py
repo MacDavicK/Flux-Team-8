@@ -34,9 +34,10 @@ async def advance_recurring_task(task_id: str) -> bool:
     """
     task_row = await db.fetchrow(
         """
-        SELECT id, recurrence_rule, scheduled_at, user_id, title, description,
+        SELECT id, recurrence_rule, scheduled_at, canonical_scheduled_at,
+               user_id, title, description,
                duration_minutes, trigger_type, location_trigger,
-               goal_id, shared_with_goal_ids, escalation_policy, proposed_time
+               goal_id, shared_with_goal_ids, escalation_policy
         FROM tasks WHERE id = $1
         """,
         task_id,
@@ -62,58 +63,35 @@ async def advance_recurring_task(task_id: str) -> bool:
         else pendulum.parse(str(scheduled_at))
     )
 
+    raw_canonical = task_row["canonical_scheduled_at"]
+    if raw_canonical is not None:
+        canonical_dt = (
+            pendulum.instance(raw_canonical)
+            if hasattr(raw_canonical, "isoformat")
+            else pendulum.parse(str(raw_canonical))
+        )
+    else:
+        canonical_dt = ref_dt  # fallback for rows created before migration (NULL)
+
     next_utc = next_occurrence_after(
         rrule_string=task_row["recurrence_rule"],
-        after_dt=ref_dt,
+        after_dt=canonical_dt,  # canonical position — not rescheduled time
         user_timezone=user_tz,
+        dtstart=canonical_dt,  # same — stable series anchor
     )
     if next_utc is None:
         logger.info("No further occurrences for recurring task %s", task_id)
         return False
 
-    # If proposed_time is set, override the time component of next_utc with the
-    # canonical wall-clock time. This ensures a single-occurrence reschedule
-    # (which only changed scheduled_at, not proposed_time) reverts correctly.
-    # proposed_time restores the canonical wall-clock time after a
-    # single-occurrence reschedule (which changes scheduled_at but not
-    # proposed_time). This only makes sense for day-or-longer frequencies
-    # where there is a single canonical time-of-day per occurrence.
-    # Sub-daily rules (MINUTELY, HOURLY) have no meaningful canonical
-    # time-of-day — applying the override there causes the same timestamp
-    # to be re-inserted on every advance, creating an infinite miss loop.
-    proposed_time = task_row["proposed_time"]
-    _SUB_DAILY = ("MINUTELY", "HOURLY")
-    rrule_upper = (task_row["recurrence_rule"] or "").upper()
-    _proposed_time_applies = proposed_time is not None and not any(
-        f"FREQ={f}" in rrule_upper for f in _SUB_DAILY
-    )
-
-    if _proposed_time_applies:
-        try:
-            proposed_hour, proposed_minute = divmod(proposed_time, 60)
-            next_local = pendulum.parse(next_utc).in_timezone(user_tz)
-            next_local = next_local.set(
-                hour=proposed_hour, minute=proposed_minute, second=0, microsecond=0
-            )
-            next_utc = next_local.in_timezone("UTC").isoformat()
-        except Exception as exc:
-            logger.warning(
-                "Could not apply proposed_time to next occurrence of task %s: %s",
-                task_id,
-                exc,
-            )
-
     # Sleep-window guard: advance next_utc past sleep if it lands during sleep.
-    # Applied after proposed_time so the restored wall-clock time is also checked.
     if sleep_window and next_utc:
         try:
-            dt_for_dtstart = pendulum.parse(next_utc)
             next_utc = advance_past_sleep(
                 utc_iso=next_utc,
                 sleep_window=sleep_window,
                 user_timezone=user_tz,
                 rrule_string=task_row["recurrence_rule"],
-                dtstart=dt_for_dtstart,
+                dtstart=canonical_dt,  # was: dt_for_dtstart
             )
         except Exception as exc:
             logger.warning(
@@ -156,21 +134,24 @@ async def advance_recurring_task(task_id: str) -> bool:
         INSERT INTO tasks (
             user_id, goal_id, title, description, status,
             scheduled_at, duration_minutes, trigger_type, location_trigger,
-            recurrence_rule, shared_with_goal_ids, escalation_policy, proposed_time
+            recurrence_rule, shared_with_goal_ids, escalation_policy,
+            canonical_scheduled_at
         ) VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12)
         """,
         user_id,
         goal_id,
         task_row["title"],
         task_row["description"],
-        pendulum.parse(next_utc),
+        pendulum.parse(next_utc),  # $5 = scheduled_at
         task_row["duration_minutes"],
         task_row["trigger_type"],
         task_row["location_trigger"],
         task_row["recurrence_rule"],
         shared_ids,
         task_row["escalation_policy"],
-        task_row["proposed_time"],
+        pendulum.parse(
+            next_utc
+        ),  # $12 = canonical_scheduled_at (= scheduled_at on new advance)
     )
     logger.info("Advanced recurring task %s → next occurrence at %s", task_id, next_utc)
     return True
