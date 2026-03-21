@@ -17,18 +17,18 @@ from app.services.rrule_expander import (
 
 def test_next_occurrence_after_daily():
     """DAILY rule strictly after a given datetime returns the next calendar day."""
-    after = pendulum.datetime(2026, 3, 21, 9, 0, 0, tz="UTC")
-    dtstart = pendulum.datetime(2026, 3, 21, 9, 0, 0, tz="UTC")
+    after = pendulum.datetime(2026, 3, 21, 13, 0, 0, tz="UTC")
+    dtstart = pendulum.datetime(2026, 3, 21, 13, 0, 0, tz="UTC")
     result = next_occurrence_after(
         "FREQ=DAILY", after, "America/New_York", dtstart=dtstart
     )
-    # dtstart = 09:00 UTC = 05:00 New York (EDT). DAILY at 05:00 NY,
-    # strictly after 05:00 NY = next day 05:00 NY = March 22 05:00 NY.
+    # dtstart = 13:00 UTC = 09:00 New York (EDT). DAILY at 09:00 NY,
+    # strictly after 09:00 NY = next day 09:00 NY = March 22 09:00 NY.
     assert result is not None
     dt = pendulum.parse(result)
     local = dt.in_timezone("America/New_York")
     assert local.day == 22
-    assert local.hour == 5
+    assert local.hour == 9
     assert local.minute == 0
 
 
@@ -71,6 +71,7 @@ def test_next_occurrence_after_pull_back_no_same_day_duplicate():
     local = pendulum.parse(result).in_timezone("America/New_York")
     assert local.day == 24  # Tuesday, not Monday
     assert local.hour == 9
+    assert local.minute == 0
 
 
 # ── parse_sleep_window ──────────────────────────────────────────────────────
@@ -84,6 +85,7 @@ def test_parse_sleep_window_wraps_midnight():
 def test_parse_sleep_window_none():
     assert parse_sleep_window(None) is None
     assert parse_sleep_window({}) is None
+    assert parse_sleep_window({"start": "not-a-time", "end": "07:00"}) is None
 
 
 # ── advance_past_sleep ───────────────────────────────────────────────────────
@@ -112,15 +114,19 @@ def test_advance_past_sleep_inside_window_no_rrule():
     local = pendulum.parse(result).in_timezone("America/New_York")
     assert local.hour == 7
     assert local.minute == 0
+    assert local.day == 21
+    assert local.month == 3
 
 
 def test_advance_past_sleep_inside_window_with_rrule():
-    """With RRULE, returns the next valid RRULE occurrence at or after sleep end."""
-    # 02:00 NY = inside sleep (23:00–07:00). dtstart = canonical 02:00 NY.
-    # DAILY rule: next occurrence strictly after (sleep_end - 1s) = 06:59:59
-    # dtstart=02:00 NY, DAILY → occurrences at 02:00. next after 06:59:59 = next day 02:00.
-    # That lands in sleep again — advance_past_sleep is called once (single pass).
-    # Key check: function returns a valid ISO string (not the original).
+    """With RRULE, advances to the next RRULE occurrence strictly after sleep-end - 1s.
+
+    dtstart = 03:00 NY Mar 21 (= 07:00 UTC), inside sleep window 23:00–07:00.
+    DAILY rule: next occurrence strictly after sleep_end - 1s (06:59:59 NY / 10:59:59 UTC)
+    is Mar 22 03:00 NY = Mar 22 07:00 UTC.
+    Note: that result lands back inside sleep — advance_past_sleep is called once
+    (single pass, no loop), so the returned value is Mar 22 07:00 UTC as-is.
+    """
     dtstart = pendulum.datetime(2026, 3, 21, 7, 0, 0, tz="UTC")  # 03:00 NY (in sleep)
     utc = dtstart.isoformat()
     result = advance_past_sleep(
@@ -130,7 +136,4 @@ def test_advance_past_sleep_inside_window_with_rrule():
         rrule_string="FREQ=DAILY",
         dtstart=dtstart,
     )
-    # Result should be different from the input (it was in sleep and was advanced)
-    assert result != utc
-    # And it should be a valid ISO string
-    pendulum.parse(result)
+    assert pendulum.parse(result) == pendulum.datetime(2026, 3, 22, 7, 0, 0, tz="UTC")
