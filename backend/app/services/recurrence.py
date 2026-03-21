@@ -56,13 +56,6 @@ async def advance_recurring_task(task_id: str) -> bool:
         profile_data = tz_row["profile"] if isinstance(tz_row["profile"], dict) else {}
         sleep_window = profile_data.get("sleep_window")
 
-    scheduled_at = task_row["scheduled_at"]
-    ref_dt = (
-        pendulum.instance(scheduled_at)
-        if hasattr(scheduled_at, "isoformat")
-        else pendulum.parse(str(scheduled_at))
-    )
-
     raw_canonical = task_row["canonical_scheduled_at"]
     if raw_canonical is not None:
         canonical_dt = (
@@ -71,7 +64,13 @@ async def advance_recurring_task(task_id: str) -> bool:
             else pendulum.parse(str(raw_canonical))
         )
     else:
-        canonical_dt = ref_dt  # fallback for rows created before migration (NULL)
+        # Fallback for rows created before migration 016 (NULL canonical_scheduled_at).
+        scheduled_at = task_row["scheduled_at"]
+        canonical_dt = (
+            pendulum.instance(scheduled_at)
+            if hasattr(scheduled_at, "isoformat")
+            else pendulum.parse(str(scheduled_at))
+        )
 
     next_utc = next_occurrence_after(
         rrule_string=task_row["recurrence_rule"],
