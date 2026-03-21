@@ -74,8 +74,21 @@ async def advance_recurring_task(task_id: str) -> bool:
     # If proposed_time is set, override the time component of next_utc with the
     # canonical wall-clock time. This ensures a single-occurrence reschedule
     # (which only changed scheduled_at, not proposed_time) reverts correctly.
+    # proposed_time restores the canonical wall-clock time after a
+    # single-occurrence reschedule (which changes scheduled_at but not
+    # proposed_time). This only makes sense for day-or-longer frequencies
+    # where there is a single canonical time-of-day per occurrence.
+    # Sub-daily rules (MINUTELY, HOURLY) have no meaningful canonical
+    # time-of-day — applying the override there causes the same timestamp
+    # to be re-inserted on every advance, creating an infinite miss loop.
     proposed_time = task_row["proposed_time"]
-    if proposed_time is not None:
+    _SUB_DAILY = ("MINUTELY", "HOURLY")
+    rrule_upper = (task_row["recurrence_rule"] or "").upper()
+    _proposed_time_applies = proposed_time is not None and not any(
+        f"FREQ={f}" in rrule_upper for f in _SUB_DAILY
+    )
+
+    if _proposed_time_applies:
         try:
             proposed_hour, proposed_minute = divmod(proposed_time, 60)
             next_local = pendulum.parse(next_utc).in_timezone(user_tz)

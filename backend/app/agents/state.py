@@ -53,6 +53,8 @@ class AgentState(TypedDict):
     classifier_output: Annotated[Optional[dict], _merge_dict]
     scheduler_output: Annotated[Optional[dict], _merge_dict]
     pattern_output: Annotated[Optional[dict], _merge_dict]
+    # RAG retrieval output — shape: {context: str, sources: list[dict], retrieved: bool}
+    rag_output: Annotated[Optional[dict], _merge_dict]
 
     clarification_question: Optional[str]  # Set by orchestrator when intent == CLARIFY
     approval_status: Optional[

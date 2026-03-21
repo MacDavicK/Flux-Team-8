@@ -1,0 +1,109 @@
+Title: How Are Habits Formed: Modelling Habit Formation in the Real World | Source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3505409/
+Category: behavioral | Authority: peer_reviewed
+---
+Habits are behaviours that are performed automatically and consistently in response to contextual cues, without requiring deliberate decision-making. Understanding how habits form — and how long they take to form — has important practical implications for health behaviour change, including diet, exercise, and other lifestyle modifications.
+
+The Classic "21 Days" Myth
+
+The popular notion that habits take 21 days to form stems from plastic surgeon Maxwell Maltz's observation in the 1950s that patients required a minimum of 21 days to adjust to changes in their body image. This was never a scientific finding about habit formation, yet it has become deeply embedded in popular culture.
+
+The scientific evidence paints a more complex and nuanced picture.
+
+The Science of Habit Formation
+
+A landmark study by Phillippa Lally and colleagues at University College London followed 96 participants over 12 weeks as they attempted to form a new healthy eating, drinking, or exercise behaviour. Participants reported daily on whether they performed the behaviour and whether it felt automatic.
+
+Key findings:
+
+Time to automaticity: The time it took for a behaviour to become habit ranged from 18 to 254 days, with an average of 66 days. The median was approximately 66 days.
+
+Individual variability: There was enormous variation between individuals and behaviours. Simple behaviours (drinking a glass of water after breakfast) formed faster than complex behaviours (completing a 50-minute run before work).
+
+Missing a day doesn't break a habit: Occasional missed performances of the habit did not significantly disrupt the habit formation trajectory. This contradicts the belief that a single lapse undoes progress.
+
+The Habit Loop
+
+Psychological research describes habit formation through a "habit loop" consisting of three components:
+
+1. Cue (trigger): A contextual signal that initiates the habit behaviour. Cues can be time of day, location, preceding event, emotional state, or other people.
+
+2. Routine (behaviour): The automatic behaviour performed in response to the cue.
+
+3. Reward: The positive outcome (physical or psychological) that reinforces the behaviour.
+
+Strengthening the cue-routine-reward loop through repetition is how habits become automatic. The cue triggers the routine without requiring deliberate intention.
+
+Implementation Intentions and Habit Formation
+
+Research by Gollwitzer and others demonstrates that "implementation intentions" — specific plans of the form "When [cue], I will [behaviour]" — significantly increase the likelihood of behaviour initiation and habit formation.
+
+Example implementation intentions for exercise:
+- "When I wake up on Monday, Wednesday, and Friday, I will put on my running shoes and go for a 30-minute run."
+- "When I sit down at my desk after lunch, I will do 10 minutes of stretching."
+
+Implementation intentions work by pre-deciding behaviour in specific situations, reducing the cognitive load of the decision and linking the behaviour to existing contextual cues.
+
+Studies show that people who form implementation intentions are 2–3 times more likely to perform new behaviours than those who simply express intention to do so.
+
+Identity and Habit Formation
+
+Research by James Clear (building on BJ Fogg's habit science work) emphasises the role of identity in sustaining habits. Behaviour change is most durable when the individual internalises the new behaviour as part of their identity.
+
+The shift from:
+- "I'm trying to exercise more" (outcome-based)
+to:
+- "I am someone who exercises regularly" (identity-based)
+
+This identity shift is reinforced through consistent action — each time the behaviour is performed, it is a vote for the identity. Over time, identity and behaviour become mutually reinforcing.
+
+Habit Stacking
+
+Habit stacking involves anchoring a new behaviour to an existing well-established habit. The format is:
+
+"After [CURRENT HABIT], I will [NEW HABIT]."
+
+Examples:
+- "After I pour my morning coffee, I will write in my food journal for 2 minutes."
+- "After I arrive home from work, I will immediately change into my workout clothes."
+- "After brushing my teeth at night, I will prepare my gym bag for tomorrow."
+
+Because the existing habit is already automatic, it serves as a reliable cue that initiates the new behaviour without requiring a separate reminder.
+
+Friction and Habit Formation
+
+The effort required to perform a behaviour (friction) strongly influences whether it becomes a habit. Research demonstrates that reducing friction for desired behaviours and increasing friction for undesired behaviours is a highly effective strategy.
+
+Reducing friction for exercise:
+- Sleep in workout clothes (for early morning exercise)
+- Place running shoes by the door
+- Pack your gym bag the night before
+- Choose a gym on your route to work
+- Keep equipment visible and accessible at home
+
+Reducing friction for healthy eating:
+- Pre-cut vegetables and store them at eye level in the refrigerator
+- Prepare meals in advance and portion them
+- Keep healthy snacks accessible and unhealthy foods out of sight
+
+Reward and Dopaminergic Reinforcement
+
+Reward is the critical element that strengthens the habit loop. When a behaviour is followed by a positive outcome (even a small one), the dopaminergic reward system reinforces the cue-routine association, making the habit stronger.
+
+The brain anticipates reward when the habit cue is encountered — this anticipatory dopamine is part of what makes established habits feel compelling.
+
+For health habits, rewards need not be external:
+- Tracking completion and reviewing a streak (visual progress)
+- A brief feeling of accomplishment immediately after completing the behaviour
+- Social recognition from a group or partner
+
+The reward must be immediate — delayed consequences (future health benefits) are neurologically weak motivators compared with immediate consequences. This is why linking immediate enjoyment to a healthy habit (e.g., only listening to a favourite podcast while running) can accelerate habit formation.
+
+Implications for Sustainable Behaviour Change
+
+1. Expect habit formation to take 2–3 months, not 21 days. Set realistic timelines.
+2. Design specific cues using implementation intentions ("When X, I will Y").
+3. Anchor new habits to existing ones through habit stacking.
+4. Reduce friction for desired behaviours; increase friction for undesired ones.
+5. Build in immediate rewards; don't rely on long-term health benefits as motivation.
+6. Missing a day or two does not require starting over — consistency over time is what matters.
+7. Cultivate identity as a person who engages in the healthy behaviour.

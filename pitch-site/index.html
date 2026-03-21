@@ -757,12 +757,31 @@
       border-radius: 10px;
       font-size: 11px; font-weight: 700;
       text-align: center;
+      display: flex; flex-direction: column; align-items: center; gap: 4px;
     }
     .fan-node.sage  { background: rgba(92,124,102,0.12); color: var(--sage); border: 1px solid rgba(92,124,102,0.2); }
     .fan-node.terra { background: rgba(194,125,102,0.12); color: var(--terra); border: 1px solid rgba(194,125,102,0.2); }
     .fan-node.river { background: rgba(138,143,139,0.12); color: var(--river); border: 1px solid rgba(138,143,139,0.2); }
+    .fan-node.dark  { background: rgba(45,51,47,0.08); color: var(--charcoal); border: 1px solid rgba(45,51,47,0.15); }
     .fan-node div   { font-size: 10px; font-weight: 400; margin-top: 1px; }
     .fan-label { font-size: 10px; color: var(--river); font-style: italic; text-align: center; margin-bottom: 4px; }
+
+    /* Graph legend */
+    .graph-legend {
+      display: flex; gap: 16px; justify-content: center;
+      margin-top: 16px; padding-top: 12px;
+      border-top: 1px solid rgba(255,255,255,0.4);
+    }
+    .graph-legend-item {
+      display: flex; align-items: center; gap: 5px;
+      font-size: 10px; font-weight: 600; letter-spacing: 0.06em;
+      text-transform: uppercase; color: var(--river);
+    }
+    .legend-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .legend-dot.ai     { background: var(--sage); }
+    .legend-dot.logic  { background: var(--stone-dark); border: 1.5px solid var(--river); }
 
     /* Architecture points */
     .ai-points { list-style: none; margin-top: 0; }
@@ -792,18 +811,20 @@
     #tech { padding: var(--space-2xl) 0; }
 
     .tech-grid {
-      display: grid;
-      grid-template-columns: repeat(3,1fr);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: center;
       gap: 14px;
       margin-top: 48px;
     }
-    @media (max-width: 768px) { .tech-grid { grid-template-columns: 1fr; } }
-    @media (max-width: 900px) and (min-width: 641px) { .tech-grid { grid-template-columns: repeat(2,1fr); } }
 
     .tech-item {
+      flex: 0 1 calc(33.333% - 10px);
       padding: 22px 20px;
       display: flex; gap: 14px; align-items: flex-start;
     }
+    @media (max-width: 900px) and (min-width: 641px) { .tech-item { flex-basis: calc(50% - 7px); } }
+    @media (max-width: 640px) { .tech-item { flex-basis: 100%; } }
     .tech-emoji { font-size: 20px; flex-shrink: 0; margin-top: 2px; }
     .tech-name { font-size: 14px; font-weight: 700; color: var(--charcoal); margin-bottom: 4px; }
     .tech-desc { font-size: 12px; color: var(--river); line-height: 1.5; }
@@ -831,8 +852,9 @@
       padding: 4px 10px; border-radius: var(--r-pill);
       font-size: 10px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase;
     }
-    .rm-badge.infra { background: rgba(194,125,102,0.1); color: var(--terra); border: 1px solid rgba(194,125,102,0.2); }
-    .rm-badge.soon  { background: rgba(92,124,102,0.1);  color: var(--sage);  border: 1px solid rgba(92,124,102,0.2); }
+    .rm-badge.infra    { background: rgba(194,125,102,0.1); color: var(--terra);    border: 1px solid rgba(194,125,102,0.2); }
+    .rm-badge.soon     { background: rgba(92,124,102,0.1);  color: var(--sage);     border: 1px solid rgba(92,124,102,0.2); }
+    .rm-badge.shipped  { background: rgba(45,51,47,0.07);   color: var(--charcoal); border: 1px solid rgba(45,51,47,0.18); }
 
     /* ═══════════════════════════
        CTA
@@ -1158,7 +1180,7 @@
     <div class="container">
       <div class="section-header reveal">
         <span class="label">How Flux works</span>
-        <h2 class="section-title">Five things no other<br><em>productivity app does</em></h2>
+        <h2 class="section-title">Six things no other<br><em>productivity app does</em></h2>
         <p class="body-lg">Not a to-do list. A coaching system that plans, adapts, and persists.</p>
       </div>
 
@@ -1181,7 +1203,7 @@
               <span class="usp-number">02</span>
             </div>
             <h3 class="usp-title">Plans, doesn't just list</h3>
-            <p class="usp-body">Say "I want to run a 5K in 6 weeks." Flux builds a milestone roadmap with recurring tasks, realistic durations, and slots them into your actual free time — no conflicts, no overbooking.</p>
+            <p class="usp-body">Say "I want to run a 5K in 6 weeks." Flux builds a milestone roadmap with recurring tasks, realistic durations, and slots them into your actual free time — no conflicts, no overbooking. For health and fitness goals, plans are grounded in guidance from WHO, CDC, and Mayo Clinic — not guesswork.</p>
           </div>
         </div>
 
@@ -1652,7 +1674,7 @@
         <span class="label">Under the hood</span>
         <h2 class="section-title">A stateful multi-agent<br><em>AI system</em></h2>
         <p class="body-lg">
-          Not a single LLM call. A graph of 13 specialized agents — each one checkpointed to PostgreSQL, so every conversation can be interrupted and resumed exactly where it left off.
+          Not <strong>one</strong> LLM call &mdash; <em><strong>nine</strong></em>. Nine AI-powered agents in a 15-node LangGraph pipeline — each node checkpointed to PostgreSQL, so every conversation can be interrupted and resumed exactly where it left off.
         </p>
       </div>
 
@@ -1668,13 +1690,23 @@
               <div class="node-desc">Intent classification &middot; GPT-4o</div>
             </div>
           </div>
+          <div style="margin:4px 0 2px;">
+            <div class="fan-label">Routes by intent</div>
+            <div class="fan-row">
+              <div class="fan-node sage"><div class="legend-dot ai"></div>Goal Clarifier<div>Goal path</div></div>
+              <div class="fan-node terra"><div class="legend-dot ai"></div>Task Handler<div>New tasks</div></div>
+              <div class="fan-node terra"><div class="legend-dot ai"></div>Goal Modifier<div>Edit goals</div></div>
+            </div>
+          </div>
+
           <div class="connector"></div>
+          <div class="fan-label">Goal planning path</div>
 
           <div class="agent-node indent">
-            <div class="nd nd-sage"></div>
+            <div class="legend-dot logic"></div>
             <div>
-              <div class="node-name">Goal Clarifier</div>
-              <div class="node-desc">Multi-turn Q&amp;A to refine the goal</div>
+              <div class="node-name">Ask Start Date</div>
+              <div class="node-desc">Date picker before fan-out</div>
             </div>
           </div>
           <div class="connector indent"></div>
@@ -1688,20 +1720,44 @@
           </div>
 
           <div style="margin:4px 0 2px;">
-            <div class="fan-label">Fan-out (parallel execution)</div>
+            <div class="fan-label">Phase 1 — classifier runs solo first</div>
+            <div class="fan-row" style="grid-template-columns: 1fr;">
+              <div class="fan-node sage"><div class="legend-dot ai"></div>Classifier<div>Tags goal &middot; gates RAG</div></div>
+            </div>
+            <div class="fan-label" style="margin-top:6px;">Phase 2 — parallel fan-out</div>
             <div class="fan-row">
-              <div class="fan-node sage">Classifier<div>Tags goal</div></div>
-              <div class="fan-node terra">Scheduler<div>Free slots</div></div>
-              <div class="fan-node river">Pattern<div>Behavior</div></div>
+              <div class="fan-node terra"><div class="legend-dot ai"></div>Scheduler<div>Free slots</div></div>
+              <div class="fan-node river"><div class="legend-dot ai"></div>Pattern<div>Behavior</div></div>
+              <div class="fan-node river" style="border-style: dashed;"><div class="legend-dot logic"></div>RAG<div>Expert docs</div></div>
             </div>
           </div>
 
           <div class="connector"></div>
+          <div class="fan-label">All paths converge</div>
+
+          <div class="agent-node indent">
+            <div class="nd nd-sage"></div>
+            <div>
+              <div class="node-name">Reschedule</div>
+              <div class="node-desc">Slot-finding &middot; via Goal Modifier</div>
+            </div>
+          </div>
+          <div class="connector indent"></div>
+
           <div class="agent-node">
-            <div class="nd nd-river"></div>
+            <div class="legend-dot logic"></div>
             <div>
               <div class="node-name">Save Tasks</div>
               <div class="node-desc">Materializes goals + tasks to PostgreSQL</div>
+            </div>
+          </div>
+
+          <div class="graph-legend">
+            <div class="graph-legend-item">
+              <div class="legend-dot ai"></div> AI agent
+            </div>
+            <div class="graph-legend-item">
+              <div class="legend-dot logic"></div> Logic node
             </div>
           </div>
         </div>
@@ -1720,8 +1776,8 @@
             <li>
               <span class="ai-num">02</span>
               <div>
-                <div class="ai-point-title">Parallel planning</div>
-                <div class="ai-point-body">Classifier, Scheduler, and Pattern Observer run simultaneously via Send() fan-out — not in sequence. Planning is ~3&times; faster than a chain-of-thought approach.</div>
+                <div class="ai-point-title">Two-phase parallel planning</div>
+                <div class="ai-point-body">The Classifier runs first solo — its tags decide whether to invoke RAG. Then Scheduler, Pattern Observer, and RAG fan out simultaneously via Send(). Two phases instead of a long chain means planning is ~3&times; faster.</div>
               </div>
             </li>
             <li>
@@ -1738,6 +1794,13 @@
                 <div class="ai-point-body">Conversation history is auto-summarized when it exceeds limits. The agent always has full context without burning tokens on old messages.</div>
               </div>
             </li>
+            <li>
+              <span class="ai-num">05</span>
+              <div>
+                <div class="ai-point-title">Evidence-based planning</div>
+                <div class="ai-point-body">Health and fitness goals are grounded in 30 curated articles from WHO, CDC, Mayo Clinic, and peer-reviewed journals — retrieved via Pinecone at plan time, not hard-coded into prompts.</div>
+              </div>
+            </li>
           </ul>
 
           <div class="ai-tags">
@@ -1745,6 +1808,7 @@
             <span class="tag tag-terra">LiteLLM &rarr; OpenRouter</span>
             <span class="tag tag-river">LangSmith tracing</span>
             <span class="tag tag-dark">PostgreSQL checkpoint</span>
+            <span class="tag tag-dark">Pinecone RAG</span>
           </div>
         </div>
 
@@ -1780,7 +1844,7 @@
           <div class="tech-emoji"><i data-lucide="brain"></i></div>
           <div>
             <div class="tech-name">LangGraph + LiteLLM</div>
-            <div class="tech-desc">13-node stateful agent graph. Routes to GPT-4o, Claude Sonnet 4, and GPT-4o-mini with automatic fallback.</div>
+            <div class="tech-desc">15-node stateful agent graph. Routes to GPT-4o, Claude Sonnet 4, and GPT-4o-mini with automatic fallback.</div>
           </div>
         </div>
         <div class="tech-item glass-bubble reveal d1">
@@ -1823,6 +1887,20 @@
           <div>
             <div class="tech-name">Docker Compose</div>
             <div class="tech-desc">API + Notifier + Redis + Postgres + ngrok in one file. One-command local setup.</div>
+          </div>
+        </div>
+        <div class="tech-item glass-bubble reveal d1">
+          <div class="tech-emoji"><i data-lucide="search"></i></div>
+          <div>
+            <div class="tech-name">Pinecone + OpenAI Embeddings</div>
+            <div class="tech-desc">Serverless vector store for RAG. 30 curated health &amp; fitness articles embedded with text-embedding-3-small and retrieved at plan time.</div>
+          </div>
+        </div>
+        <div class="tech-item glass-bubble reveal d2">
+          <div class="tech-emoji"><i data-lucide="mic"></i></div>
+          <div>
+            <div class="tech-name">Deepgram STT + TTS</div>
+            <div class="tech-desc">Push-to-talk voice input via nova-3 STT. AI responses played back via aura-asteria-en TTS. Low-latency streaming over WebSocket.</div>
           </div>
         </div>
       </div>
@@ -1901,17 +1979,6 @@
           </a>
         </div>
 
-        <div class="team-card glass-card reveal d2">
-          <img class="team-avatar" src="avatars/session.jpg" alt="Session Mwamufiya" />
-          <div class="team-name">Session Mwamufiya</div>
-          <div class="team-role">Frontend Developer</div>
-          <div class="team-ownership">Notification system, Notifier agent &amp; Pattern Observer agent</div>
-          <a class="team-gh" href="https://github.com/Session-SOS" target="_blank" rel="noopener">
-            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-            @Session-SOS
-          </a>
-        </div>
-
         <div class="team-card glass-card reveal d3">
           <img class="team-avatar" src="https://github.com/kiyer1974.png" alt="Krishnan Iyer" />
           <div class="team-name">Krishnan Iyer</div>
@@ -1920,6 +1987,17 @@
           <a class="team-gh" href="https://github.com/kiyer1974" target="_blank" rel="noopener">
             <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
             @kiyer1974
+          </a>
+        </div>
+
+        <div class="team-card glass-card reveal d3">
+          <img class="team-avatar" src="https://github.com/MacDavicK.png" alt="Kavish Jaiswal" />
+          <div class="team-name">Kavish Jaiswal</div>
+          <div class="team-role">Full-Stack Developer</div>
+          <div class="team-ownership">RAG pipeline for Health &amp; Fitness goals + onboarding flow</div>
+          <a class="team-gh" href="https://github.com/MacDavicK" target="_blank" rel="noopener">
+            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            @MacDavicK
           </a>
         </div>
 
@@ -1935,24 +2013,24 @@
         </div>
 
         <div class="team-card glass-card reveal d2">
-          <img class="team-avatar" src="avatars/hima.jpg" alt="Hima" />
+          <img class="team-avatar" src="avatars/session.png" alt="Session Mwamufiya" />
+          <div class="team-name">Session Mwamufiya</div>
+          <div class="team-role">Frontend Developer</div>
+          <div class="team-ownership">Notification system, Notifier agent &amp; Pattern Observer agent</div>
+          <a class="team-gh" href="https://github.com/Session-SOS" target="_blank" rel="noopener">
+            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
+            @Session-SOS
+          </a>
+        </div>
+
+        <div class="team-card glass-card reveal d2">
+          <img class="team-avatar" src="avatars/hima.png" alt="Hima" />
           <div class="team-name">Hima</div>
           <div class="team-role">Backend Developer</div>
           <div class="team-ownership">Scheduler agent &amp; task reschedule flow</div>
           <a class="team-gh" href="https://github.com/aug13post" target="_blank" rel="noopener">
             <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
             @aug13post
-          </a>
-        </div>
-
-        <div class="team-card glass-card reveal d3">
-          <img class="team-avatar" src="https://github.com/MacDavicK.png" alt="Kavish Jaiswal" />
-          <div class="team-name">Kavish Jaiswal</div>
-          <div class="team-role">Full-Stack Developer</div>
-          <div class="team-ownership">RAG pipeline for Health &amp; Fitness goals + onboarding flow</div>
-          <a class="team-gh" href="https://github.com/MacDavicK" target="_blank" rel="noopener">
-            <svg class="gh-icon" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.531 1.032 1.531 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0112 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0022 12.017C22 6.484 17.522 2 12 2z"/></svg>
-            @MacDavicK
           </a>
         </div>
 
@@ -1972,6 +2050,11 @@
         <p class="cta-sub">
           Not a to-do list. Not another reminder app. A coaching system that plans with you, adapts to you, and holds you accountable — every single day.
         </p>
+        <div class="cta-actions">
+          <a href="#demos" class="btn-primary">Watch demos &rarr;</a>
+          <a href="#ai" class="btn-secondary">See the AI engine</a>
+        </div>
+        <p class="cta-micro">Built with LangGraph &middot; FastAPI &middot; TanStack Start</p>
       </div>
     </div>
   </section>

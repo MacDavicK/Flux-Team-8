@@ -1,0 +1,75 @@
+Title: Prevention of Obesity among Adults: Evidence Review | Source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3471136/
+Category: weight_loss | Authority: peer_reviewed
+---
+Obesity prevention requires a multi-level approach that addresses individual, environmental, and policy-level determinants. Evidence from systematic reviews and meta-analyses indicates that sustainable weight management depends on integrating behavioural, dietary, and physical activity interventions rather than relying on any single strategy.
+
+Key Risk Factors for Weight Gain in Adults
+
+Research consistently identifies the following modifiable risk factors for obesity onset in adults:
+
+- Sedentary behaviour and low physical activity levels
+- High intake of energy-dense, nutrient-poor foods
+- Excessive consumption of sugar-sweetened beverages
+- Frequent fast-food consumption
+- Short sleep duration (less than 7 hours per night)
+- Chronic psychological stress
+- Irregular meal timing and skipping breakfast
+
+Non-modifiable risk factors include genetic predisposition, which can account for 40–70% of individual variability in BMI. However, genetic susceptibility is expressed in the context of an obesogenic environment, meaning behavioural change remains a meaningful lever.
+
+Dietary Interventions with Evidence of Effectiveness
+
+Energy restriction remains the cornerstone of weight loss. However, the composition of the diet also influences outcomes:
+
+Low-glycaemic index (GI) diets: These diets reduce postprandial blood glucose spikes, potentially improving satiety and reducing total energy intake. Meta-analyses show modest but consistent weight loss advantages over high-GI diets.
+
+Higher protein diets (25–30% of total energy from protein): Protein has a higher thermic effect than carbohydrate or fat, meaning more calories are expended during digestion. Higher protein intake also promotes greater satiety per calorie consumed.
+
+Mediterranean dietary patterns: Associated with lower risk of weight regain after weight loss, lower rates of metabolic syndrome, and better long-term cardiovascular outcomes compared with low-fat diets.
+
+Reduction of ultra-processed foods: Strong observational evidence links ultra-processed food intake to positive energy balance and weight gain, independent of macronutrient composition.
+
+Physical Activity and Obesity Prevention
+
+Aerobic physical activity is associated with modest weight loss (approximately 1–3 kg over 6 months when performed at recommended levels without dietary changes). The combination of dietary restriction and physical activity consistently outperforms either strategy alone.
+
+Current evidence suggests:
+
+- 150 minutes per week of moderate-intensity activity is sufficient for health benefits but may be insufficient for preventing weight regain in adults who have lost significant weight
+- 200–300 minutes per week is associated with better long-term weight maintenance
+- Resistance training preserves lean mass during caloric restriction, reducing the decline in resting metabolic rate that often accompanies weight loss
+
+Screen time reduction independently predicts lower total energy intake, likely through reducing exposure to food advertising and reducing sedentary energy-dense eating occasions.
+
+Behavioural Strategies Supported by Evidence
+
+Self-monitoring: Consistent self-monitoring of food intake (through food diaries, apps, or wearable devices) is one of the most robustly supported predictors of weight loss success across multiple intervention trials and longitudinal studies.
+
+Goal setting: Specific, proximal, achievable goals produce better outcomes than vague or distal goals. The SMART framework (Specific, Measurable, Achievable, Relevant, Time-limited) is widely endorsed in clinical practice guidelines.
+
+Stimulus control: Modifying the food environment — removing high-calorie foods from the home, reducing portion sizes, using smaller plates, and placing healthy foods at eye level in the refrigerator — leverages environmental cues to support healthier choices.
+
+Social support: Interventions that include a social support component, whether from family members, peers, or health professionals, consistently outperform individual-only interventions.
+
+Environmental and Policy Considerations
+
+Individual-level interventions are more effective when embedded in supportive environmental contexts. Evidence supports the role of:
+
+- Food labelling and nutrition information at point of purchase
+- Taxation of sugar-sweetened beverages
+- Urban design features that support active transport (cycling and pedestrian infrastructure)
+- Workplace wellness programs that offer healthy food options and facilitate physical activity
+
+The cumulative evidence suggests that combining individual-level behavioural interventions with supportive environmental and policy structures produces larger and more sustained population-level effects on obesity prevalence than either approach alone.
+
+Long-Term Maintenance
+
+Weight maintenance after loss is more challenging than the initial weight loss phase. Factors associated with successful maintenance include:
+
+- Continued self-monitoring of weight (weekly weighing)
+- High physical activity levels (>200 min/week)
+- Consistent dietary patterns across weekdays and weekends
+- Continued use of the strategies that produced initial weight loss
+- Access to ongoing professional or peer support
+
+Relapse rates are high: approximately 30–50% of weight lost is typically regained within 1 year, and up to 80% within 5 years without active maintenance strategies. This underscores the importance of long-term follow-up and support rather than treating obesity as an acute condition.

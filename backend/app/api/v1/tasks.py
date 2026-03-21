@@ -92,7 +92,10 @@ async def get_tasks(
         FROM tasks t
         LEFT JOIN goals g ON g.id = t.goal_id
         WHERE t.user_id = $1
-          AND t.status IN ('pending', 'rescheduled', 'missed', 'done')
+          AND (
+            t.status IN ('pending', 'rescheduled', 'done')
+            OR (t.status = 'missed' AND t.goal_id IS NOT NULL)
+          )
           AND t.scheduled_at >= $2
           AND t.scheduled_at < $3
         ORDER BY t.scheduled_at ASC

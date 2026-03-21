@@ -1,0 +1,118 @@
+Title: Behavioral Treatment of Obesity | Source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5764240/
+Category: behavioral | Authority: peer_reviewed
+---
+Behavioural treatment of obesity is an evidence-based approach that uses psychological and behavioural strategies to help individuals modify the eating, activity, and lifestyle behaviours that contribute to excess weight. It is a cornerstone of clinical weight management and is recommended as a first-line treatment by major clinical guidelines including those from the US Preventive Services Task Force, the National Heart, Lung, and Blood Institute, and the Obesity Society.
+
+Foundational Principles
+
+Behavioural treatment is grounded in social cognitive theory and behaviour change science. It operates on the premise that eating and physical activity behaviours are learned and can be modified through systematic application of behavioural principles.
+
+Core components of evidence-based behavioural treatment:
+
+1. Self-monitoring of diet, physical activity, and body weight
+2. Goal setting (both process and outcome goals)
+3. Stimulus control (modifying the environment to support healthy behaviours)
+4. Problem solving (identifying and addressing barriers to behaviour change)
+5. Cognitive restructuring (identifying and changing unhelpful thought patterns)
+6. Relapse prevention (anticipating and planning for high-risk situations)
+7. Social support mobilisation
+8. Motivational enhancement
+
+Evidence for Behavioural Treatment
+
+Comprehensive lifestyle intervention (combining dietary change, physical activity, and behavioural strategies) produces average weight losses of 8–10% of initial body weight over 6 months in research trials. The Look AHEAD trial (Action for Health in Diabetes), the largest and longest trial of intensive behavioural treatment, demonstrated average weight loss of 8.6% at 1 year and maintained benefits for cardiovascular risk factors over 4 years.
+
+Even a 5–10% reduction in body weight from behavioural intervention produces clinically meaningful improvements in:
+- Blood pressure
+- Blood glucose and insulin resistance
+- Blood lipids (triglycerides, HDL cholesterol)
+- Sleep apnoea severity
+- Joint pain and mobility
+- Mood and quality of life
+
+Structure of Effective Behavioural Treatment
+
+High-contact programmes: The most effective behavioural programmes involve frequent contact with a treatment provider or group — at least monthly, and ideally weekly in the initial phase. More contact produces more weight loss within a given timeframe.
+
+Group vs. individual formats: Group-based behavioural treatment is at least as effective as individual treatment and is more cost-effective. Groups provide social support, accountability, and shared learning.
+
+Duration: Programmes that last at least 12 months produce better long-term outcomes than shorter programmes. Most of the evidence base comes from 12–18 month programmes.
+
+Maintenance phase: After the initial weight loss phase, a maintenance phase with continued but reduced contact frequency (monthly or bimonthly) significantly improves long-term weight maintenance compared with no follow-up.
+
+Key Behavioural Strategies in Detail
+
+Self-Monitoring
+
+As reviewed extensively in the literature, self-monitoring is the single strongest predictor of weight loss success within behavioural programmes. Participants who complete more food diary entries lose more weight, independent of other programme components.
+
+Specific self-monitoring assignments in evidence-based programmes:
+- Daily food logging with estimated calorie counts
+- Weekly weigh-ins recorded in a log
+- Activity logs recording type, duration, and estimated energy expenditure
+
+Goal Setting
+
+Effective goal setting in behavioural treatment follows the SMART framework and distinguishes between:
+
+Process goals: Specific behavioural targets (e.g., "I will log my food diary every day this week"; "I will walk for 30 minutes on Monday, Wednesday, and Friday").
+
+Outcome goals: Weight or health targets (e.g., "I will lose 5 kg by Month 3").
+
+Process goals are prioritised in behavioural treatment because they are within the individual's direct control, unlike outcome goals which depend on process.
+
+Stimulus Control
+
+Stimulus control refers to modifying the environment to make healthy behaviours easier and unhealthy behaviours harder. Evidence-based stimulus control strategies:
+
+Food environment:
+- Remove or limit high-calorie, low-nutrient foods from the home
+- Place fruits, vegetables, and other healthy options at eye level in the refrigerator
+- Use smaller plates, bowls, and glasses
+- Avoid eating directly from packages or serving dishes
+- Pre-portion snacks into serving-sized containers
+- Avoid eating in front of screens (TV, smartphone)
+
+Physical activity environment:
+- Lay out workout clothes the night before
+- Keep exercise equipment visible and accessible
+- Place a gym bag by the door
+- Remove barriers to exercise (e.g., pay for gym membership, create a home workout space)
+
+Cognitive Restructuring
+
+Cognitive restructuring addresses unhelpful thoughts and beliefs that interfere with behaviour change. Common unhelpful cognitions in weight management:
+
+All-or-nothing thinking: "I ate one biscuit, so the whole day is ruined." Reframe: "One biscuit is a small deviation that I can move past. My next meal is a fresh start."
+
+Catastrophising: "I've gained 2 kg since last week — all my progress is gone." Reframe: "Weight fluctuates daily. A 2 kg gain likely reflects water retention. I'll focus on my next week of healthy behaviours."
+
+Emotional reasoning: "I feel fat, therefore I am failing." Reframe: "Feelings are not facts. I can feel discouraged and still make healthy choices today."
+
+Attributional errors: "I'm bad at losing weight" (internal, stable, global attribution for setbacks). Reframe: "This week was particularly difficult because of [specific stressor]. I can use different strategies next week."
+
+Relapse Prevention
+
+The Marlatt and Gordon relapse prevention model, originally developed for addiction, has been adapted for weight management. Key components:
+
+High-risk situation identification: Identifying situations likely to trigger overeating or physical inactivity (social events, stress, travel, holidays).
+
+Coping planning: Developing specific strategies for each high-risk situation in advance.
+
+Lapse vs. relapse distinction: A lapse (single episode of overeating or missed exercise) is expected and can be recovered from. A relapse (return to pre-treatment patterns) is more serious. Preventing lapses from becoming relapses requires addressing the "abstinence violation effect" — the guilt and catastrophising that follows a lapse and makes it more likely to continue.
+
+Long-Term Weight Maintenance
+
+The most challenging phase of weight management is maintenance after initial loss. Key evidence-based strategies for maintenance:
+
+Continued self-monitoring: Those who maintain monitoring continue to lose weight or maintain loss; those who stop monitoring tend to regain.
+
+Regular physical activity: Higher levels of physical activity (>200–250 min/week) are strongly associated with successful maintenance.
+
+Continued professional support: Regular (even monthly) check-ins with a healthcare provider or group maintain accountability and allow early intervention when weight regain begins.
+
+Flexible rather than rigid dietary control: Those who use flexible, moderate dietary restraint (allowing occasional departures from their plan) maintain weight loss better than those who use rigid, all-or-nothing restraint.
+
+Problem solving: Successful maintainers use systematic problem solving when barriers arise rather than abandoning their efforts.
+
+Behavioural treatment provides the skill set and support structure that enables lasting change. It is most effective when combined with appropriate dietary and physical activity prescriptions tailored to the individual.

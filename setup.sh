@@ -10,7 +10,8 @@
 #   2. .env setup        — interactive prompts for all required variables
 #   3. Migrations        — apply all SQL migrations (all files are idempotent)
 #   4. Docker            — stop stale containers, then start the backend stack
-#   5. Frontend          — install deps and start the dev server
+#   5. RAG ingestion     — populate Pinecone index once (skipped if already done)
+#   6. Frontend          — install deps and start the dev server
 # =============================================================================
 
 set -euo pipefail
@@ -101,7 +102,7 @@ ask() {
 # =============================================================================
 
 check_deps() {
-    step "Step 1 of 5 — Dependency check"
+    step "Step 1 of 6 — Dependency check"
 
     local missing_hard=()
     local missing_soft=()
@@ -279,6 +280,33 @@ setup_openrouter() {
         set_env "OPENROUTER_API_KEY" "$api_key"
     else
         success "OPENROUTER_API_KEY already set"
+    fi
+}
+
+setup_pinecone() {
+    header "── Pinecone (RAG / Vector Store) ───────────────"
+    info "Create a serverless index at: https://app.pinecone.io"
+    info "Index settings: name=flux-articles, dims=1536, metric=cosine"
+    echo
+
+    local api_key index_name
+
+    api_key="$(get_env PINECONE_API_KEY)"
+    if is_placeholder "$api_key"; then
+        info "Get your key at: https://app.pinecone.io → API Keys"
+        api_key="$(ask "PINECONE_API_KEY (leave blank to skip)" "" "secret")"
+        [[ -n "$api_key" ]] && set_env "PINECONE_API_KEY" "$api_key"
+    else
+        success "PINECONE_API_KEY already set"
+    fi
+
+    index_name="$(get_env PINECONE_INDEX_NAME)"
+    if is_placeholder "$index_name"; then
+        local v
+        v="$(ask "PINECONE_INDEX_NAME" "flux-articles")"
+        set_env "PINECONE_INDEX_NAME" "$v"
+    else
+        success "PINECONE_INDEX_NAME=${index_name}"
     fi
 }
 
@@ -596,13 +624,14 @@ setup_frontend_env() {
 }
 
 run_env_setup() {
-    step "Step 2 of 5 — .env setup"
+    step "Step 2 of 6 — .env setup"
 
     bootstrap_env
 
     setup_app
     setup_supabase
     setup_openrouter
+    setup_pinecone
     setup_deepgram
     setup_langsmith
     setup_sentry
@@ -621,7 +650,7 @@ run_env_setup() {
 # =============================================================================
 
 run_migrations() {
-    step "Step 3 of 5 — Database migrations"
+    step "Step 3 of 6 — Database migrations"
 
     info "Running migrations via Docker (postgres:15-alpine) — no local psql required."
 
@@ -697,7 +726,7 @@ check_ngrok_container_running() {
 }
 
 run_docker() {
-    step "Step 4 of 5 — Docker (backend stack)"
+    step "Step 4 of 6 — Docker (backend stack)"
 
     local use_ngrok=false
     local ngrok_domain
@@ -748,33 +777,149 @@ run_docker() {
     echo
 
     # Wait until the API is reachable before starting the frontend
-    info "Waiting for API to become ready..."
+    info "Waiting for API to become ready (up to 90 s)..."
     local attempts=0
     until curl -sf http://localhost:8000/health >/dev/null 2>&1; do
         attempts=$(( attempts + 1 ))
-        if [[ $attempts -ge 30 ]]; then
-            warn "API did not become ready after 30 seconds — starting frontend anyway."
+        if [[ $attempts -ge 90 ]]; then
+            warn "API did not become ready after 90 seconds — starting frontend anyway."
             break
         fi
         sleep 1
     done
-    if [[ $attempts -lt 30 ]]; then
+    if [[ $attempts -lt 90 ]]; then
         success "API is ready."
     fi
 }
 
 # =============================================================================
-# STEP 5 — FRONTEND
+# STEP 5 — RAG CORPUS INGESTION
+# =============================================================================
+
+run_rag_ingest() {
+    step "Step 5 of 6 — RAG corpus ingestion"
+
+    local api_key index_name
+    api_key="$(get_env PINECONE_API_KEY)"
+    index_name="$(get_env PINECONE_INDEX_NAME)"
+    index_name="${index_name:-flux-articles}"
+
+    # Skip if Pinecone is not configured
+    if [[ -z "$api_key" ]] || is_placeholder "$api_key"; then
+        warn "PINECONE_API_KEY not set — skipping RAG ingestion."
+        info "Configure Pinecone and re-run, or trigger manually:"
+        info "  curl -X POST 'http://localhost:8000/api/v1/rag/ingest?articles_dir=\$(pwd)/backend/articles&clear_existing=true'"
+        return
+    fi
+
+    # Fetch index details from Pinecone control plane to get the host
+    info "Checking Pinecone index '${index_name}'..."
+    local index_json host
+    index_json="$(curl -sf \
+        -H "Api-Key: ${api_key}" \
+        -H "Accept: application/json" \
+        "https://api.pinecone.io/indexes/${index_name}" 2>/dev/null || echo "")"
+
+    if [[ -z "$index_json" ]]; then
+        warn "Index '${index_name}' not found or Pinecone unreachable."
+        info "Create it at https://app.pinecone.io (dims=1536, metric=cosine) then re-run."
+        return
+    fi
+
+    host="$(echo "$index_json" | python3 -c \
+        "import sys,json; print(json.load(sys.stdin).get('host',''))" 2>/dev/null || echo "")"
+
+    if [[ -z "$host" ]]; then
+        warn "Could not read index host from Pinecone response — skipping."
+        return
+    fi
+
+    # Idempotency check: skip if index already has vectors
+    local stats vector_count
+    stats="$(curl -sf \
+        -H "Api-Key: ${api_key}" \
+        "https://${host}/describe_index_stats" 2>/dev/null || echo "")"
+    vector_count="$(echo "$stats" | python3 -c \
+        "import sys,json; print(json.load(sys.stdin).get('totalVectorCount', 0))" 2>/dev/null || echo "0")"
+
+    if [[ "$vector_count" -gt 0 ]]; then
+        success "Pinecone index already populated (${vector_count} vectors) — skipping ingestion."
+        return
+    fi
+
+    # Check that the articles directory is non-empty (host-side check)
+    local articles_dir_host="$BACKEND_DIR/articles"
+    local articles_dir_container="/app/articles"
+    if [[ ! -d "$articles_dir_host" ]] || [[ -z "$(ls -A "$articles_dir_host" 2>/dev/null)" ]]; then
+        warn "No articles found in backend/articles/ — skipping ingestion."
+        info "Add .txt files to backend/articles/ then trigger manually:"
+        info "  curl -X POST 'http://localhost:8000/api/v1/rag/ingest?articles_dir=${articles_dir_container}&clear_existing=true'"
+        return
+    fi
+
+    # Run ingestion via the already-running backend API.
+    # The ingest endpoint is dev-only (no auth required; returns 403 in production).
+    # articles_dir must be the path *inside* the container (mounted as /app/articles).
+    info "Ingesting RAG article corpus into Pinecone (runs once — may take ~60 s)..."
+    local ingest_response http_code
+    ingest_response="$(curl -s --max-time 120 -w "\n%{http_code}" -X POST \
+        "http://localhost:8000/api/v1/rag/ingest?articles_dir=${articles_dir_container}&clear_existing=true" \
+        2>/dev/null || echo "")"
+    http_code="$(echo "$ingest_response" | tail -1)"
+    ingest_response="$(echo "$ingest_response" | sed '$d')"
+
+    if [[ -z "$ingest_response" ]] || [[ "$http_code" == "000" ]]; then
+        warn "Ingestion request failed — backend may not have responded in time."
+        info "Trigger manually once the backend is up:"
+        info "  curl -X POST 'http://localhost:8000/api/v1/rag/ingest?articles_dir=${articles_dir_container}&clear_existing=true'"
+        return
+    fi
+
+    if [[ "$http_code" != "200" ]]; then
+        warn "Ingestion returned HTTP ${http_code}: ${ingest_response}"
+        info "Trigger manually once the issue is resolved:"
+        info "  curl -X POST 'http://localhost:8000/api/v1/rag/ingest?articles_dir=${articles_dir_container}&clear_existing=true'"
+        return
+    fi
+
+    local status article_count chunk_count
+    status="$(echo "$ingest_response" | python3 -c \
+        "import sys,json; print(json.load(sys.stdin).get('status',''))" 2>/dev/null || echo "")"
+    article_count="$(echo "$ingest_response" | python3 -c \
+        "import sys,json; print(json.load(sys.stdin).get('articles', 0))" 2>/dev/null || echo "0")"
+    chunk_count="$(echo "$ingest_response" | python3 -c \
+        "import sys,json; print(json.load(sys.stdin).get('chunks', 0))" 2>/dev/null || echo "0")"
+
+    if [[ "$status" == "ok" ]]; then
+        success "RAG ingestion complete: ${article_count} articles, ${chunk_count} chunks → Pinecone."
+    else
+        warn "Unexpected ingestion response: ${ingest_response}"
+        info "Check backend logs and trigger manually if needed."
+    fi
+}
+
+# =============================================================================
+# STEP 6 — FRONTEND
 # =============================================================================
 
 teardown() {
     echo
-    warn "Shutting down — running backend teardown (dev-end.sh)..."
-    bash "$BACKEND_DIR/dev-end.sh" --soft
+    warn "Shutting down — stopping Docker containers..."
+    if command -v docker &>/dev/null && docker info &>/dev/null 2>&1; then
+        if docker compose --project-directory "$BACKEND_DIR" ps --quiet 2>/dev/null | grep -q .; then
+            docker compose \
+                --project-directory "$BACKEND_DIR" \
+                --profile ngrok \
+                down --remove-orphans
+            success "Containers stopped."
+        else
+            info "No running containers found."
+        fi
+    fi
 }
 
 run_frontend() {
-    step "Step 5 of 5 — Frontend"
+    step "Step 6 of 6 — Frontend"
 
     info "Installing frontend dependencies (npm install)..."
     npm --prefix "$FRONTEND_DIR" install
@@ -809,6 +954,7 @@ main() {
     run_env_setup
     run_migrations
     run_docker
+    run_rag_ingest
     run_frontend
 
     # Note: run_frontend blocks (foreground dev server), so this banner only

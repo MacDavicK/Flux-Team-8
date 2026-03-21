@@ -101,14 +101,15 @@ The app escalates notifications progressively (push → WhatsApp → phone call)
 | Notifications | Twilio (WhatsApp Business API + Voice) + Web Push API | Single vendor for escalation; Web Push for zero-friction in-app alerts |
 | Voice (STT + TTS) | Deepgram (nova-3 STT, aura-asteria-en TTS) | Low-latency streaming STT; natural TTS for spoken assistant responses |
 | LLM — Orchestrator | GPT-4o (via OpenRouter) | Strong intent classification + multi-turn reasoning |
-| LLM — Goal Planner | Claude 3.5 Sonnet (via OpenRouter) | Long-context planning, nuanced negotiation |
+| LLM — Goal Planner | Claude Sonnet 4 (via OpenRouter) | Long-context planning, nuanced negotiation |
 | LLM — Goal Clarifier | GPT-4o-mini (via OpenRouter) | Lightweight question generation before planning |
 | LLM — Classifier | GPT-4o-mini (via OpenRouter) | Fast, cheap, structured output (JSON tags) |
 | LLM — Scheduler | GPT-4o-mini (via OpenRouter) | Slot-finding logic with structured output |
 | LLM — Pattern Observer | GPT-4o-mini (via OpenRouter) | Pattern summarization over historical data |
 | LLM — Notifier Agent | No LLM needed | Pure deterministic state machine |
 | Monitoring | Sentry (frontend) + LangSmith (agents) | Error tracking + full LangGraph trace observability |
-| Embeddings (future) | OpenAI text-embedding-3-small | Semantic task deduplication |
+| Embeddings | OpenAI text-embedding-3-small via OpenRouter | RAG corpus embedding (1536 dims) |
+| Vector Store | Pinecone (serverless, cosine) | RAG retrieval for health/fitness goals |
 
 ---
 
@@ -212,7 +213,7 @@ responded_at    TIMESTAMPTZ
 
 ## 5. Agent Architecture
 
-There are **11 agents** in the system. Each is a node (or subgraph) in the LangGraph execution graph. Five new agents were added beyond the original spec to handle goal clarification, start-date collection, task amendment, goal modification, and conversational onboarding.
+There are **12 dedicated agent files** in the system, assembled into a **15-node LangGraph graph**. Two lightweight utility nodes — `chitchat` and `clarify` — are defined inline in `graph.py` rather than as separate files; `reschedule` reuses `scheduler_node` as a standalone graph node. Five agents were added beyond the original spec to handle goal clarification, start-date collection, task amendment, goal modification, and conversational onboarding. The RAG Retriever grounds health/fitness goal plans in expert evidence. The Notifier runs as a background service outside the conversational graph.
 
 ---
 
@@ -301,20 +302,21 @@ Rules:
 
 **Role:** Converts a validated goal statement into a concrete, sustainable 6-week action plan through negotiation with the user.
 
-**LLM:** Claude 3.5 Sonnet (best for long-context, nuanced multi-turn planning)
+**LLM:** Claude Sonnet 4 (best for long-context, nuanced multi-turn planning)
 
 **Responsibilities:**
 1. Assess if the goal is achievable in ≤6 weeks. If not, decompose into ordered micro-goals. Present the roadmap to the user for confirmation. Queue all but the first micro-goal in `goals` table with `status = 'pipeline'`.
 2. Consult the **Classifier** for goal tags.
 3. Consult the **Scheduler** for the user's available time slots over the next 6 weeks.
 4. Consult the **Pattern Observer** for behavioral data.
-5. Check if any generated tasks overlap with *existing active tasks* — if so, flag them and present to the user ("I see you're already going to the gym on Tuesdays — I'll incorporate that into your plan").
+5. Consult the **RAG Retriever** for expert evidence (fires automatically when Classifier tags include `Health`, `Fitness`, `Nutrition`, or `Mental Health`). If relevant context is found, it is injected into the planning prompt as a numbered citation block.
+6. Check if any generated tasks overlap with *existing active tasks* — if so, flag them and present to the user ("I see you're already going to the gym on Tuesdays — I'll incorporate that into your plan").
 6. Generate a proposed plan (list of structured tasks with day/time/duration).
 7. Negotiate with the user until confirmed. Allow slot negotiation.
 8. On confirmation: write tasks to DB via the Scheduler. Notify user the plan is live.
 9. If available slots are insufficient for 6 weeks: notify user that the goal will start on the first available date and set goal `status = 'pipeline'` with a future `activated_at`.
 
-**Input:** Goal statement + user profile + Classifier output + Scheduler output + Pattern Observer output
+**Input:** Goal statement + user profile + Classifier output + Scheduler output + Pattern Observer output + RAG Retriever output (when triggered)
 
 **Output:** Confirmed task list (JSON) → written to `tasks` table
 
@@ -365,7 +367,31 @@ After presenting the plan, continue the conversation to refine it. Only output S
 
 ---
 
-### 5.5 Classifier Agent
+### 5.5 RAG Retriever Agent _(new)_
+
+**Role:** Retrieves relevant expert evidence from the Pinecone vector store to ground health/fitness goal plans in authoritative guidance.
+
+**LLM:** None — embedding only (`openai/text-embedding-3-small` via OpenRouter).
+
+**Responsibilities:**
+- Runs as a parallel node in the Phase 2 fan-out, alongside Scheduler and Pattern Observer.
+- Fires only when the Classifier output contains at least one of: `Health`, `Fitness`, `Nutrition`, `Mental Health`.
+- Builds a semantic query from `goal_draft` fields (title, description, target, preferences).
+- Calls `rag_service.retrieve()` to fetch the top-5 most similar chunks from Pinecone.
+- Filters chunks below a 0.4 cosine similarity threshold.
+- Returns formatted context (numbered citation blocks) + deduplicated source list for the Goal Planner.
+
+**Input:** `goal_draft` fields from AgentState; falls back to latest user message if `goal_draft` is not yet populated.
+
+**Output:** `rag_output: { context: str, sources: list[{title, url}], retrieved: bool }`
+
+**Corpus:** 30 curated `.txt` articles in `backend/articles/` — 6 per category (weight loss, nutrition, strength, cardio, behavioral). Sources include WHO, CDC, NHLBI, Mayo Clinic, Harvard, ACSM, NHS, and peer-reviewed PMC journals.
+
+**Graceful degradation:** Any exception in retrieval returns `[]` — the Goal Planner proceeds without expert context rather than failing.
+
+---
+
+### 5.6 Classifier Agent
 
 **Role:** Tags a goal with one or more category labels for analytics.
 
@@ -391,7 +417,7 @@ Rules:
 
 ---
 
-### 5.6 Scheduler Agent
+### 5.7 Scheduler Agent
 
 **Role:** Manages the user's time. Finds available slots, detects conflicts, and writes confirmed plans to the database.
 
@@ -441,7 +467,7 @@ Output format:
 
 ---
 
-### 5.7 Pattern Observer Agent
+### 5.8 Pattern Observer Agent
 
 **Role:** Learns from the user's behavioral history to improve scheduling recommendations.
 
@@ -483,7 +509,7 @@ Only report patterns with at least 3 data points. Mark low-confidence patterns (
 
 ---
 
-### 5.8 Notifier Agent
+### 5.9 Notifier Agent
 
 **Role:** Background service that monitors task states and dispatches escalating notifications.
 
@@ -527,7 +553,7 @@ DTMF responses map to: 1 → `done`, 2 → `reschedule` (opens chat), 3 → `mis
 
 ---
 
-### 5.9 Task Handler Agent _(new)_
+### 5.10 Task Handler Agent _(new)_
 
 **Role:** Handles `NEW_TASK` intent — creates standalone, one-time or recurring tasks without going through the Goal Planner.
 
@@ -541,11 +567,11 @@ DTMF responses map to: 1 → `done`, 2 → `reschedule` (opens chat), 3 → `mis
 
 ---
 
-### 5.10 Goal Modifier Agent _(new)_
+### 5.11 Goal Modifier Agent _(new)_
 
 **Role:** Handles `MODIFY_GOAL` intent for already-saved goals — mutates the existing plan without full replanning.
 
-**LLM:** GPT-4o-mini
+**LLM:** Claude Sonnet 4
 
 **Responsibilities:**
 - Cancel all future pending tasks for the goal.
@@ -555,7 +581,7 @@ DTMF responses map to: 1 → `done`, 2 → `reschedule` (opens chat), 3 → `mis
 
 ---
 
-### 5.11 Save Tasks Agent _(new)_
+### 5.12 Save Tasks Agent _(new)_
 
 **Role:** Terminal write node. Bulk-inserts confirmed tasks into the database.
 
@@ -571,7 +597,7 @@ DTMF responses map to: 1 → `done`, 2 → `reschedule` (opens chat), 3 → `mis
 
 ---
 
-### 5.12 Onboarding Agent _(new)_
+### 5.13 Onboarding Agent _(new)_
 
 **Role:** Handles new-user onboarding entirely within the chat interface. Runs once per user; activated when `users.onboarded = false`.
 
@@ -613,6 +639,7 @@ graph.add_node("goal_planner", goal_planner_node)
 graph.add_node("classifier", classifier_node)
 graph.add_node("scheduler", scheduler_node)
 graph.add_node("pattern_observer", pattern_observer_node)
+graph.add_node("rag_retriever", rag_retriever_node)
 graph.add_node("task_handler", task_handler_node)
 graph.add_node("goal_modifier", goal_modifier_node)
 graph.add_node("save_tasks", save_tasks_node)
@@ -650,6 +677,7 @@ graph.add_conditional_edges("goal_planner", route_from_goal_planner)
 graph.add_edge("classifier",       "goal_planner")
 graph.add_edge("scheduler",        "goal_planner")
 graph.add_edge("pattern_observer", "goal_planner")
+graph.add_edge("rag_retriever",    "goal_planner")  # Only dispatched for health-adjacent goals
 
 # After all sub-agents complete: approval check
 # APPROVED + goal_start_date → save_tasks
@@ -664,7 +692,7 @@ graph.add_edge("save_tasks",    END)
 ```
 
 **Key implementation notes:**
-- **Parallel fan-out** uses LangGraph's `Send()` primitive — classifier, scheduler, and pattern_observer execute simultaneously. A custom merge reducer accumulates their results in `AgentState` without race conditions.
+- **Two-phase fan-out** uses LangGraph's `Send()` primitive. Phase 1 dispatches the classifier solo (its tags gate RAG in Phase 2). Phase 2 fans out scheduler, pattern_observer, and rag_retriever (health-adjacent goals only) in parallel. A custom merge reducer accumulates all results in `AgentState` without race conditions.
 - **Multi-turn persistence** uses `AsyncPostgresSaver` (psycopg + Supabase PostgreSQL direct port 5432 — not PgBouncer, which is incompatible with LangGraph checkpoint writes).
 - **`goal_start_date` is always collected before the fan-out** so the Scheduler uses the correct window on its first (and only) run — no reschedule round-trip needed after plan generation.
 
@@ -685,6 +713,7 @@ class AgentState(TypedDict):
     classifier_output: Annotated[Optional[dict], _merge_dict]
     scheduler_output:  Annotated[Optional[dict], _merge_dict]
     pattern_output:    Annotated[Optional[dict], _merge_dict]
+    rag_output:        Annotated[Optional[dict], _merge_dict]  # {context, sources, retrieved} — None when skipped
 
     clarification_question: Optional[str]
     approval_status: Optional[str]    # 'pending' | 'approved' | 'awaiting_start_date' | 'negotiating' | 'abandoned'
@@ -922,7 +951,7 @@ Refresh materialized views on a schedule (every hour) or trigger-based after tas
 > 2️⃣ Reschedule
 > 3️⃣ Mark as missed"
 
-**Phone call (TTS):** See §5.6
+**Phone call (TTS):** See §5.9
 
 ---
 
