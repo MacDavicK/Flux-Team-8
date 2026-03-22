@@ -172,6 +172,7 @@ export interface GoalClarifierQuestion {
   question: string;
   options: string[]; // pre-defined choices (empty = open-ended)
   allows_custom: boolean; // true if user can type a custom answer
+  multi_select: boolean; // true if user may pick more than one option
   zod_validator: string | null; // Zod schema string for validating custom input
   required: boolean;
 }
@@ -214,6 +215,10 @@ export interface ChatMessageResponse {
   spoken_summary?: string | null;
   rag_used: boolean;
   rag_sources: { title: string; url: string | null }[];
+  /** YYYY-MM-DD; lightest available day in the next 14. Set when agent_node == "ask_start_date". */
+  suggested_date?: string | null;
+  /** YYYY-MM-DD list of fully-booked days; these are disabled in the calendar picker. */
+  congested_dates?: string[];
 }
 
 /**
