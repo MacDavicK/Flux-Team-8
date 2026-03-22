@@ -50,6 +50,7 @@ class ClarifierQuestionSchema(BaseModel):
     question: str
     options: list[str] = []
     allows_custom: bool = True
+    multi_select: bool = False
     zod_validator: Optional[str] = None
     required: bool = True
 
@@ -70,6 +71,9 @@ class ChatMessageResponse(BaseModel):
     spoken_summary: Optional[str] = None
     rag_used: bool = False
     rag_sources: list[RagSource] = []
+    # Congestion-aware start date — populated when agent_node == "ask_start_date"
+    suggested_date: Optional[str] = None  # YYYY-MM-DD; lightest day in next 14
+    congested_dates: list[str] = []  # YYYY-MM-DD list; fully-booked days
 
 
 # ─────────────────────────────────────────────────────────────────
