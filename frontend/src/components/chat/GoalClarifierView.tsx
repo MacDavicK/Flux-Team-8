@@ -29,6 +29,7 @@ export function GoalClarifierView({
   const [customValue, setCustomValue] = useState("");
   const [customError, setCustomError] = useState<string | null>(null);
   const [direction, setDirection] = useState<1 | -1>(1);
+  const [pendingSelections, setPendingSelections] = useState<string[]>([]);
 
   if (questions.length === 0) return null;
 
@@ -57,11 +58,19 @@ export function GoalClarifierView({
       setAnswers(updatedAnswers);
       setDirection(1);
       setCurrentIndex(currentIndex + 1);
-      // Pre-fill custom input with existing answer for next question (if any)
       const nextQ = questions[currentIndex + 1];
       const nextAnswer = updatedAnswers.find((a) => a.question_id === nextQ.id);
-      setCustomValue(nextAnswer?.answer ?? "");
       setCustomError(null);
+      if (nextQ.multi_select && nextAnswer) {
+        const [optionsPart, customPart] = nextAnswer.answer.split("; ");
+        setPendingSelections(
+          optionsPart ? optionsPart.split(", ").filter(Boolean) : [],
+        );
+        setCustomValue(customPart ?? ""); // restore only the custom-text portion
+      } else {
+        setPendingSelections([]);
+        setCustomValue(nextAnswer?.answer ?? "");
+      }
     } else {
       onSubmit(updatedAnswers);
     }
@@ -74,17 +83,40 @@ export function GoalClarifierView({
     setCurrentIndex(prevIndex);
     const prevQ = questions[prevIndex];
     const prevAnswer = answers.find((a) => a.question_id === prevQ.id);
-    setCustomValue(prevAnswer?.answer ?? "");
     setCustomError(null);
+    if (prevQ.multi_select && prevAnswer) {
+      const [optionsPart, customPart] = prevAnswer.answer.split("; ");
+      setPendingSelections(
+        optionsPart ? optionsPart.split(", ").filter(Boolean) : [],
+      );
+      setCustomValue(customPart ?? ""); // restore only the custom-text portion, not the full answer
+    } else {
+      setPendingSelections([]);
+      setCustomValue(prevAnswer?.answer ?? "");
+    }
   }
 
   function handleCustomSubmit() {
     const trimmed = customValue.trim();
-    if (!trimmed) {
-      setCustomError("Please enter a value");
-      return;
+    if (current.multi_select) {
+      // For multi-select: need at least one option selected OR custom text
+      if (pendingSelections.length === 0 && !trimmed) {
+        setCustomError("Please select an option or enter a value");
+        return;
+      }
+      const answer = trimmed
+        ? pendingSelections.length > 0
+          ? `${pendingSelections.join(", ")}; ${trimmed}`
+          : trimmed
+        : pendingSelections.join(", ");
+      recordAnswer(answer);
+    } else {
+      if (!trimmed) {
+        setCustomError("Please enter a value");
+        return;
+      }
+      recordAnswer(trimmed);
     }
-    recordAnswer(trimmed);
   }
 
   // Progress: fraction of questions answered (0 → empty, 1 → full)
@@ -167,14 +199,26 @@ export function GoalClarifierView({
             {current.options.length > 0 && (
               <div className="flex flex-wrap gap-2">
                 {current.options.map((opt) => {
-                  const isSelected =
-                    answers.find((a) => a.question_id === current.id)
-                      ?.answer === opt;
+                  const isSelected = current.multi_select
+                    ? pendingSelections.includes(opt)
+                    : answers.find((a) => a.question_id === current.id)
+                        ?.answer === opt;
                   return (
                     <motion.button
                       key={opt}
                       type="button"
-                      onClick={() => !disabled && recordAnswer(opt)}
+                      onClick={() => {
+                        if (disabled) return;
+                        if (current.multi_select) {
+                          setPendingSelections((prev) =>
+                            prev.includes(opt)
+                              ? prev.filter((s) => s !== opt)
+                              : [...prev, opt],
+                          );
+                        } else {
+                          recordAnswer(opt);
+                        }
+                      }}
                       disabled={disabled}
                       whileTap={{ scale: 0.96 }}
                       className={cn(
@@ -190,6 +234,25 @@ export function GoalClarifierView({
                   );
                 })}
               </div>
+            )}
+
+            {/* Multi-select confirm button (shown after options, before custom input) */}
+            {current.multi_select && current.options.length > 0 && (
+              <button
+                type="button"
+                onClick={handleCustomSubmit}
+                disabled={
+                  disabled ||
+                  (pendingSelections.length === 0 && !customValue.trim())
+                }
+                className={cn(
+                  "w-full px-4 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                  "bg-sage text-white",
+                  "hover:bg-sage/90 disabled:opacity-40 disabled:cursor-not-allowed",
+                )}
+              >
+                {isLast ? "Done" : "Next"}
+              </button>
             )}
 
             {/* Custom input */}
@@ -220,18 +283,20 @@ export function GoalClarifierView({
                         : "border-charcoal/20 focus:border-sage",
                     )}
                   />
-                  <button
-                    type="button"
-                    onClick={handleCustomSubmit}
-                    disabled={disabled || !customValue.trim()}
-                    className={cn(
-                      "px-4 py-2.5 rounded-xl text-sm font-medium transition-colors",
-                      "bg-sage text-white",
-                      "hover:bg-sage/90 disabled:opacity-40 disabled:cursor-not-allowed",
-                    )}
-                  >
-                    {isLast ? "Done" : "Next"}
-                  </button>
+                  {!current.multi_select && (
+                    <button
+                      type="button"
+                      onClick={handleCustomSubmit}
+                      disabled={disabled || !customValue.trim()}
+                      className={cn(
+                        "px-4 py-2.5 rounded-xl text-sm font-medium transition-colors",
+                        "bg-sage text-white",
+                        "hover:bg-sage/90 disabled:opacity-40 disabled:cursor-not-allowed",
+                      )}
+                    >
+                      {isLast ? "Done" : "Next"}
+                    </button>
+                  )}
                 </div>
                 {customError && (
                   <p className="text-red-500 text-xs pl-1">{customError}</p>
