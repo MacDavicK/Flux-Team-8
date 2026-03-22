@@ -182,6 +182,7 @@ class ClarifierQuestion(BaseModel):
     question: str
     options: list[str] = []  # pre-defined choices (empty = open-ended)
     allows_custom: bool = True
+    multi_select: bool = False
     zod_validator: Optional[str] = None  # e.g. "z.string().min(1).max(500)"
     required: bool = True
 
