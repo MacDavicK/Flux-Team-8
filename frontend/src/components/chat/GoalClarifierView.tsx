@@ -62,11 +62,27 @@ export function GoalClarifierView({
       const nextAnswer = updatedAnswers.find((a) => a.question_id === nextQ.id);
       setCustomError(null);
       if (nextQ.multi_select && nextAnswer) {
-        const [optionsPart, customPart] = nextAnswer.answer.split("; ");
-        setPendingSelections(
-          optionsPart ? optionsPart.split(", ").filter(Boolean) : [],
-        );
-        setCustomValue(customPart ?? ""); // restore only the custom-text portion
+        const answer = nextAnswer.answer;
+        const semicolonIdx = answer.indexOf("; ");
+        if (semicolonIdx !== -1) {
+          const optionsPart = answer.slice(0, semicolonIdx);
+          const customPart = answer.slice(semicolonIdx + 2);
+          setPendingSelections(
+            optionsPart ? optionsPart.split(", ").filter(Boolean) : [],
+          );
+          setCustomValue(customPart);
+        } else {
+          const parts = answer.split(", ").filter(Boolean);
+          const allAreOptions =
+            parts.length > 0 && parts.every((p) => nextQ.options.includes(p));
+          if (allAreOptions) {
+            setPendingSelections(parts);
+            setCustomValue("");
+          } else {
+            setPendingSelections([]);
+            setCustomValue(answer);
+          }
+        }
       } else {
         setPendingSelections([]);
         setCustomValue(nextAnswer?.answer ?? "");
@@ -85,11 +101,27 @@ export function GoalClarifierView({
     const prevAnswer = answers.find((a) => a.question_id === prevQ.id);
     setCustomError(null);
     if (prevQ.multi_select && prevAnswer) {
-      const [optionsPart, customPart] = prevAnswer.answer.split("; ");
-      setPendingSelections(
-        optionsPart ? optionsPart.split(", ").filter(Boolean) : [],
-      );
-      setCustomValue(customPart ?? ""); // restore only the custom-text portion, not the full answer
+      const answer = prevAnswer.answer;
+      const semicolonIdx = answer.indexOf("; ");
+      if (semicolonIdx !== -1) {
+        const optionsPart = answer.slice(0, semicolonIdx);
+        const customPart = answer.slice(semicolonIdx + 2);
+        setPendingSelections(
+          optionsPart ? optionsPart.split(", ").filter(Boolean) : [],
+        );
+        setCustomValue(customPart);
+      } else {
+        const parts = answer.split(", ").filter(Boolean);
+        const allAreOptions =
+          parts.length > 0 && parts.every((p) => prevQ.options.includes(p));
+        if (allAreOptions) {
+          setPendingSelections(parts);
+          setCustomValue("");
+        } else {
+          setPendingSelections([]);
+          setCustomValue(answer);
+        }
+      }
     } else {
       setPendingSelections([]);
       setCustomValue(prevAnswer?.answer ?? "");

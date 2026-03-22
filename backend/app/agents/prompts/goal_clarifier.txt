@@ -88,13 +88,13 @@ Return ONLY valid JSON matching this schema:
       "required": true
     },
     {
-      "id": "available_days",
-      "question": "Which days of the week can you train?",
-      "options": ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"],
-      "allows_custom": false,
+      "id": "available_equipment",
+      "question": "What equipment or facilities do you have access to?",
+      "options": ["No equipment (bodyweight only)", "Dumbbells/kettlebells", "Gym membership", "Resistance bands", "Pull-up bar"],
+      "allows_custom": true,
       "multi_select": true,
       "zod_validator": null,
-      "required": true
+      "required": false
     }
   ]
 }
