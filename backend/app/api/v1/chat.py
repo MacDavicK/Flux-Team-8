@@ -392,6 +392,9 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
         if _rag_used
         else []
     )
+    raw_options = result.get("options")
+    is_clarifier = agent_node_value == "GOAL_CLARIFY"
+
     if goal_draft and (approval_pending or awaiting_start_date):
         metadata: dict | None = {
             "proposed_plan": goal_draft,
@@ -400,8 +403,16 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
             "rag_used": _rag_used,
             "rag_sources": [s.model_dump() for s in _rag_sources],
         }
-    elif agent_node_value == "ONBOARDING" and result.get("options"):
-        metadata = {"options": result.get("options")}
+    elif is_clarifier and raw_options:
+        # Persist questions so the clarifier sheet can be restored on page refresh.
+        # Also preserve plan + approval_status when a plan is already pending
+        # (post-plan clarification path) so state restoration still works next turn.
+        metadata = {"questions": raw_options}
+        if goal_draft and approval_pending:
+            metadata["proposed_plan"] = goal_draft
+            metadata["approval_status"] = result_approval
+    elif agent_node_value == "ONBOARDING" and raw_options:
+        metadata = {"options": raw_options}
     else:
         metadata = None
     await db.execute(
@@ -441,14 +452,12 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
             conv_id,
         )
 
-    raw_options = result.get("options")
-    is_clarifier = agent_node_value == "GOAL_CLARIFY"
     resp = ChatMessageResponse(
         conversation_id=str(conv_id),
         message=reply,
         agent_node=agent_node_value,
-        proposed_plan=goal_draft if approval_pending else None,
-        requires_user_action=approval_pending,
+        proposed_plan=goal_draft if (approval_pending and not is_clarifier) else None,
+        requires_user_action=approval_pending and not is_clarifier,
         options=None if is_clarifier else raw_options,
         questions=raw_options if is_clarifier else None,
         rag_used=_rag_used,

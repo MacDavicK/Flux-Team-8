@@ -3,6 +3,7 @@ import { getNodeLabel } from "~/lib/nodeLabels";
 import type {
   ChatMessageResponse,
   GoalClarifierAnswer,
+  GoalClarifierQuestion,
   OnboardingOption,
 } from "~/types";
 
@@ -15,6 +16,7 @@ export interface HistoryMessage {
   metadata?: {
     proposed_plan?: Record<string, unknown>;
     options?: OnboardingOption[];
+    questions?: GoalClarifierQuestion[];
     rag_used?: boolean;
     rag_sources?: { title: string; url: string | null }[];
   } | null;

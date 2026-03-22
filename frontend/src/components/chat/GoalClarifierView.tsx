@@ -1,5 +1,5 @@
 import { AnimatePresence, motion } from "framer-motion";
-import { ChevronLeft, X } from "lucide-react";
+import { ChevronLeft } from "lucide-react";
 import { useState } from "react";
 import type {
   GoalClarifierAnswer,
@@ -10,7 +10,6 @@ import { cn } from "~/utils/cn";
 interface GoalClarifierViewProps {
   questions: GoalClarifierQuestion[];
   onSubmit: (answers: GoalClarifierAnswer[]) => void;
-  onDismiss: () => void;
   disabled?: boolean;
 }
 
@@ -21,7 +20,6 @@ interface GoalClarifierViewProps {
 export function GoalClarifierView({
   questions,
   onSubmit,
-  onDismiss,
   disabled,
 }: GoalClarifierViewProps) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -162,7 +160,6 @@ export function GoalClarifierView({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onDismiss}
       />
 
       {/* Sheet */}
@@ -186,7 +183,7 @@ export function GoalClarifierView({
         )}
 
         {/* Header */}
-        <div className="flex items-center justify-between px-5 pt-5 pb-3">
+        <div className="flex items-center px-5 pt-5 pb-3">
           <div className="flex items-center gap-2">
             {canGoBack && (
               <button
@@ -203,13 +200,6 @@ export function GoalClarifierView({
                 : "Quick question"}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onDismiss}
-            className="w-8 h-8 flex items-center justify-center rounded-full bg-black/5 text-river hover:text-charcoal transition-colors"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         {/* Question */}

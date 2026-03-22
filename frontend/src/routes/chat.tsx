@@ -673,6 +673,19 @@ function ChatPage() {
         });
 
         setMessages(uiMessages);
+
+        // Restore clarifier sheet if the last assistant message was a GOAL_CLARIFY with questions
+        const lastMsg = filtered[filtered.length - 1];
+        if (
+          lastMsg?.role === "assistant" &&
+          lastMsg.agent_node === "GOAL_CLARIFY" &&
+          lastMsg.metadata?.questions?.length
+        ) {
+          setActiveClarifier({
+            questions: lastMsg.metadata.questions,
+            messageId: `history-${filtered.length - 1}`,
+          });
+        }
       } catch {
         // Silently fail — keep current chat state.
       } finally {
@@ -909,7 +922,6 @@ function ChatPage() {
           <GoalClarifierView
             questions={activeClarifier.questions}
             disabled={isThinking}
-            onDismiss={() => setActiveClarifier(null)}
             onSubmit={(answers) => {
               setActiveClarifier(null);
               const summary = answers
