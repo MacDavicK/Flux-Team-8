@@ -286,6 +286,106 @@ async def test_minutely_single_reschedule_into_sleep_uses_canonical():
     assert inserted_local.day == 22
 
 
+# ── Test: WEEKLY task, single-occurrence reschedule → reverts to canonical weekday ─
+
+
+@pytest.mark.asyncio
+async def test_weekly_single_reschedule_reverts_to_canonical_weekday():
+    """
+    FREQ=WEEKLY;BYDAY=MO on Mon Mar 23. Single reschedule moves scheduled_at
+    to Tue Mar 24; canonical stays on Mon Mar 23 09:00.
+    advance must return next Monday (Mar 30), not Tuesday.
+    """
+    scheduled = _ny(2026, 3, 24, 9)  # Tuesday — rescheduled
+    canonical = _ny(2026, 3, 23, 9)  # Monday  — canonical
+
+    task = _make_task("FREQ=WEEKLY;BYDAY=MO", scheduled, canonical)
+    user = _make_user()
+
+    with patch("app.services.recurrence.db") as mock_db:
+        mock_db.fetchrow = AsyncMock(side_effect=[task, user])
+        mock_db.execute = AsyncMock()
+
+        result = await advance_recurring_task("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+    assert result is True
+    inserted_at = mock_db.execute.call_args[0][5]
+    inserted_local = pendulum.instance(inserted_at).in_timezone("America/New_York")
+    assert inserted_local.day_of_week == pendulum.MONDAY
+    assert inserted_local.day == 30  # Mon Mar 30
+    assert inserted_local.hour == 9
+    assert inserted_local.minute == 0
+
+
+# ── Test: MINUTELY pull-back where canonical-based next still hits sleep ─────
+
+
+@pytest.mark.asyncio
+async def test_minutely_pull_back_canonical_next_still_hits_sleep():
+    """
+    FREQ=MINUTELY;INTERVAL=30. Single pull-back: scheduled=20:00 (rescheduled back),
+    canonical=21:30 (unchanged). advance uses canonical → rule.after(21:30) = 22:00
+    → inside 22:00–07:00 sleep → sleep guard → 07:00 next day.
+    The pull-back rescheduled time (20:00) is completely irrelevant.
+    """
+    canonical_t = pendulum.datetime(
+        2026, 3, 21, 21, 30, tz="America/New_York"
+    ).in_timezone("UTC")
+    scheduled_t = pendulum.datetime(
+        2026, 3, 21, 20, 0, tz="America/New_York"
+    ).in_timezone("UTC")
+
+    task = _make_task("FREQ=MINUTELY;INTERVAL=30", scheduled_t, canonical_t)
+    user = _make_user(sleep_window={"start": "22:00", "end": "07:00"})
+
+    with patch("app.services.recurrence.db") as mock_db:
+        mock_db.fetchrow = AsyncMock(side_effect=[task, user])
+        mock_db.execute = AsyncMock()
+
+        result = await advance_recurring_task("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+    assert result is True
+    inserted_at = mock_db.execute.call_args[0][5]
+    inserted_local = pendulum.instance(inserted_at).in_timezone("America/New_York")
+    assert inserted_local.hour == 7
+    assert inserted_local.minute == 0
+    assert inserted_local.day == 22  # next day
+
+
+# ── Test: MINUTELY single reschedule entirely outside sleep → no guard ───────
+
+
+@pytest.mark.asyncio
+async def test_minutely_single_reschedule_outside_sleep_no_guard():
+    """
+    FREQ=MINUTELY;INTERVAL=30, canonical=09:00, single reschedule to 09:15.
+    advance uses canonical (09:00) → next=09:30 → outside 23:00–07:00 sleep →
+    sleep guard does not fire; inserted at 09:30 same day.
+    """
+    canonical_t = pendulum.datetime(
+        2026, 3, 21, 9, 0, tz="America/New_York"
+    ).in_timezone("UTC")
+    scheduled_t = pendulum.datetime(
+        2026, 3, 21, 9, 15, tz="America/New_York"
+    ).in_timezone("UTC")
+
+    task = _make_task("FREQ=MINUTELY;INTERVAL=30", scheduled_t, canonical_t)
+    user = _make_user(sleep_window={"start": "23:00", "end": "07:00"})
+
+    with patch("app.services.recurrence.db") as mock_db:
+        mock_db.fetchrow = AsyncMock(side_effect=[task, user])
+        mock_db.execute = AsyncMock()
+
+        result = await advance_recurring_task("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee")
+
+    assert result is True
+    inserted_at = mock_db.execute.call_args[0][5]
+    inserted_local = pendulum.instance(inserted_at).in_timezone("America/New_York")
+    assert inserted_local.day == 21  # same day — no sleep-guard push
+    assert inserted_local.hour == 9
+    assert inserted_local.minute == 30
+
+
 # ── Test 9: Goal guard — goal completed → returns False ─────────────────────
 
 
