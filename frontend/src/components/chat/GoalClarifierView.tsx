@@ -237,7 +237,7 @@ export function GoalClarifierView({
             )}
 
             {/* Multi-select confirm button (shown after options, before custom input) */}
-            {current.multi_select && current.options.length > 0 && (
+            {current.multi_select && (
               <button
                 type="button"
                 onClick={handleCustomSubmit}
