@@ -453,6 +453,8 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
         questions=raw_options if is_clarifier else None,
         rag_used=_rag_used,
         rag_sources=_rag_sources,
+        suggested_date=result.get("suggested_date"),
+        congested_dates=result.get("congested_dates") or [],
     )
     resp.spoken_summary = build_spoken_summary(resp)
     yield f"data: {json.dumps({'type': 'complete', 'data': resp.model_dump(mode='json')})}\n\n"

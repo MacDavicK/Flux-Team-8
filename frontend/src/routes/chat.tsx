@@ -552,6 +552,8 @@ function ChatPage() {
                 <MarkdownMessage>{result.message}</MarkdownMessage>
                 {isStartDatePrompt ? (
                   <StartDatePicker
+                    defaultDate={result.suggested_date ?? undefined}
+                    disabledDates={result.congested_dates ?? []}
                     onSelect={(date) => handleSendMessage(date)}
                   />
                 ) : parsed ? (
@@ -959,6 +961,8 @@ function ChatPage() {
                             <MarkdownMessage>{result.message}</MarkdownMessage>
                             {isStartDatePrompt ? (
                               <StartDatePicker
+                                defaultDate={result.suggested_date ?? undefined}
+                                disabledDates={result.congested_dates ?? []}
                                 onSelect={(date) => handleSendMessage(date)}
                               />
                             ) : parsed ? (

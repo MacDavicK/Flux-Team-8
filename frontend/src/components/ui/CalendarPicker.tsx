@@ -76,6 +76,8 @@ export interface CalendarPickerProps {
   showChips?: boolean;
   disabled?: boolean;
   className?: string;
+  /** YYYY-MM-DD strings for fully-congested days — rendered as disabled with a subtle dot. */
+  disabledDates?: string[];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -88,6 +90,7 @@ export function CalendarPicker({
   showChips = true,
   disabled = false,
   className,
+  disabledDates = [],
 }: CalendarPickerProps) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -238,7 +241,8 @@ export function CalendarPicker({
               const inMonth = day.getMonth() === calMonth.getMonth();
               const isPast = day < min;
               const isFuture = max ? day > max : false;
-              const isDisabled = isPast || isFuture || !inMonth;
+              const isCongested = disabledDates.includes(toISODate(day));
+              const isDisabled = isPast || isFuture || !inMonth || isCongested;
               const isToday = isSameDay(day, today);
               const isSelected = isSameDay(day, selected);
 
@@ -252,7 +256,7 @@ export function CalendarPicker({
                     "relative h-8 w-full flex items-center justify-center text-[13px] rounded-full transition-all duration-120",
                     // out-of-month: invisible but takes space
                     !inMonth && "invisible pointer-events-none",
-                    // past / out-of-range
+                    // past / out-of-range / congested
                     inMonth && isDisabled && "text-river/25 cursor-not-allowed",
                     // normal
                     inMonth &&
@@ -270,6 +274,10 @@ export function CalendarPicker({
                   )}
                 >
                   {day.getDate()}
+                  {/* Congested indicator — small terracotta dot at the bottom */}
+                  {inMonth && isCongested && (
+                    <span className="absolute bottom-0.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-terracotta/50 pointer-events-none" />
+                  )}
                 </button>
               );
             })}

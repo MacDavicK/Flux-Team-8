@@ -5,6 +5,10 @@ import { CalendarPicker } from "~/components/ui/CalendarPicker";
 interface StartDatePickerProps {
   onSelect: (dateStr: string) => void;
   disabled?: boolean;
+  /** YYYY-MM-DD; pre-selects this date instead of today (suggested by the backend). */
+  defaultDate?: string;
+  /** YYYY-MM-DD list; forwarded to CalendarPicker as fully-congested disabled cells. */
+  disabledDates?: string[];
 }
 
 function toISODate(d: Date): string {
@@ -24,14 +28,19 @@ function formatDisplay(dateStr: string): string {
   });
 }
 
-export function StartDatePicker({ onSelect, disabled }: StartDatePickerProps) {
+export function StartDatePicker({
+  onSelect,
+  disabled,
+  defaultDate,
+  disabledDates = [],
+}: StartDatePickerProps) {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const todayStr = toISODate(today);
 
   // Keep selected in local state just to track the confirm button label
   // CalendarPicker is controlled: we pass value + onChange
-  const [selected, setSelected] = useState(todayStr);
+  const [selected, setSelected] = useState(defaultDate ?? todayStr);
 
   function handleConfirm() {
     if (disabled) return;
@@ -50,6 +59,7 @@ export function StartDatePicker({ onSelect, disabled }: StartDatePickerProps) {
         minDate={todayStr}
         showChips
         disabled={disabled}
+        disabledDates={disabledDates}
       />
 
       {/* Selected date label + confirm */}
