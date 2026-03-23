@@ -73,21 +73,25 @@ async def _ensure_goal(user_id: str, goal_draft: dict) -> Optional[str]:
     return str(new_id) if new_id else None
 
 
+def _parse_dt(value) -> Optional[object]:
+    """Parse a datetime string or return the value unchanged if already a datetime."""
+    if isinstance(value, str):
+        try:
+            return pendulum.parse(value)
+        except Exception:
+            return None
+    return value
+
+
 def _row_to_tuple(row: dict) -> tuple:
     """Convert a task dict to the positional tuple used by the INSERT statement."""
-    scheduled_at = row.get("scheduled_at")
-    if isinstance(scheduled_at, str):
-        try:
-            scheduled_at = pendulum.parse(scheduled_at)
-        except Exception:
-            scheduled_at = None
     return (
         row.get("user_id"),
         row.get("goal_id"),
         row.get("title", ""),
         row.get("description", ""),
         row.get("status", "pending"),
-        scheduled_at,
+        _parse_dt(row.get("scheduled_at")),
         row.get("duration_minutes", 30),
         row.get("trigger_type", "time"),
         row.get("location_trigger"),
@@ -95,7 +99,7 @@ def _row_to_tuple(row: dict) -> tuple:
         row.get("shared_with_goal_ids") or [],
         row.get("escalation_policy", "standard"),
         row.get("conversation_id"),
-        row.get("canonical_scheduled_at"),
+        _parse_dt(row.get("canonical_scheduled_at")),
     )
 
 
