@@ -1,0 +1,99 @@
+Title: Evidence-Based Physical Activity Recommendations: Resistance Training and Muscle Fitness | Source: https://www.canr.msu.edu/news/evidence-based_physical_activity_recommendations_part_2
+Category: strength | Authority: university
+---
+Evidence-based physical activity recommendations represent the scientific consensus on the types, frequency, duration, and intensity of exercise needed to produce meaningful health and fitness benefits. Part 2 of this series focuses on resistance training and muscular fitness — the evidence base for recommendations, how to apply them, and common questions from practitioners and the public.
+
+The Scientific Basis for Resistance Training Recommendations
+
+The current evidence base for resistance training recommendations draws from:
+
+- Dose-response studies: Establishing minimum effective doses and the point of diminishing returns for various health outcomes
+- Randomised controlled trials: Comparing different training parameters (frequency, volume, intensity) in defined populations
+- Systematic reviews and meta-analyses: Pooling results across multiple studies to identify robust effects
+
+This evidence forms the foundation for recommendations from the American College of Sports Medicine (ACSM), the American Heart Association (AHA), the World Health Organization (WHO), and national physical activity guidelines.
+
+Frequency: How Often Should You Train?
+
+The evidence supports training each major muscle group 2–3 days per week for most health and fitness goals. More frequent training (4+ days per week) can produce additional benefits for advanced individuals but is not necessary and increases injury risk in untrained populations.
+
+Key findings on frequency:
+- Once per week produces meaningful initial strength gains in beginners
+- Twice per week is sufficient for maintaining strength gains once achieved
+- Three times per week produces optimal hypertrophy and strength gains for most non-athletic goals
+- Greater frequency (4+ days) provides marginal additional benefit when total volume is equated
+
+A minimum of 48 hours between sessions targeting the same muscle group is strongly supported by the evidence to allow adequate recovery and adaptation.
+
+Volume: How Much Should You Do?
+
+Volume is typically quantified as the total number of sets per muscle group per week. Evidence suggests:
+
+- Beginners: 10–15 total sets per muscle group per week is adequate for substantial strength and hypertrophy gains
+- Intermediate: 15–20 sets per muscle group per week for continued progress
+- Advanced: up to 25 sets per muscle group per week (with appropriate periodisation)
+
+Research suggests a dose-response relationship for hypertrophy up to approximately 10 hard sets per session per muscle group, above which recovery is compromised.
+
+The minimum effective volume for maintaining muscle mass is remarkably low — as few as 1–2 sets per muscle group per week can maintain gains previously achieved. This is important context for busy periods or travel.
+
+Intensity: How Heavy?
+
+Intensity refers to the percentage of the one-repetition maximum (1RM) used during training. The evidence has evolved significantly on this:
+
+Traditional view: Heavy loads (70–85% of 1RM) were considered necessary for hypertrophy and strength.
+
+Current evidence: Loads across a wide range (30–90% of 1RM) can produce similar hypertrophy when sets are performed to or near muscular failure. The effort applied (proximity to failure) matters more than the absolute load.
+
+Practical implications:
+- For beginners: Moderate loads (60–70% of 1RM) with controlled technique are appropriate
+- For those unable to train with heavy loads (older adults, those with joint issues): Lighter loads performed to near-failure are equally effective for hypertrophy
+- For strength gains: Heavier loads (80%+ of 1RM) produce superior strength outcomes due to neurological adaptations
+
+Rest Periods: How Long Between Sets?
+
+Longer rest periods (3–5 minutes) produce superior strength and power adaptations. Shorter rest periods (60–90 seconds) increase metabolic stress and may enhance hypertrophy in some contexts.
+
+Practical recommendation: Rest 90–120 seconds between sets for most goals. This balances recovery, training efficiency, and adaptation stimulus.
+
+Exercise Order
+
+Evidence supports:
+- Performing multi-joint compound exercises (squats, bench press, rows) before single-joint isolation exercises (curls, extensions)
+- Training larger muscle groups or priority areas earlier in the session when energy and focus are highest
+- Alternating upper and lower body exercises in circuit-style training is an effective time-efficient option
+
+Progressive Overload: The Fundamental Principle
+
+No aspect of resistance training is more evidence-based than the principle of progressive overload. Muscles adapt to a training stimulus; to continue improving, the stimulus must be progressively increased over time.
+
+Evidence-based approaches to progression:
+- Linear periodisation: Gradually increasing load over weeks (most appropriate for beginners)
+- Undulating periodisation: Varying intensity and volume within the week (more appropriate for intermediate/advanced)
+- Double progression: Increase reps within a target range before increasing load (e.g., perform 3 sets of 8–12; when all sets reach 12, increase load to bring reps back to 8)
+
+Without progressive overload, adaptation plateaus within 6–8 weeks as the body accommodates to the training stimulus.
+
+Special Populations: Evidence-Based Considerations
+
+Older adults (65+):
+- Resistance training is safe and highly effective in older adults, even those over 80
+- Focus on functional movements (squats, deadlifts, step-ups) that improve daily living activities
+- Include balance training alongside resistance training to prevent falls
+- Higher-repetition, lower-load training (15–20 reps) may be more joint-friendly while still producing adaptation
+
+Women:
+- Women respond to resistance training in qualitatively similar ways to men
+- Women have the same capacity for relative strength gains and hypertrophy per unit of muscle
+- Women tend to recover faster from training sessions than men, potentially supporting higher training frequencies
+- Hormonal fluctuations across the menstrual cycle affect recovery; adjusting training intensity accordingly may be beneficial
+
+Summary of Minimum Effective Dose
+
+For health benefits with minimal time investment:
+- Frequency: 2 days per week
+- Volume: 1–3 sets per exercise, targeting all major muscle groups
+- Intensity: 60–70% of 1RM, or a weight that allows 10–15 repetitions with good form but is challenging
+- Duration: 20–30 minutes per session
+
+This minimal dose is sufficient to produce meaningful improvements in strength, muscle mass, bone density, metabolic health, and functional capacity in previously untrained individuals.

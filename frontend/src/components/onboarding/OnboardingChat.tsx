@@ -39,6 +39,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
   const [isInitializing, setIsInitializing] = useState(true);
   const [onboardingPhone, setOnboardingPhone] = useState("");
   const [onboardingComplete, setOnboardingComplete] = useState(false);
+  const [autoOpenSpecify, setAutoOpenSpecify] = useState(false);
   const conversationIdRef = useRef<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const initDoneRef = useRef(false);
@@ -85,11 +86,16 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
       .then(({ messages: history, conversation_id }) => {
         if (conversation_id) conversationIdRef.current = conversation_id;
 
-        const uiMessages: ChatMessage[] = history
-          .filter(
-            (m: HistoryMessage) => m.role === "user" || m.role === "assistant",
-          )
-          .map((m: HistoryMessage, i: number) => ({
+        const filtered = history.filter(
+          (m: HistoryMessage) => m.role === "user" || m.role === "assistant",
+        );
+        const lastAssistantIdx = [...filtered]
+          .map((m, i) => ({ m, i }))
+          .filter(({ m }) => m.role === "assistant")
+          .at(-1)?.i;
+
+        const uiMessages: ChatMessage[] = filtered.map(
+          (m: HistoryMessage, i: number) => ({
             id: `history-${i}`,
             type: m.role === "user" ? MessageVariant.USER : MessageVariant.AI,
             content:
@@ -98,12 +104,14 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
               ) : (
                 m.content
               ),
-            // Restore options from persisted metadata (new messages).
+            // Only restore options on the last AI message — earlier messages
+            // already have a user reply so their options should not be shown.
             options:
-              m.role === "assistant"
+              m.role === "assistant" && i === lastAssistantIdx
                 ? (m.metadata?.options ?? undefined)
                 : undefined,
-          }));
+          }),
+        );
 
         if (uiMessages.length > 0) {
           // For the last AI message, check whether we need to restore OTP state.
@@ -155,6 +163,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
     if (!phoneStepOptionsRef.current) return;
     const phoneOptions = phoneStepOptionsRef.current;
     setOnboardingPhone("");
+    setAutoOpenSpecify(true);
     setMessages((prev) => {
       // Find the last AI message that has OTP options and replace its options
       // with the phone step options, effectively going back to phone input.
@@ -174,7 +183,8 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
     });
   }, []);
 
-  const handleSendMessage = async (text: string) => {
+  const handleSendMessage = async (text: string, displayLabel?: string) => {
+    setAutoOpenSpecify(false);
     if (/^\+[1-9]\d{1,14}$/.test(text.trim())) {
       setOnboardingPhone(text.trim());
     }
@@ -182,21 +192,23 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
     const userMessage: ChatMessage = {
       id: Date.now().toString(),
       type: MessageVariant.USER,
-      content: /^\d{4}-\d{2}-\d{2}T/.test(text)
-        ? (() => {
-            try {
-              return new Intl.DateTimeFormat(undefined, {
-                weekday: "short",
-                month: "short",
-                day: "numeric",
-                hour: "numeric",
-                minute: "2-digit",
-              }).format(new Date(text));
-            } catch {
-              return text;
-            }
-          })()
-        : text,
+      content:
+        displayLabel ??
+        (/^\d{4}-\d{2}-\d{2}T/.test(text)
+          ? (() => {
+              try {
+                return new Intl.DateTimeFormat(undefined, {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  hour: "numeric",
+                  minute: "2-digit",
+                }).format(new Date(text));
+              } catch {
+                return text;
+              }
+            })()
+          : text),
     };
 
     setMessages((prev) => [
@@ -223,15 +235,7 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
         // so "Change number" can restore them without a network round-trip.
         const isOtpStep = result.options?.some((o) => o.input_type === "otp");
         if (isOtpStep && phoneStepOptionsRef.current === null) {
-          // The current message being processed was the phone number submission.
-          // Find the phone step options from the last message's options.
-          setMessages((prev) => {
-            const last = [...prev]
-              .reverse()
-              .find((m) => m.options && m.options.length > 0);
-            if (last?.options) phoneStepOptionsRef.current = last.options;
-            return prev;
-          });
+          phoneStepOptionsRef.current = PHONE_STEP_OPTIONS;
         }
 
         const aiMessage: ChatMessage = {
@@ -288,6 +292,9 @@ export function OnboardingChat({ onComplete }: OnboardingChatProps) {
                     onChangeNumber={handleChangeNumber}
                     disabled={isThinking || isInitializing}
                     phoneNumber={onboardingPhone}
+                    autoOpenSpecify={
+                      index === messages.length - 1 && autoOpenSpecify
+                    }
                   />
                 )}
             </motion.div>

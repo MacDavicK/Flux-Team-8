@@ -90,7 +90,7 @@ async def scheduler_node(state: AgentState) -> dict:
     # but are hard time blocks for the scheduler.
     recurring_rows = await db.fetch(
         """
-        SELECT title, scheduled_at, duration_minutes, recurrence_rule
+        SELECT title, scheduled_at, canonical_scheduled_at, duration_minutes, recurrence_rule
         FROM tasks
         WHERE user_id = $1
           AND status IN ('pending', 'rescheduled')
@@ -99,7 +99,11 @@ async def scheduler_node(state: AgentState) -> dict:
         user_id,
     )
     for rec in recurring_rows:
-        anchor = pendulum.instance(rec["scheduled_at"])
+        # Use canonical_scheduled_at as the RRULE anchor so projections stay
+        # aligned with the true series position, not any rescheduled time.
+        # Fall back to scheduled_at for rows created before migration 016 (NULL).
+        raw_anchor = rec["canonical_scheduled_at"] or rec["scheduled_at"]
+        anchor = pendulum.instance(raw_anchor)
         for proj in projected_occurrences_in_window(
             rec["recurrence_rule"], anchor, window_start, window_end, user_tz
         ):

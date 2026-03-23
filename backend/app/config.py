@@ -70,5 +70,17 @@ class Settings(BaseSettings):
     pattern_miss_threshold: int = 3
     pattern_min_datapoints: int = 3
 
+    # Pinecone / RAG
+    pinecone_api_key: str = ""
+    pinecone_index_name: str = "flux-articles"
+    embedding_model: str = "openai/text-embedding-3-small"
+    embedding_dimensions: int = 1536  # must match your Pinecone index dims
+    rag_chunk_size: int = 2000
+    rag_chunk_overlap: int = 200
+    rag_top_k: int = 5
+    rag_relevance_threshold: float = 0.4
+    # Classifier tags (from 14-tag taxonomy) that trigger RAG retrieval
+    rag_trigger_tags: list[str] = ["Health", "Fitness", "Nutrition", "Mental Health"]
+
 
 settings = Settings()

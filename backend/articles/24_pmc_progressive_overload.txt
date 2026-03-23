@@ -1,0 +1,111 @@
+Title: Progressive Overload Without Progressing Load: A Narrative Review | Source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC8293728/
+Category: cardio | Authority: peer_reviewed
+---
+Progressive overload is the foundational principle underlying adaptations to both resistance and cardiovascular training. It refers to the gradual increase in training stimulus over time, which is necessary to drive continued physiological adaptation. While progressive overload is often associated with increasing weight lifted, the concept extends far beyond load — encompassing volume, intensity, density, frequency, and variety of training stimuli.
+
+Definition and Theoretical Basis
+
+Progressive overload was formalised by Thomas DeLorme in the 1940s during rehabilitation of World War II soldiers. The fundamental premise: the human body adapts to a training stimulus, and for adaptations to continue, the stimulus must be progressively increased.
+
+This principle applies universally across exercise modalities:
+- Resistance training: increasing load, volume, or complexity
+- Cardiovascular training: increasing duration, frequency, or intensity
+- Flexibility training: progressively deeper stretches over time
+
+Without progressive overload, the body reaches a plateau — training maintains current fitness but does not drive further adaptation. This plateau typically occurs within 6–8 weeks of initiating a new programme.
+
+Methods of Progressive Overload in Cardiovascular Training
+
+Load-independent methods of progressive overload are particularly relevant for cardiovascular exercise, where "load" in the traditional sense does not apply. Evidence supports multiple valid approaches:
+
+1. Duration progression
+Gradually increasing the duration of each cardiovascular session over weeks:
+- Week 1–2: 20 minutes
+- Week 3–4: 25 minutes
+- Week 5–6: 30 minutes
+- Week 7–8: 35 minutes
+
+Duration progression is the most accessible method for beginners and forms the basis of structured beginner running programmes.
+
+2. Frequency progression
+Increasing the number of training sessions per week:
+- Phase 1: 2 days per week → Phase 2: 3 days per week → Phase 3: 4–5 days per week
+
+Frequency should be increased only after adapting to the current frequency for at least 3–4 weeks.
+
+3. Intensity progression
+Increasing the relative effort or absolute pace:
+- Begin at moderate intensity (65–75% maximum heart rate)
+- Progressively include tempo runs (75–85% maximum heart rate) as fitness improves
+- Introduce interval training (85–95% maximum heart rate) once a base of aerobic fitness is established
+
+Intensity progression should follow a base of volume: build duration and frequency first, then increase intensity.
+
+4. Interval training as progressive overload
+Incorporating intervals — alternating bouts of higher-intensity effort with recovery periods — is a potent form of progressive overload. High-intensity interval training (HIIT) produces cardiovascular adaptations comparable to longer moderate-intensity sessions in substantially less time.
+
+Interval progression for runners:
+- Phase 1: 30-second fast intervals with 90-second recovery × 6 sets
+- Phase 2: 1-minute intervals with 2-minute recovery × 6 sets
+- Phase 3: 2-minute intervals with 2-minute recovery × 5 sets
+- Phase 4: 3-minute intervals with 90-second recovery × 5 sets (classic tempo-style)
+
+5. Rest reduction
+Decreasing recovery time between intervals (or sets in resistance training) increases training density — doing the same work in less time — and progressively challenges the cardiovascular and muscular systems.
+
+6. Specificity of progression
+Specific adaptations result from specific training stimuli. For a runner training for a 5K race, progressively increasing distance at race pace is more specific than simply increasing easy running volume. Progression should be targeted to the desired adaptation.
+
+Progressive Overload in Resistance Training
+
+In resistance training, the classic model of progressive overload involves the "double progression" method:
+
+Step 1: Establish a target repetition range (e.g., 3 sets of 8–12 reps)
+Step 2: Begin with a load at which you can complete the bottom of the range (e.g., 8 reps) with good form but difficulty on the last set
+Step 3: Over sessions, work toward completing the top of the range (12 reps) for all sets
+Step 4: When all sets reach 12 reps, increase the load by 2–5% and restart from 8 reps
+
+This model is evidence-based and produces consistent strength and hypertrophy gains for beginners and intermediate exercisers.
+
+Alternative progression strategies:
+- Rep progression: Same load, more reps each session
+- Set progression: Same load and reps, add a set
+- Exercise variation: Progress to a harder variation of the same movement pattern
+- Tempo manipulation: Slow the eccentric (lowering) phase to increase time under tension
+
+Periodisation: Structured Long-Term Progression
+
+For those training beyond the beginner stage, periodisation — the systematic planning of training across time — is the most evidence-based approach to long-term progressive overload.
+
+Linear periodisation: Increases intensity steadily over weeks while reducing volume. Simple and effective for beginners and intermediate exercisers.
+
+Undulating periodisation: Varies intensity and volume within the week or month. More flexible and may reduce accommodation (the body's adaptation to a fixed stimulus).
+
+Block periodisation: Concentrates specific training stimuli in dedicated blocks (e.g., a hypertrophy block, then a strength block, then a power block). Used by advanced athletes and competitive runners.
+
+Deload weeks: Scheduled reductions in training load every 3–6 weeks allow connective tissue to fully recover and prevent overtraining. A deload typically involves reducing volume by 30–50% while maintaining or slightly reducing intensity. Deload weeks prevent accumulated fatigue from masking fitness gains.
+
+Signs That Progressive Overload Is Working
+
+Positive indicators:
+- Completing the same workout with less perceived effort over time
+- Increasing the weight, reps, or time while maintaining good form
+- Improving pace for a given heart rate or perceived effort
+- Reduced resting heart rate over weeks and months
+- Improved recovery between sessions
+
+Signs that progression has stalled:
+- No improvement in performance over 3–4 weeks
+- Persistent fatigue that doesn't resolve with rest
+- Declining performance (regression) — a sign of overtraining
+
+When progression stalls, common solutions include: reducing volume temporarily, changing exercises, increasing protein intake, prioritising sleep, or reassessing training quality.
+
+Summary of Evidence-Based Recommendations
+
+1. Progressive overload is necessary for continued adaptation in all forms of exercise.
+2. For cardiovascular training, duration, frequency, and intensity can all serve as progression variables.
+3. For resistance training, load and volume are primary progression variables; technique quality must be maintained throughout.
+4. Deload weeks every 3–6 weeks are evidence-based and improve long-term outcomes.
+5. Periodisation is the most systematic approach to long-term progressive overload.
+6. The rate of progression must match recovery capacity — too much progression leads to injury or overtraining; too little leads to plateaus.

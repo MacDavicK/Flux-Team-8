@@ -46,7 +46,7 @@ export const Route = createFileRoute("/profile")({
 
 function ProfilePage() {
   const { account: initialAccount } = Route.useLoaderData();
-  const { user, logout } = useAuth();
+  const { user, logout, hasTasks } = useAuth();
   const navigate = useNavigate();
   const [account, setAccount] = useState<AccountMe>(
     initialAccount as AccountMe,
@@ -79,7 +79,11 @@ function ProfilePage() {
     <div className="min-h-screen pb-32">
       <AmbientBackground />
 
-      <ProfileHeader name={displayName} avatarUrl={undefined} />
+      <ProfileHeader
+        name={displayName}
+        avatarUrl={undefined}
+        backTo={hasTasks ? "/reflection" : undefined}
+      />
 
       {isSaving && (
         <motion.div

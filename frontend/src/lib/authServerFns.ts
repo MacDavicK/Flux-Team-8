@@ -103,6 +103,11 @@ type ServerMe = {
         onboarded: boolean;
         timezone?: string | null;
         hasTasks?: boolean;
+        phone_verified?: boolean | null;
+        notification_preferences?: Record<
+          string,
+          string | number | boolean | object
+        > | null;
       })
     | null;
   /** Set to true when the FastAPI backend rejected the token (401/403). */
@@ -153,6 +158,11 @@ export const serverGetMe = createServerFn({ method: "GET" }).handler(
           name?: string | null;
           timezone?: string | null;
           has_tasks?: boolean | null;
+          phone_verified?: boolean | null;
+          notification_preferences?: Record<
+            string,
+            string | number | boolean | object
+          > | null;
         };
         return {
           token,
@@ -162,6 +172,8 @@ export const serverGetMe = createServerFn({ method: "GET" }).handler(
             ...(me.name ? { name: me.name } : {}),
             timezone: me.timezone ?? null,
             hasTasks: me.has_tasks ?? false,
+            phone_verified: me.phone_verified ?? false,
+            notification_preferences: me.notification_preferences ?? null,
           },
         };
       }

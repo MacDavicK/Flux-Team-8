@@ -25,6 +25,7 @@ You'll be prompted for credentials from the following services during setup. Hav
 |---------|---------|--------------|-----------------|
 | **Supabase** | Backend + Frontend | Project URL, anon key, service role key, database URL | [supabase.com/dashboard](https://supabase.com/dashboard) → Settings → API |
 | **OpenRouter** | Backend | API key (`sk-or-...`) | [openrouter.ai/keys](https://openrouter.ai/keys) |
+| **Pinecone** | Backend (RAG) | API key + index name (default: `flux-articles`) | [app.pinecone.io](https://app.pinecone.io) → API Keys |
 | **Twilio** | Backend | Account SID, Auth Token, phone numbers, Verify service SID | [console.twilio.com](https://console.twilio.com) |
 | **LangSmith** *(optional)* | Backend | API key for LangGraph agent tracing | [smith.langchain.com](https://smith.langchain.com) → Settings → API Keys |
 | **Sentry** *(optional)* | Backend + Frontend | DSN for error tracking (each has its own project) | Sentry project → Settings → SDK Setup → DSN |
@@ -44,15 +45,16 @@ From the **repo root**, run:
 bash setup.sh
 ```
 
-The script will walk you through five steps:
+The script will walk you through six steps:
 
 | Step | What it does |
 |------|-------------|
 | **1 — Dependency check** | Verifies Docker, Python, Node, and npm are available |
-| **2 — .env setup** | Creates `backend/.env` and `frontend/.env` from examples. Prompts for each service's credentials. Shared values (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `APP_ENV`) are entered once and automatically mirrored into `frontend/.env`. Already-configured values are skipped automatically. |
+| **2 — .env setup** | Creates `backend/.env` and `frontend/.env` from examples. Prompts for each service's credentials (including Pinecone). Shared values (`SUPABASE_URL`, `SUPABASE_ANON_KEY`, `APP_ENV`) are entered once and automatically mirrored into `frontend/.env`. Already-configured values are skipped automatically. |
 | **3 — Migrations** | Applies all SQL files in `backend/migrations/` against your Supabase database (no local `psql` needed — runs inside a Docker container) |
 | **4 — Docker (backend)** | Builds and starts the API server, Redis, and ngrok (reuses existing tunnel if online); waits for the API to be healthy |
-| **5 — Frontend** | Runs `npm install` in `frontend/` then starts the Vite dev server in the foreground |
+| **5 — RAG ingest** | Checks whether the Pinecone index is already populated. If empty, calls `POST /api/v1/rag/ingest` to embed and upload the 30 health/fitness articles. Skipped automatically on subsequent runs (idempotent). |
+| **6 — Frontend** | Runs `npm install` in `frontend/` then starts the Vite dev server in the foreground |
 
 Press **Enter** to accept any default shown in `[brackets]`. Values already present in your `.env` files are shown with a ✔ and skipped.
 
@@ -126,16 +128,17 @@ If you still see ERR_NGROK_334, the endpoint is held by a zombie session (ngrok 
 
 Press **Ctrl-C** (or **Cmd-C**) to stop the frontend dev server.
 
-`setup.sh` registers a shutdown hook, so stopping the frontend **automatically runs `backend/dev-end.sh --soft`**, which:
+`setup.sh` registers a shutdown hook that automatically stops and removes all Docker Compose containers (API, Redis, ngrok) when you exit.
 
-- Stops and removes all Docker Compose containers (API, Redis, ngrok)
-- Skips volume and build-cache pruning so the next startup is faster
-
-If you need a full teardown (remove volumes and build cache too), run it manually:
+If you need to tear down the stack manually (e.g. remove volumes and build cache too):
 
 ```bash
-bash backend/dev-end.sh          # full teardown
-bash backend/dev-end.sh --soft   # containers only (keep volumes & cache)
+# Stop containers only
+docker compose --project-directory backend --profile ngrok down --remove-orphans
+
+# Full teardown (also remove volumes and build cache)
+docker compose --project-directory backend --profile ngrok down --volumes --remove-orphans
+docker builder prune --force
 ```
 
 ---

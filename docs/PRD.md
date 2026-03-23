@@ -1,10 +1,10 @@
 # Engineering Specification: AI-Powered Goal & Task Management App
 
-> **Version:** 1.0 — Greenfield  
-> **Team:** 1 Frontend Engineer, 4 Backend Engineers  
-> **Platform:** PWA (React) → React Native (Phase 2)  
-> **Stack:** Python FastAPI · Supabase (PostgreSQL) · LangGraph · Twilio  
-> **LLM Strategy:** Best-model-per-agent (specified per agent below)
+> **Version:** 1.2 — MVP In Progress
+> **Team:** 1 Frontend Engineer, 4 Backend Engineers
+> **Platform:** TanStack Start (React SSR + PWA) → React Native (Phase 2)
+> **Stack:** Python FastAPI · Supabase (PostgreSQL) · LangGraph · Twilio · Deepgram
+> **LLM Strategy:** Best-model-per-agent via OpenRouter/LiteLLM (specified per agent below)
 
 ---
 
@@ -92,19 +92,24 @@ The app escalates notifications progressively (push → WhatsApp → phone call)
 
 | Layer | Technology | Rationale |
 |---|---|---|
-| Frontend | React (PWA) → React Native | PWA for fast iteration; RN for Phase 2 |
+| Frontend | TanStack Start (React SSR + PWA) → React Native | SSR meta-framework for performance and SEO; RN for Phase 2 |
 | Backend API | Python FastAPI | Native LangGraph support; async-first |
-| Agent Framework | LangGraph (LangChain ecosystem) | Stateful graphs, conditional routing, thread memory |
+| Agent Framework | LangGraph (LangChain ecosystem) | Stateful graphs, conditional routing, Send() fan-out, thread memory |
 | Database | Supabase (PostgreSQL) | Auth, Realtime, PostgREST, storage — all-in-one |
-| Background Jobs | APScheduler (MVP) → Celery + Redis (scale) | Notification polling, micro-goal pipeline triggers |
-| Notifications | Twilio (WhatsApp Business API + Voice) | Single vendor for all escalation channels |
-| LLM — Orchestrator | GPT-4o (OpenAI) | Strong intent classification + multi-turn reasoning |
-| LLM — Goal Planner | Claude 3.5 Sonnet (Anthropic) | Long-context planning, nuanced negotiation |
-| LLM — Classifier | GPT-4o-mini | Fast, cheap, structured output (JSON tags) |
-| LLM — Scheduler | GPT-4o-mini | Slot-finding logic with structured output |
-| LLM — Pattern Observer | GPT-4o-mini | Pattern summarization over historical data |
-| LLM — Notifier Agent | No LLM needed | Pure logic/state machine |
-| Embeddings (future) | OpenAI text-embedding-3-small | Semantic task deduplication |
+| LLM Gateway | LiteLLM via OpenRouter | Unified multi-provider client; swap models without code changes |
+| Background Jobs | Asyncio polling loop (MVP) → Celery + Redis (scale) | Notification polling; simpler and more observable than APScheduler at MVP scale |
+| Notifications | Twilio (WhatsApp Business API + Voice) + Web Push API | Single vendor for escalation; Web Push for zero-friction in-app alerts |
+| Voice (STT + TTS) | Deepgram (nova-3 STT, aura-asteria-en TTS) | Low-latency streaming STT; natural TTS for spoken assistant responses |
+| LLM — Orchestrator | GPT-4o (via OpenRouter) | Strong intent classification + multi-turn reasoning |
+| LLM — Goal Planner | Claude Sonnet 4 (via OpenRouter) | Long-context planning, nuanced negotiation |
+| LLM — Goal Clarifier | GPT-4o-mini (via OpenRouter) | Lightweight question generation before planning |
+| LLM — Classifier | GPT-4o-mini (via OpenRouter) | Fast, cheap, structured output (JSON tags) |
+| LLM — Scheduler | GPT-4o-mini (via OpenRouter) | Slot-finding logic with structured output |
+| LLM — Pattern Observer | GPT-4o-mini (via OpenRouter) | Pattern summarization over historical data |
+| LLM — Notifier Agent | No LLM needed | Pure deterministic state machine |
+| Monitoring | Sentry (frontend) + LangSmith (agents) | Error tracking + full LangGraph trace observability |
+| Embeddings | OpenAI text-embedding-3-small via OpenRouter | RAG corpus embedding (1536 dims) |
+| Vector Store | Pinecone (serverless, cosine) | RAG retrieval for health/fitness goals |
 
 ---
 
@@ -162,6 +167,12 @@ whatsapp_sent_at TIMESTAMPTZ
 call_sent_at    TIMESTAMPTZ
 completed_at    TIMESTAMPTZ
 recurrence_rule TEXT  -- iCal RRULE string (e.g. "FREQ=DAILY;BYDAY=MO,WE,FR")
+proposed_time   INTEGER     -- canonical recurring time: minutes since midnight in user's local tz (0–1439).
+                            -- NULL for one-off tasks. Set at creation from scheduled_at local time.
+                            -- advance_recurring_task() applies this as the time component of each
+                            -- next occurrence, so a single-occurrence reschedule (which only changes
+                            -- scheduled_at) causes future occurrences to revert to the original time.
+                            -- A series reschedule updates both scheduled_at AND proposed_time.
 shared_with_goal_ids UUID[]  -- if task belongs to multiple goals
 created_at      TIMESTAMPTZ DEFAULT now()
 ```
@@ -202,7 +213,7 @@ responded_at    TIMESTAMPTZ
 
 ## 5. Agent Architecture
 
-There are **6 agents** in the system. Each is a node (or subgraph) in the LangGraph execution graph.
+There are **12 dedicated agent files** in the system, assembled into a **15-node LangGraph graph**. Two lightweight utility nodes — `chitchat` and `clarify` — are defined inline in `graph.py` rather than as separate files; `reschedule` reuses `scheduler_node` as a standalone graph node. Five agents were added beyond the original spec to handle goal clarification, start-date collection, task amendment, goal modification, and conversational onboarding. The RAG Retriever grounds health/fitness goal plans in expert evidence. The Notifier runs as a background service outside the conversational graph.
 
 ---
 
@@ -223,6 +234,14 @@ There are **6 agents** in the system. Each is a node (or subgraph) in the LangGr
 
 **Output:** Routing decision + structured payload for downstream agent
 
+**Intents classified:**
+`GOAL` · `GOAL_CLARIFY` · `NEW_TASK` · `RESCHEDULE_TASK` · `MODIFY_GOAL` · `NEXT_MILESTONE` · `CHITCHAT` · `CLARIFY` · `ONBOARDING` · `APPROVE` · `START_DATE`
+
+**Special behaviors:**
+- If `users.onboarded = false`, intent is overridden to `ONBOARDING` regardless of message content.
+- On hard token budget limit, model is downgraded from GPT-4o → GPT-4o-mini automatically.
+- `GOAL_CLARIFY` (frontend batch-submitting clarification answers) short-circuits without an LLM call.
+
 **System Prompt:**
 ```
 You are the Orchestrator for a personal goal and task management assistant.
@@ -231,40 +250,73 @@ Your job is to analyze the user's message and classify it into one of the follow
 - GOAL: The user expresses an aspiration or multi-step desire (e.g., "I want to lose weight", "I want to learn guitar")
 - NEW_TASK: The user wants a discrete, one-time or recurring reminder (e.g., "Remind me to buy groceries")
 - RESCHEDULE_TASK: The user wants to reschedule an existing task. Message will contain a task_id.
-- CLARIFY: You need more information before routing (e.g., a task with no time or location context)
+- MODIFY_GOAL: The user wants to change an existing goal's plan or schedule.
+- NEXT_MILESTONE: The user has completed a milestone and wants to start the next one.
+- APPROVE: The user is confirming a proposed plan.
+- START_DATE: The user is answering the "when do you want to start?" question.
+- CHITCHAT: Greetings or off-topic messages.
+- CLARIFY: You need more information before routing.
 
 Rules:
 - If intent is NEW_TASK or RESCHEDULE_TASK, check if there is enough context: either a specific time, a recurrence pattern, or a location trigger.
 - If context is missing, set intent to CLARIFY and specify exactly what is missing.
 - Never guess. If ambiguous, ask one focused question.
-- Always respond with valid JSON only:
-  {
-    "intent": "GOAL" | "NEW_TASK" | "RESCHEDULE_TASK" | "CLARIFY",
-    "payload": { ... },
-    "clarification_question": "string | null"
-  }
+- Always respond with valid JSON only.
 ```
 
 ---
 
-### 5.2 Goal Planning Agent
+### 5.2 Goal Clarifier Agent _(new)_
+
+**Role:** Inserted between the Orchestrator and Goal Planner. Determines whether the goal statement needs clarifying questions before planning can begin.
+
+**LLM:** GPT-4o-mini
+
+**Responsibilities:**
+- On `GOAL` intent (first visit): call LLM to decide if 1–3 clarifying questions are needed (e.g., timeframe, constraints, prior experience).
+- If questions are needed: return them as a structured list to the frontend for rendering as a quick-select form. Set intent to `GOAL_CLARIFY` and end the turn.
+- On `GOAL_CLARIFY` intent (user submitted answers): store answers in `goal_draft`, set intent to `GOAL_PLAN`, and route to Ask Start Date.
+- If no questions are needed: route directly to Ask Start Date.
+
+**Why it exists:** Prevents the Goal Planner from generating plans with insufficient context, reducing multi-turn negotiation loops.
+
+---
+
+### 5.3 Ask Start Date Agent _(new)_
+
+**Role:** Collects the user's desired goal start date before the planner fan-out runs.
+
+**LLM:** None — pure state machine.
+
+**Responsibilities:**
+- Presents a structured date picker to the frontend (sets `approval_status = awaiting_start_date`).
+- Waits for the user to select a date (natural language or picker selection).
+- On `START_DATE` intent: parses date using Pendulum (supports "today", "tomorrow", ISO strings, natural language). Stores as `goal_start_date` in state.
+- Clears stale fan-out outputs so the Scheduler uses the correct date window on its first (and only) run.
+
+**Why it exists:** Ensures the Scheduler anchors slot-finding to the user's actual intended start date, not "today by default." Avoids a reschedule round-trip after plan generation.
+
+---
+
+### 5.4 Goal Planning Agent
 
 **Role:** Converts a validated goal statement into a concrete, sustainable 6-week action plan through negotiation with the user.
 
-**LLM:** Claude 3.5 Sonnet (best for long-context, nuanced multi-turn planning)
+**LLM:** Claude Sonnet 4 (best for long-context, nuanced multi-turn planning)
 
 **Responsibilities:**
 1. Assess if the goal is achievable in ≤6 weeks. If not, decompose into ordered micro-goals. Present the roadmap to the user for confirmation. Queue all but the first micro-goal in `goals` table with `status = 'pipeline'`.
 2. Consult the **Classifier** for goal tags.
 3. Consult the **Scheduler** for the user's available time slots over the next 6 weeks.
 4. Consult the **Pattern Observer** for behavioral data.
-5. Check if any generated tasks overlap with *existing active tasks* — if so, flag them and present to the user ("I see you're already going to the gym on Tuesdays — I'll incorporate that into your plan").
+5. Consult the **RAG Retriever** for expert evidence (fires automatically when Classifier tags include `Health`, `Fitness`, `Nutrition`, or `Mental Health`). If relevant context is found, it is injected into the planning prompt as a numbered citation block.
+6. Check if any generated tasks overlap with *existing active tasks* — if so, flag them and present to the user ("I see you're already going to the gym on Tuesdays — I'll incorporate that into your plan").
 6. Generate a proposed plan (list of structured tasks with day/time/duration).
 7. Negotiate with the user until confirmed. Allow slot negotiation.
 8. On confirmation: write tasks to DB via the Scheduler. Notify user the plan is live.
 9. If available slots are insufficient for 6 weeks: notify user that the goal will start on the first available date and set goal `status = 'pipeline'` with a future `activated_at`.
 
-**Input:** Goal statement + user profile + Classifier output + Scheduler output + Pattern Observer output
+**Input:** Goal statement + user profile + Classifier output + Scheduler output + Pattern Observer output + RAG Retriever output (when triggered)
 
 **Output:** Confirmed task list (JSON) → written to `tasks` table
 
@@ -315,7 +367,31 @@ After presenting the plan, continue the conversation to refine it. Only output S
 
 ---
 
-### 5.3 Classifier Agent
+### 5.5 RAG Retriever Agent _(new)_
+
+**Role:** Retrieves relevant expert evidence from the Pinecone vector store to ground health/fitness goal plans in authoritative guidance.
+
+**LLM:** None — embedding only (`openai/text-embedding-3-small` via OpenRouter).
+
+**Responsibilities:**
+- Runs as a parallel node in the Phase 2 fan-out, alongside Scheduler and Pattern Observer.
+- Fires only when the Classifier output contains at least one of: `Health`, `Fitness`, `Nutrition`, `Mental Health`.
+- Builds a semantic query from `goal_draft` fields (title, description, target, preferences).
+- Calls `rag_service.retrieve()` to fetch the top-5 most similar chunks from Pinecone.
+- Filters chunks below a 0.4 cosine similarity threshold.
+- Returns formatted context (numbered citation blocks) + deduplicated source list for the Goal Planner.
+
+**Input:** `goal_draft` fields from AgentState; falls back to latest user message if `goal_draft` is not yet populated.
+
+**Output:** `rag_output: { context: str, sources: list[{title, url}], retrieved: bool }`
+
+**Corpus:** 30 curated `.txt` articles in `backend/articles/` — 6 per category (weight loss, nutrition, strength, cardio, behavioral). Sources include WHO, CDC, NHLBI, Mayo Clinic, Harvard, ACSM, NHS, and peer-reviewed PMC journals.
+
+**Graceful degradation:** Any exception in retrieval returns `[]` — the Goal Planner proceeds without expert context rather than failing.
+
+---
+
+### 5.6 Classifier Agent
 
 **Role:** Tags a goal with one or more category labels for analytics.
 
@@ -341,7 +417,7 @@ Rules:
 
 ---
 
-### 5.4 Scheduler Agent
+### 5.7 Scheduler Agent
 
 **Role:** Manages the user's time. Finds available slots, detects conflicts, and writes confirmed plans to the database.
 
@@ -391,7 +467,7 @@ Output format:
 
 ---
 
-### 5.5 Pattern Observer Agent
+### 5.8 Pattern Observer Agent
 
 **Role:** Learns from the user's behavioral history to improve scheduling recommendations.
 
@@ -433,7 +509,7 @@ Only report patterns with at least 3 data points. Mark low-confidence patterns (
 
 ---
 
-### 5.6 Notifier Agent
+### 5.9 Notifier Agent
 
 **Role:** Background service that monitors task states and dispatches escalating notifications.
 
@@ -462,6 +538,10 @@ If task.status NOT IN ('done', 'missed') after escalation_window:
   → Notify Pattern Observer (if 3rd consecutive miss in same slot)
 ```
 
+**Recurring task advancement:** When a recurring task transitions out of `pending` (done or missed), `advance_recurring_task()` inserts the next pending occurrence. It applies the same **sleep-window guard** used at save time — if the next RRULE occurrence lands inside `profile.sleep_window`, it advances to the first valid occurrence after sleep ends. This prevents recurring reminders (e.g., `FREQ=MINUTELY;INTERVAL=30`) from silently accumulating occurrences during sleep that would fire in a burst at wake time.
+
+**`proposed_time` propagation:** `advance_recurring_task()` reads `proposed_time` (minutes since midnight, user local time) from the current task row and applies it as the wall-clock time of the next occurrence's `scheduled_at`. This means a single-occurrence reschedule — which only changes `scheduled_at`, leaving `proposed_time` intact — automatically causes all subsequent occurrences to revert to the original recurring time. The system maintains exactly one pending row per recurring series at all times; future occurrences beyond the current pending row are projected on-the-fly from RRULE + `scheduled_at`.
+
 **Twilio Call Script (TTS):**
 ```
 "Hi! This is your assistant. [task_name] is coming up in the next [time_left_minutes] minutes.
@@ -470,6 +550,63 @@ Press 2 if you want to reschedule.
 Press 3 to mark it as missed."
 ```
 DTMF responses map to: 1 → `done`, 2 → `reschedule` (opens chat), 3 → `missed`.
+
+---
+
+### 5.10 Task Handler Agent _(new)_
+
+**Role:** Handles `NEW_TASK` intent — creates standalone, one-time or recurring tasks without going through the Goal Planner.
+
+**LLM:** GPT-4o-mini
+
+**Responsibilities:**
+- Extract task title, description, scheduled time, duration, and recurrence rule from the user's message.
+- Convert local time to UTC using the user's timezone profile.
+- Detect if a pending task for the same user already exists in the current conversation — if so, amend it in-place rather than creating a duplicate.
+- Route to `save_tasks` on completion.
+
+---
+
+### 5.11 Goal Modifier Agent _(new)_
+
+**Role:** Handles `MODIFY_GOAL` intent for already-saved goals — mutates the existing plan without full replanning.
+
+**LLM:** Claude Sonnet 4
+
+**Responsibilities:**
+- Cancel all future pending tasks for the goal.
+- Use the user's modification request (e.g., "move gym sessions to evenings") to generate updated `proposed_tasks`.
+- Route directly to the `reschedule` node (a standalone run of the Scheduler) then `save_tasks`.
+- Does not re-enter goal negotiation — the user's modification is applied immediately.
+
+---
+
+### 5.12 Save Tasks Agent _(new)_
+
+**Role:** Terminal write node. Bulk-inserts confirmed tasks into the database.
+
+**LLM:** None — pure database write logic.
+
+**Responsibilities:**
+- Accepts `proposed_tasks` from Goal Planner, Task Handler, or Goal Modifier.
+- For recurring tasks, inserts only the **first occurrence** as a DB row. `advance_recurring_task()` lazily inserts subsequent occurrences as each one is completed or missed.
+- Sets `proposed_time` on every recurring task row at insertion time — computed as `local_hour * 60 + local_minute` from `scheduled_at` in the user's timezone. This is the canonical wall-clock time the series always returns to after a single-occurrence reschedule.
+- Activates the first pipeline micro-goal if a parent goal chain exists.
+- Notifies the frontend that the plan is live.
+- **Sleep-window guard (deterministic safety net):** After resolving `scheduled_at`, checks whether the time falls inside `profile.sleep_window`. If it does, advances to the first valid RRULE occurrence after sleep ends (or the bare sleep-end time for one-off tasks). This runs unconditionally — it catches edge cases where the LLM schedules a task during sleep (e.g., a late-night reminder creation, or a minutely recurring task saved while the user is awake but whose next slot lands during sleep).
+
+---
+
+### 5.13 Onboarding Agent _(new)_
+
+**Role:** Handles new-user onboarding entirely within the chat interface. Runs once per user; activated when `users.onboarded = false`.
+
+**LLM:** None — structured quick-select + validated free-text.
+
+**Responsibilities:**
+- Collect: name, timezone, sleep window, work hours, chronotype (morning/evening/neutral).
+- Present each question as a structured option card in the frontend (no freeform parsing required).
+- On completion: write to `users.profile`, set `users.onboarded = true`, seamlessly transition to the normal chat flow.
 
 **Reschedule from Notification:**
 - Check if any slots are available in the remaining hours of the current day.
@@ -488,60 +625,105 @@ DTMF responses map to: 1 → `done`, 2 → `reschedule` (opens chat), 3 → `mis
 ### Graph Structure
 
 ```python
-# Simplified node structure
+# Actual node structure (as implemented)
 graph = StateGraph(AgentState)
 
+# All nodes
 graph.add_node("orchestrator", orchestrator_node)
-graph.add_node("clarify", clarify_node)          # Ask user for missing context
+graph.add_node("chitchat", chitchat_node)          # Greetings / off-topic
+graph.add_node("clarify", clarify_node)             # Ask user for missing context
+graph.add_node("onboarding", onboarding_node)       # New-user profile collection
+graph.add_node("goal_clarifier", goal_clarifier_node)  # Pre-planning Q&A
+graph.add_node("ask_start_date", ask_start_date_node)  # Date picker before fan-out
 graph.add_node("goal_planner", goal_planner_node)
 graph.add_node("classifier", classifier_node)
 graph.add_node("scheduler", scheduler_node)
 graph.add_node("pattern_observer", pattern_observer_node)
-graph.add_node("save_tasks", save_tasks_node)     # Writes to Supabase
-graph.add_node("task_handler", task_handler_node) # Handles standalone tasks
+graph.add_node("rag_retriever", rag_retriever_node)
+graph.add_node("task_handler", task_handler_node)
+graph.add_node("goal_modifier", goal_modifier_node)
+graph.add_node("save_tasks", save_tasks_node)
+graph.add_node("reschedule", scheduler_node)  # Reuses scheduler; standalone run
 
 graph.set_entry_point("orchestrator")
 
+# Orchestrator routing
 graph.add_conditional_edges("orchestrator", route_from_orchestrator, {
-    "GOAL": "goal_planner",
-    "NEW_TASK": "task_handler",
-    "RESCHEDULE_TASK": "scheduler",
-    "CLARIFY": "clarify",
+    "ONBOARDING":     "onboarding",
+    "GOAL":           "goal_clarifier",   # Always through clarifier first
+    "GOAL_CLARIFY":   "goal_clarifier",   # Frontend batch-submitted answers
+    "NEW_TASK":       "task_handler",
+    "MODIFY_GOAL":    "goal_modifier",    # (or goal_planner if no goal_id yet)
+    "NEXT_MILESTONE": "goal_planner",     # Skips clarifier
+    "CHITCHAT":       "chitchat",
+    "CLARIFY":        "clarify",
 })
 
-graph.add_edge("clarify", "orchestrator")  # Loop back after clarification
+# Terminal / loop-back edges
+graph.add_edge("onboarding", END)
+graph.add_edge("chitchat", END)
+graph.add_edge("clarify", END)         # User re-enters via orchestrator next turn
 
-# Goal planning subgraph
-graph.add_edge("goal_planner", "classifier")
-graph.add_edge("goal_planner", "scheduler")
-graph.add_edge("goal_planner", "pattern_observer")
-# goal_planner collects all three, then negotiates
-
-graph.add_conditional_edges("goal_planner", check_user_approval, {
-    "APPROVED": "save_tasks",
-    "NEGOTIATING": "goal_planner",  # Continue conversation
-    "ABANDONED": END,
+# Goal clarifier routing
+graph.add_conditional_edges("goal_clarifier", route_from_goal_clarifier, {
+    "ask_start_date": "ask_start_date", # Needs date before fan-out
+    END:              END,              # Questions sent; wait for user
 })
+graph.add_edge("ask_start_date", END)  # User re-enters via orchestrator next turn
 
-graph.add_edge("save_tasks", END)
-graph.add_edge("task_handler", "save_tasks")
+# Goal planner: true parallel fan-out via Send() on first call
+graph.add_conditional_edges("goal_planner", route_from_goal_planner)
+# Sub-agents reconverge back to goal_planner
+graph.add_edge("classifier",       "goal_planner")
+graph.add_edge("scheduler",        "goal_planner")
+graph.add_edge("pattern_observer", "goal_planner")
+graph.add_edge("rag_retriever",    "goal_planner")  # Only dispatched for health-adjacent goals
+
+# After all sub-agents complete: approval check
+# APPROVED + goal_start_date → save_tasks
+# NEGOTIATING → END (state preserved; user re-enters next turn)
+# ABANDONED → END
+
+# Terminal write path
+graph.add_edge("task_handler",  "save_tasks")
+graph.add_edge("goal_modifier", "reschedule")
+graph.add_edge("reschedule",    "save_tasks")
+graph.add_edge("save_tasks",    END)
 ```
+
+**Key implementation notes:**
+- **Two-phase fan-out** uses LangGraph's `Send()` primitive. Phase 1 dispatches the classifier solo (its tags gate RAG in Phase 2). Phase 2 fans out scheduler, pattern_observer, and rag_retriever (health-adjacent goals only) in parallel. A custom merge reducer accumulates all results in `AgentState` without race conditions.
+- **Multi-turn persistence** uses `AsyncPostgresSaver` (psycopg + Supabase PostgreSQL direct port 5432 — not PgBouncer, which is incompatible with LangGraph checkpoint writes).
+- **`goal_start_date` is always collected before the fan-out** so the Scheduler uses the correct window on its first (and only) run — no reschedule round-trip needed after plan generation.
 
 ### State Schema
 
 ```python
 class AgentState(TypedDict):
     user_id: str
-    conversation_history: list[dict]  # Full message history
-    intent: str
+    conversation_history: list[dict]  # Windowed — cost-controlled
+
+    intent: Optional[str]
     user_profile: dict                # Cached from DB at session start
-    goal_draft: dict | None
-    proposed_tasks: list[dict] | None
-    classifier_output: dict | None
-    scheduler_output: dict | None
-    pattern_output: dict | None
-    approval_status: str | None       # 'pending' | 'approved' | 'negotiating'
-    error: str | None
+
+    goal_draft: Optional[dict]
+    proposed_tasks: Optional[list[dict]]
+
+    # Annotated with merge reducer — safe for Send() parallel fan-out
+    classifier_output: Annotated[Optional[dict], _merge_dict]
+    scheduler_output:  Annotated[Optional[dict], _merge_dict]
+    pattern_output:    Annotated[Optional[dict], _merge_dict]
+    rag_output:        Annotated[Optional[dict], _merge_dict]  # {context, sources, retrieved} — None when skipped
+
+    clarification_question: Optional[str]
+    approval_status: Optional[str]    # 'pending' | 'approved' | 'awaiting_start_date' | 'negotiating' | 'abandoned'
+    goal_start_date: Optional[str]    # ISO8601 date — collected before fan-out
+    milestone_order: Optional[int]    # Which pipeline milestone to plan
+    error: Optional[str]
+    token_usage: dict                 # Accumulated per-session token count
+    correlation_id: Optional[str]     # End-to-end trace (Sentry + LangSmith)
+    conversation_id: Optional[str]    # DB UUID — used by save_tasks
+    options: Optional[list]           # Quick-select options for frontend UI
 ```
 
 ### Thread Persistence
@@ -556,12 +738,11 @@ class AgentState(TypedDict):
 
 ### Architecture
 
-The Notifier Agent runs as a **background service** separate from the FastAPI app, implemented with **APScheduler** (MVP) running within the same process, or **Celery + Redis** at scale.
+The Notifier Agent runs as a **standalone background process** (`backend/notifier/main.py`) separate from the FastAPI app, implemented as an **asyncio polling loop** (MVP) polling every 60 seconds, or **Celery + Redis** at scale.
 
 ```python
-# Core polling loop (runs every 60 seconds)
-@scheduler.scheduled_job('interval', seconds=60)
-def notification_poll():
+# Core polling loop (runs every 60 seconds via asyncio)
+async def notification_poll():
     now = datetime.utcnow()
     
     # Find tasks due for PUSH notification (T - 10min)
@@ -597,19 +778,87 @@ def notification_poll():
 | Phone Call | Twilio Programmable Voice (TTS) | +2min after WhatsApp (unacknowledged) | DTMF: 1/2/3 |
 | Auto-miss | System | +2min after call (unacknowledged) | None |
 
+### Escalation Policy (Per-Task)
+
+Each task carries an `escalation_policy` field controlling how aggressively notifications escalate:
+
+| Policy | Behavior |
+|---|---|
+| `silent` | Push notification only — no WhatsApp or call escalation |
+| `standard` | Full escalation ladder: push → WhatsApp → call (default) |
+| `aggressive` | Shorter escalation window between channels |
+
+Users can update per-task escalation policy via `PATCH /api/v1/tasks/{id}/escalation-policy`.
+
 ### Webhook Endpoints
 
 ```
-POST /api/webhooks/twilio/whatsapp  → Handle WhatsApp replies
-POST /api/webhooks/twilio/voice     → Handle DTMF call responses
-POST /api/tasks/{id}/complete       → Handle in-app "Done" CTA
-POST /api/tasks/{id}/missed         → Handle in-app "Missed" CTA
-POST /api/tasks/{id}/reschedule     → Trigger reschedule chat flow
+POST /api/v1/webhooks/twilio/whatsapp  → Handle WhatsApp replies (DTMF: 1=done, 2=reschedule, 3=missed)
+POST /api/v1/webhooks/twilio/voice     → Handle DTMF voice call responses
+PATCH /api/v1/tasks/{id}/complete      → Handle in-app "Done" CTA
+PATCH /api/v1/tasks/{id}/missed        → Handle in-app "Missed" CTA
+PATCH /api/v1/tasks/{id}/reschedule-confirm → Confirm a reschedule slot
 ```
 
 ---
 
-## 8. Analytics & Dashboard
+## 8. Voice Interaction Layer _(new — shipped in MVP)_
+
+Voice is a **transport layer**, not a separate agent pipeline. A spoken message is transcribed and fed into the same `onSend()` → `ChatService.sendMessage()` → LangGraph pipeline as typed text. Zero changes to orchestrator or agents are required.
+
+### Architecture
+
+```
+User speaks
+    │
+    ▼
+MediaRecorder API (browser)
+    │  audio/webm;codecs=opus
+    ▼
+WebSocket → Deepgram STT API (nova-3 model)
+    │  is_final transcript only (suppresses partial results)
+    ▼
+Transcript string injected into chat input
+    │
+    ▼
+ChatService.sendMessage() — identical to typed input
+    │
+    ▼
+LangGraph pipeline (no changes)
+    │
+    ▼
+Response includes spoken_summary field (≤300 chars, markdown stripped)
+    │
+    ▼
+HTTPS POST → Deepgram TTS API (aura-asteria-en)
+    │
+    ▼
+Audio played in browser
+```
+
+### Key Implementation Details
+
+| Concern | Implementation |
+|---|---|
+| STT auth | Short-lived Deepgram JWT issued by `GET /api/v1/voice/token` (120s TTL) |
+| Browser WebSocket auth | JWT passed as `Sec-WebSocket-Protocol: ["bearer", token]` (browser WS has no custom header support) |
+| Audio encoding | `audio/webm;codecs=opus` — use `encoding=opus&container=webm` in Deepgram params (NOT linear16) |
+| Partial results | Suppressed — only `is_final` transcripts accumulated to avoid premature submission |
+| TTS | `spoken_summary` built server-side in `build_spoken_summary()` — strips markdown, caps at 300 chars, omits raw task lists |
+| State machine | idle → connecting → recording → transcribing → done → idle |
+| Frontend hook | `frontend/src/hooks/useVoice.ts` — exposes `startRecording`, `stopRecording`, `playTTS`, and status flags |
+
+### UX Flow
+
+1. User presses and holds the mic button (push-to-talk).
+2. Status indicator shows: connecting → recording.
+3. On release: recording stops, transcript is finalized.
+4. Transcript appears in the chat input field — user can edit before sending, or it auto-sends.
+5. Agent responds in text. If the input was voice, `spoken_summary` is played back via TTS.
+
+---
+
+## 9. Analytics & Dashboard _(Reflection Screen)_
 
 ### KPIs to Surface
 
@@ -653,25 +902,42 @@ Refresh materialized views on a schedule (every hour) or trigger-based after tas
 
 ---
 
-## 9. UI/UX Flows
+## 10. UI/UX Flows
 
-### Home Screen
-- **Header:** Greeting + date
-- **Today's Tasks:** Scrollable list of today's `pending` tasks, ordered by `scheduled_at`. Each card shows: task title, time, goal category tag (color-coded), and a "Mark Done" button.
-- **Quick Stats:** Streak count, today's completion % (X of Y done)
-- **FAB (Floating Action Button):** Opens chat — the primary creation surface. Label: "Chat with your assistant"
+### Flow Screen (`/`) — Daily Timeline
+- **Header:** Time-aware greeting + user name + date selector (navigate to past/future days)
+- **Timeline:** Chronological list of today's tasks rendered as event cards, ordered by `scheduled_at`. Each card shows: task title, time, goal category tag (color-coded), duration, and inline "Done" / "Missed" actions.
+- Tapping a card opens a **Task Detail Sheet** with full task info + Reschedule option (deep-links to `/chat` with `reschedule_task_id` in URL).
+- Push notification deep-links (`?complete_task_id=`, `?missed_task_id=`) are handled on mount — task status updated immediately on landing.
+- **Bottom nav:** Flow · Chat · Reflection · Profile
 
-### Chat Screen
-- Full-height conversational UI (similar to iMessage/WhatsApp)
-- User messages right-aligned, assistant left-aligned
-- When the Goal Planner proposes a plan, it renders as a **structured card** within the chat (not raw text): shows task list with days/times, with "Accept Plan" and "Adjust Plan" buttons.
-- Micro-goal roadmap is rendered as a vertical stepper card within the chat.
+### Chat Screen (`/chat`) — Primary AI Interface
+- Full-height conversational UI; user messages right-aligned, assistant left-aligned.
+- **Voice input:** Mic button (push-to-talk) in the chat input bar — powered by Deepgram STT. Transcript appears in the input field; TTS plays the agent's `spoken_summary` on response.
+- When the Goal Planner proposes a plan, it renders as a **structured `PlanView` card** (week-by-week milestone breakdown) with an "Accept Plan" button.
+- Multi-milestone goals render a **`MilestoneRoadmapView`** stepper card showing the full pipeline.
+- Clarifying questions render as a **`GoalClarifierView` sheet** — structured form with quick-select answers.
+- Start-date prompt renders as a **`StartDatePicker`** inline in the chat.
+- **Chat history drawer:** Slide-up panel showing past conversations (keyset-paginated); tap to reload any prior conversation.
+- **Reschedule deep-link:** Opening `/chat?reschedule_task_id=X` auto-submits a reschedule request on mount. For recurring tasks, the chat first asks whether to reschedule just this occurrence or this one and all future occurrences — then presents time slot options. Selecting "This one + all future" updates both `scheduled_at` and `proposed_time` on the current pending row; selecting "Just this one" updates only `scheduled_at`, so future occurrences automatically revert to the original recurring time.
 
-### Analytics Screen (Profile)
-- Tabbed view: Overview · Goals · Patterns
-- **Overview tab:** Streak, weekly completion line chart, activity heatmap
-- **Goals tab:** Per-goal progress bars, category breakdown bar chart
-- **Patterns tab (v2):** Surfaced behavioral insights from Pattern Observer
+### Onboarding Screen (`/onboarding`)
+- Dedicated route for first-time users (`users.onboarded = false`).
+- Chat-based interface using `OnboardingChat` component — structured quick-select options for each onboarding question (name, timezone, sleep window, work hours, chronotype).
+- On completion, redirects to `/chat` for the user's first goal or task.
+
+### Reflection Screen (`/reflection`) — Analytics
+- **Stat pills:** Streak count, today's completion %, tasks completed
+- **Energy Aura:** Visual representation of overall completion health
+- **Focus Distribution:** Category breakdown of active goals (color-coded)
+- **Goal Progress Cards:** Per-active-goal completion bars
+- Feeds from: `GET /api/v1/analytics/overview`, `weekly`, `missed-by-cat`, `goals/progress`
+
+### Profile Screen (`/profile`) — Settings
+- Edit display name and timezone
+- Notification preferences (escalation policy, reminder lead time)
+- Phone number verification (Twilio OTP) + WhatsApp opt-in
+- Account data export (GDPR) + account deletion
 
 ### Notification CTAs
 
@@ -685,7 +951,7 @@ Refresh materialized views on a schedule (every hour) or trigger-based after tas
 > 2️⃣ Reschedule
 > 3️⃣ Mark as missed"
 
-**Phone call (TTS):** See §5.6
+**Phone call (TTS):** See §5.9
 
 ---
 
@@ -729,49 +995,83 @@ All endpoints require JWT auth via Supabase Auth. Prefix: `/api/v1`
 ### Chat
 
 ```
-POST   /chat/message          → Send user message, get agent response (streams)
-GET    /chat/history          → Get conversation history for current session
+POST   /chat/message                    → Send message; SSE streaming with LangGraph execution
+GET    /chat/history                    → Paginated conversation history (oldest first)
+GET    /chat/conversations              → List conversations (keyset pagination, newest first)
+POST   /chat/onboarding/start          → Start onboarding flow for non-onboarded users
 ```
 
 ### Goals
 
 ```
-GET    /goals                 → List user's goals (with status filter)
-GET    /goals/{id}            → Goal detail + pipeline
-PATCH  /goals/{id}/abandon    → Abandon goal; cancel all future tasks (not shared)
-GET    /goals/{id}/tasks      → All tasks for this goal
+GET    /goals                           → List goals (status filter supported)
+GET    /goals/progress                  → Per-goal progress metrics (velocity, completion %)
+GET    /goals/{id}                      → Goal detail + pipeline sub-goals
+PATCH  /goals/{id}/abandon              → Abandon goal; cancel exclusive pending tasks
+PATCH  /goals/{id}/modify               → Invoke goal_modifier agent (intent=MODIFY_GOAL)
+GET    /goals/{id}/tasks                → All tasks for this goal
 ```
 
 ### Tasks
 
 ```
-GET    /tasks/today           → Today's tasks (for Home screen)
-GET    /tasks/{id}            → Task detail
-PATCH  /tasks/{id}/complete   → Mark done
-PATCH  /tasks/{id}/missed     → Mark missed
-POST   /tasks/{id}/reschedule → Trigger reschedule chat flow
+GET    /tasks                           → Tasks for a given date (defaults to today); includes RRULE projections
+POST   /tasks/todo                      → Create unscheduled to-do (no LangGraph)
+GET    /tasks/{id}                      → Task detail
+PATCH  /tasks/{id}/complete             → Mark done; triggers goal completion + pipeline activation check
+PATCH  /tasks/{id}/missed               → Mark missed; fires pattern_observer async
+PATCH  /tasks/{id}/escalation-policy   → Update per-task escalation policy (silent/standard/aggressive)
+PATCH  /tasks/{id}/reschedule-confirm  → Confirm a reschedule slot. Body: { scheduled_at, scope: "one"|"series" }.
+                                        scope=one  — updates scheduled_at only; proposed_time unchanged so future
+                                                     occurrences revert to the original recurring time.
+                                        scope=series — updates both scheduled_at and proposed_time in-place;
+                                                     all future occurrences produced by advance_recurring_task()
+                                                     inherit the new wall-clock time.
 ```
 
 ### Analytics
 
 ```
-GET    /analytics/overview         → Streak, completion %, heatmap data
-GET    /analytics/goals            → Per-goal progress
-GET    /analytics/missed-by-cat    → Missed tasks by category
-GET    /analytics/weekly           → Weekly completion over 12 weeks
+GET    /analytics/overview              → Streak, completion %, heatmap (last 365 days)
+GET    /analytics/goals                 → Per-active-goal task completion stats
+GET    /analytics/missed-by-cat         → Missed tasks grouped by goal category
+GET    /analytics/weekly                → Weekly completion (configurable window, max 52 weeks)
+```
+
+### Patterns
+
+```
+GET    /patterns                        → List user's behavioral patterns
+GET    /patterns/{id}                   → Single pattern detail
+PATCH  /patterns/{id}                   → Update description/confidence; apply user override
+DELETE /patterns/{id}                   → Hard-delete pattern (HTTP 204)
+```
+
+### Account
+
+```
+GET    /account/me                      → Current user (id, email, timezone, onboarded, notification_preferences, monthly_token_usage)
+PATCH  /account/me                      → Update name, timezone, notification preferences
+POST   /account/phone/verify/send       → Send OTP via Twilio Verify
+POST   /account/phone/verify/confirm    → Confirm OTP; set phone_verified=true
+POST   /account/whatsapp/opt-in         → Opt-in to WhatsApp (requires phone_verified)
+DELETE /account                         → GDPR erasure; cascade-delete all user data (HTTP 204)
+GET    /account/export                  → GDPR portability; export all user data as JSON
+GET    /account/push-subscription/vapid-key  → Return VAPID public key for Web Push
+POST   /account/push-subscription       → Save/update browser Web Push subscription
+```
+
+### Voice
+
+```
+GET    /voice/token                     → Issue short-lived Deepgram JWT (120s TTL) for STT + TTS
 ```
 
 ### Webhooks (Twilio)
 
 ```
-POST   /webhooks/twilio/whatsapp   → WhatsApp reply handler
-POST   /webhooks/twilio/voice      → DTMF voice response handler
-```
-
-### Demo Mode (MVP)
-
-```
-POST   /demo/trigger-location      → Simulate "away from home" state
+POST   /webhooks/twilio/whatsapp        → WhatsApp reply handler (DTMF: 1=done, 2=reschedule, 3=missed)
+POST   /webhooks/twilio/voice           → DTMF voice call response handler
 ```
 
 ---
@@ -791,18 +1091,29 @@ POST   /demo/trigger-location      → Simulate "away from home" state
 
 ## 13. Phase 2 Roadmap
 
+**Shipped in MVP (moved from Phase 2):**
+- ✅ Voice input + TTS response (Deepgram STT + TTS — fully live)
+- ✅ Per-task escalation policies (silent / standard / aggressive)
+- ✅ RRULE-based recurring tasks with projection
+- ✅ Recurring task series reschedule — "just this one" vs "this one + all future occurrences"
+- ✅ Goal pipeline (sequential micro-goal chains)
+- ✅ Behavioral pattern tracking (Pattern Observer agent + user-editable patterns)
+- ✅ GDPR data export + account deletion
+
+**Remaining Phase 2:**
+
 | Feature | Notes |
 |---|---|
 | React Native app | Reuse FastAPI backend; replace PWA shell |
 | Google Calendar integration | Bi-directional sync via Google Calendar API; Scheduler reads external events |
-| GPS geofencing | React Native location APIs; replace Demo Mode |
-| Pattern Observer UI | Users can view + correct learned patterns |
-| "Already doing" flow | Detect existing habits via onboarding + task overlap |
-| Streak notifications | "You're on a 7-day streak! Keep it up 🔥" |
+| GPS geofencing | React Native location APIs; replace current Demo Mode toggle |
+| Pattern Observer UI | Users can view, correct, and dismiss learned patterns (patterns API is live; UI pending) |
+| "Already doing" flow | Detect existing habits via onboarding + task overlap detection |
+| Streak notifications | Push notification celebrating consecutive-day streaks |
 | Apple Calendar / Outlook | After Google Calendar |
 | Collaborative goals | Shared goals between users (accountability partners) |
-| Voice input | Whisper API for voice-to-text in chat |
 | Widget (iOS/Android) | Today's tasks on home screen widget |
+| Celery + Redis | Replace asyncio polling loop for notification worker at scale |
 
 ---
 

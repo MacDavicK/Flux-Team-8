@@ -18,7 +18,7 @@ from typing import Optional
 import pendulum
 
 from app.agents.pattern_observer import flag_goal_milestone_completion
-from app.services.rrule_expander import next_occurrence_after
+from app.services.rrule_expander import advance_past_sleep, next_occurrence_after
 from app.agents.state import AgentState
 from app.services.supabase import db
 
@@ -73,21 +73,25 @@ async def _ensure_goal(user_id: str, goal_draft: dict) -> Optional[str]:
     return str(new_id) if new_id else None
 
 
+def _parse_dt(value) -> Optional[object]:
+    """Parse a datetime string or return the value unchanged if already a datetime."""
+    if isinstance(value, str):
+        try:
+            return pendulum.parse(value)
+        except Exception:
+            return None
+    return value
+
+
 def _row_to_tuple(row: dict) -> tuple:
     """Convert a task dict to the positional tuple used by the INSERT statement."""
-    scheduled_at = row.get("scheduled_at")
-    if isinstance(scheduled_at, str):
-        try:
-            scheduled_at = pendulum.parse(scheduled_at)
-        except Exception:
-            scheduled_at = None
     return (
         row.get("user_id"),
         row.get("goal_id"),
         row.get("title", ""),
         row.get("description", ""),
         row.get("status", "pending"),
-        scheduled_at,
+        _parse_dt(row.get("scheduled_at")),
         row.get("duration_minutes", 30),
         row.get("trigger_type", "time"),
         row.get("location_trigger"),
@@ -95,6 +99,7 @@ def _row_to_tuple(row: dict) -> tuple:
         row.get("shared_with_goal_ids") or [],
         row.get("escalation_policy", "standard"),
         row.get("conversation_id"),
+        _parse_dt(row.get("canonical_scheduled_at")),
     )
 
 
@@ -102,8 +107,9 @@ _INSERT_SQL = """
 INSERT INTO tasks (
     user_id, goal_id, title, description, status,
     scheduled_at, duration_minutes, trigger_type, location_trigger,
-    recurrence_rule, shared_with_goal_ids, escalation_policy, conversation_id
-) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
+    recurrence_rule, shared_with_goal_ids, escalation_policy, conversation_id,
+    canonical_scheduled_at
+) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
 """
 
 
@@ -259,6 +265,26 @@ async def save_tasks_node(state: AgentState) -> dict:
             except Exception:
                 pass
 
+        # ── Sleep-window guard ──────────────────────────────────────────────
+        # Safety net: if the resolved scheduled_at falls inside the user's sleep
+        # window (e.g. task_handler or LLM chose a time during sleep, or the
+        # past-time guard landed on a sleep-window occurrence), advance it to the
+        # first valid moment after sleep ends.
+        if scheduled_at_utc:
+            try:
+                sleep_window = profile.get("sleep_window")
+                if sleep_window:
+                    dt_for_dtstart = pendulum.parse(scheduled_at_utc)
+                    scheduled_at_utc = advance_past_sleep(
+                        utc_iso=scheduled_at_utc,
+                        sleep_window=sleep_window,
+                        user_timezone=user_tz,
+                        rrule_string=recurrence_rule,
+                        dtstart=dt_for_dtstart,
+                    )
+            except Exception:
+                pass
+
         base_row: dict = {
             "user_id": user_id,
             "goal_id": task_goal_id,
@@ -286,12 +312,16 @@ async def save_tasks_node(state: AgentState) -> dict:
             # All recurring tasks: insert only the first occurrence.
             # The notifier/task-completion handler advances to the next occurrence
             # (via the recurrence_rule) when the current one is done/missed/rescheduled.
+            # canonical_scheduled_at = scheduled_at_utc at creation (the LLM-chosen
+            # time after all guards is the first canonical position in the series).
+            # It is never changed on single-occurrence reschedule.
             await _insert_task(
                 {
                     **base_row,
                     "scheduled_at": scheduled_at_utc,
                     "recurrence_rule": recurrence_rule,
                     "escalation_policy": escalation_policy,
+                    "canonical_scheduled_at": scheduled_at_utc,
                 }
             )
             rows_inserted += 1

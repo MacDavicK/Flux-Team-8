@@ -3,6 +3,7 @@ import { getNodeLabel } from "~/lib/nodeLabels";
 import type {
   ChatMessageResponse,
   GoalClarifierAnswer,
+  GoalClarifierQuestion,
   OnboardingOption,
 } from "~/types";
 
@@ -15,6 +16,9 @@ export interface HistoryMessage {
   metadata?: {
     proposed_plan?: Record<string, unknown>;
     options?: OnboardingOption[];
+    questions?: GoalClarifierQuestion[];
+    rag_used?: boolean;
+    rag_sources?: { title: string; url: string | null }[];
   } | null;
 }
 
@@ -86,6 +90,7 @@ class ChatService {
     options?: {
       intent?: string;
       task_id?: string;
+      reschedule_scope?: string;
       answers?: GoalClarifierAnswer[];
     },
     onProgress?: (label: string) => void,
@@ -97,6 +102,9 @@ class ChatService {
         conversation_id: conversationId ?? null,
         ...(options?.intent ? { intent: options.intent } : {}),
         ...(options?.task_id ? { task_id: options.task_id } : {}),
+        ...(options?.reschedule_scope
+          ? { reschedule_scope: options.reschedule_scope }
+          : {}),
         ...(options?.answers ? { answers: options.answers } : {}),
       }),
     });

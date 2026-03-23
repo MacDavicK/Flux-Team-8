@@ -78,23 +78,32 @@ async def goal_planner_node(state: AgentState) -> dict:
     """
     user_id: str = state["user_id"]
 
-    # 9.2.2 — Only generate the plan once all sub-agent outputs are available.
-    # On the first call they are None (fan-out not yet triggered).
-    # Before fanning out, check whether we need goal-specific context from the user.
+    # 9.2.2 — Three-phase fan-out (see graph.py route_from_goal_planner):
+    #
+    #   Call 1 — nothing done yet: reset all sub-agent outputs → triggers Phase 1
+    #            (classifier fires solo so its tags can gate RAG in Phase 2).
+    #   Call 2 — classifier done, scheduler/pattern not yet: pass-through empty dict
+    #            → triggers Phase 2 (scheduler + pattern_observer + rag_retriever run
+    #            in parallel; RAG is included only for health-adjacent goals).
+    #   Call 3 — scheduler + pattern done (rag may or may not have run): fall through
+    #            to the LLM call below.
     classifier_done = state.get("classifier_output") is not None
     scheduler_done = state.get("scheduler_output") is not None
     pattern_done = state.get("pattern_output") is not None
 
-    if not (classifier_done and scheduler_done and pattern_done):
-        # Sub-agents haven't run yet — return empty dict to trigger fan-out.
-        # Clarification was already handled by goal_clarifier before reaching here.
-        # Also handles re-entry from in-negotiation MODIFY_GOAL: stale sub-agent
-        # outputs are cleared so the fan-out re-runs with fresh context.
-        return {
-            "classifier_output": None,
-            "scheduler_output": None,
-            "pattern_output": None,
-        }
+    if not (scheduler_done and pattern_done):
+        if not classifier_done:
+            # Call 1: fresh start — clear any stale sub-agent outputs so the
+            # routing function sees a clean slate and fires Phase 1.
+            return {
+                "classifier_output": None,
+                "scheduler_output": None,
+                "pattern_output": None,
+                "rag_output": None,
+            }
+        # Call 2: classifier is done; waiting for Phase 2 sub-agents.
+        # Return empty dict — route_from_goal_planner will fire the fan-out.
+        return {}
 
     # 9.2.8 — Downgrade model on hard budget limit
     budget = await check_token_budget(user_id)
@@ -190,6 +199,18 @@ async def goal_planner_node(state: AgentState) -> dict:
             )
             goal_draft = {**goal_draft, "goal_id": next_goal_id}
 
+    # ── RAG expert context ────────────────────────────────────────────────────
+    rag_output = state.get("rag_output") or {}
+    expert_context = rag_output.get("context", "")
+    if expert_context:
+        expert_context_section = (
+            f"\n\nEXPERT CONTEXT — ground your recommendations in the following "
+            f"evidence-based excerpts and cite the numbered sources in your plan_summary:\n"
+            f"{expert_context}\n"
+        )
+    else:
+        expert_context_section = ""
+
     # ── Build LLM context block ───────────────────────────────────────────────
     context_block = (
         f"\n\nContext:\n"
@@ -198,7 +219,9 @@ async def goal_planner_node(state: AgentState) -> dict:
         f"scheduler_output: {json.dumps(scheduler_output)}\n"
         f"pattern_output: {json.dumps(pattern_output)}\n"
         f"goal_draft: {json.dumps(goal_draft)}\n"
-        f"user_preference_notes: {json.dumps(user_notes)}\n" + milestone_context_block
+        f"user_preference_notes: {json.dumps(user_notes)}\n"
+        + milestone_context_block
+        + expert_context_section
     )
 
     # 9.2.3 — Call validated LLM with GoalPlannerOutput, max_tokens=4096

@@ -145,11 +145,13 @@ function mapTaskToDisplayTypes(task: {
   };
 }
 
-function getGreeting(name?: string): string {
+function getGreeting(): string {
   const hour = new Date().getHours();
-  const salutation =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  return name ? `${salutation}, ${name.split(" ")[0]}` : salutation;
+  return hour < 12
+    ? "Good morning,"
+    : hour < 17
+      ? "Good afternoon,"
+      : "Good evening,";
 }
 
 function FlowPage() {
@@ -247,7 +249,8 @@ function FlowPage() {
       <AmbientBackground />
 
       <DateHeader
-        greeting={getGreeting(displayName)}
+        greeting={getGreeting()}
+        name={displayName?.split(" ")[0]}
         selectedDate={viewDate}
         onDateChange={(d) => {
           setViewDate(d);

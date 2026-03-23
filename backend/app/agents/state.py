@@ -53,6 +53,8 @@ class AgentState(TypedDict):
     classifier_output: Annotated[Optional[dict], _merge_dict]
     scheduler_output: Annotated[Optional[dict], _merge_dict]
     pattern_output: Annotated[Optional[dict], _merge_dict]
+    # RAG retrieval output — shape: {context: str, sources: list[dict], retrieved: bool}
+    rag_output: Annotated[Optional[dict], _merge_dict]
 
     clarification_question: Optional[str]  # Set by orchestrator when intent == CLARIFY
     approval_status: Optional[
@@ -75,3 +77,9 @@ class AgentState(TypedDict):
 
     # Quick-select options shown below the latest assistant message (UI-only, not persisted)
     options: Optional[list]
+
+    # Congestion-aware start date fields — set by ask_start_date_node
+    suggested_date: Optional[str]  # YYYY-MM-DD; lightest day in the next 14
+    congested_dates: Optional[
+        list[str]
+    ]  # YYYY-MM-DD list; days with no room for new tasks
