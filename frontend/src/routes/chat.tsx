@@ -49,6 +49,7 @@ export const Route = createFileRoute("/chat")({
   validateSearch: z.object({
     reschedule_task_id: z.string().optional(),
     task_name: z.string().optional(),
+    occurrence_date: z.string().optional(),
     conversation: z.string().optional(),
   }),
   loader: async () => {
@@ -233,7 +234,8 @@ function ChatPage() {
   useEffect(() => {
     setInMemoryToken(token);
   }, [token]);
-  const { reschedule_task_id, task_name, conversation } = Route.useSearch();
+  const { reschedule_task_id, task_name, occurrence_date, conversation } =
+    Route.useSearch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [progressLabel, setProgressLabel] = useState<string | undefined>(
@@ -260,6 +262,10 @@ function ChatPage() {
   const rescheduleTaskIdRef = useRef<string | undefined>(reschedule_task_id);
   // "one" | "series" — set when user picks scope for a recurring task reschedule.
   const rescheduleScope = useRef<string>("one");
+  // Preserve occurrence_date for projected-occurrence reschedules.
+  const rescheduleOccurrenceDateRef = useRef<string | undefined>(
+    occurrence_date,
+  );
   const lastInputWasVoiceRef = useRef<boolean>(false);
   const voice = useVoice();
 
@@ -464,6 +470,7 @@ function ChatPage() {
             rescheduleTaskIdRef.current,
             text,
             rescheduleScope.current,
+            rescheduleOccurrenceDateRef.current,
           )
           .then((result) => {
             setIsThinking(false);

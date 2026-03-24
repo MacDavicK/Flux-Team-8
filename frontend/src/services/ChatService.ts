@@ -114,7 +114,8 @@ class ChatService {
     }
 
     // Parse SSE stream
-    const reader = response.body!.getReader();
+    const reader = response.body?.getReader();
+    if (!reader) throw new Error("Response body is null");
     const decoder = new TextDecoder();
     let buffer = "";
 

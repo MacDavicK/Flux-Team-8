@@ -32,13 +32,13 @@ export const Route = createFileRoute("/")({
     missed_task_id: z.string().optional(),
     date: z.string().optional(),
   }),
-  loader: async ({ location }) => {
+  loaderDeps: ({ search }) => ({ date: search.date }),
+  loader: async ({ deps }) => {
     const { user, token } = await serverGetMe();
     if (!user) throw redirect({ to: "/login" });
     if (!user.onboarded) throw redirect({ to: "/chat" });
 
-    const searchDate = (location.search as Record<string, string | undefined>)
-      .date;
+    const searchDate = deps.date;
     const dateParam = searchDate
       ? `?date=${encodeURIComponent(searchDate)}`
       : "";
@@ -286,7 +286,13 @@ function FlowPage() {
           setSelectedTask(null);
           navigate({
             to: "/chat",
-            search: { reschedule_task_id: taskId, task_name: taskTitle },
+            search: {
+              reschedule_task_id: taskId,
+              task_name: taskTitle,
+              ...(selectedTask?.occurrenceDate
+                ? { occurrence_date: selectedTask.occurrenceDate }
+                : {}),
+            },
           });
         }}
       />

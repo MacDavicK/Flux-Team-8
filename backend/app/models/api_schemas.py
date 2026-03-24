@@ -242,6 +242,9 @@ class RescheduleRequest(BaseModel):
 class RescheduleConfirmRequest(BaseModel):
     scheduled_at: str  # ISO 8601 UTC datetime string
     scope: str = "one"  # "one" | "series"
+    occurrence_date: Optional[str] = (
+        None  # YYYY-MM-DD; set when rescheduling a projected occurrence
+    )
 
 
 # ─────────────────────────────────────────────────────────────────

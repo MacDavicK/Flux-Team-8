@@ -101,8 +101,8 @@ export function TaskDetailSheet({
 
               {/* CTAs */}
               <div className="flex flex-col gap-3 pt-1">
-                {/* Acknowledged — always shown for pending tasks */}
-                {!isDone && !isMissed && (
+                {/* Acknowledged — shown for pending tasks that are not projected */}
+                {!isDone && !isMissed && !task.isProjected && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}
@@ -117,8 +117,8 @@ export function TaskDetailSheet({
                   </motion.button>
                 )}
 
-                {/* Mark as Done — shown for missed tasks */}
-                {isMissed && (
+                {/* Mark as Done — shown for missed tasks that are not projected */}
+                {isMissed && !task.isProjected && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}
@@ -133,8 +133,8 @@ export function TaskDetailSheet({
                   </motion.button>
                 )}
 
-                {/* Reschedule — shown for pending and missed tasks */}
-                {!isDone && (
+                {/* Reschedule — shown for pending and projected tasks, not missed/done */}
+                {!isDone && !isMissed && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}

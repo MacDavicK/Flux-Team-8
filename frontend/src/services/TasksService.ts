@@ -69,6 +69,7 @@ class TasksService {
     taskId: string,
     scheduledAt: string,
     scope: string = "one",
+    occurrenceDate?: string,
   ): Promise<{
     original_task_id: string;
     new_task_id: string;
@@ -80,7 +81,11 @@ class TasksService {
       `/api/v1/tasks/${taskId}/reschedule-confirm`,
       {
         method: "PATCH",
-        body: JSON.stringify({ scheduled_at: scheduledAt, scope }),
+        body: JSON.stringify({
+          scheduled_at: scheduledAt,
+          scope,
+          ...(occurrenceDate ? { occurrence_date: occurrenceDate } : {}),
+        }),
       },
     );
     if (!response.ok) throw new Error("Failed to confirm reschedule");
