@@ -151,7 +151,15 @@ function parseProposedPlan(proposed_plan: Record<string, unknown>): ParsedPlan {
   }
 
   const rawTasks = plan.proposed_tasks as
-    | Array<{ title: string; description?: string; week_range?: number[] }>
+    | Array<{
+        title: string;
+        description?: string;
+        scheduled_days?: string[];
+        suggested_time?: string;
+        duration_minutes?: number;
+        recurrence_rule?: string;
+        week_range?: number[];
+      }>
     | undefined;
   if (!Array.isArray(rawTasks) || rawTasks.length === 0) return empty;
 
@@ -180,11 +188,21 @@ function parseProposedPlan(proposed_plan: Record<string, unknown>): ParsedPlan {
       tasks: groupTasks,
     }));
 
+  const firstMilestoneTasks: ProposedTask[] = rawTasks.map((t) => ({
+    title: t.title,
+    description: t.description ?? "",
+    scheduled_days: t.scheduled_days ?? [],
+    suggested_time: t.suggested_time ?? "",
+    duration_minutes: t.duration_minutes ?? 30,
+    recurrence_rule: t.recurrence_rule ?? "",
+    week_range: t.week_range ?? [1, 6],
+  }));
+
   return {
     feasible: true,
     milestones,
     roadmap: null,
-    firstMilestoneTasks: null,
+    firstMilestoneTasks,
   };
 }
 
@@ -193,7 +211,18 @@ function renderPlanUI(
   onConfirm: () => void,
 ): React.ReactNode {
   if (parsed.feasible && parsed.milestones) {
-    return <PlanView plan={parsed.milestones} onConfirm={onConfirm} />;
+    return (
+      <>
+        <PlanView plan={parsed.milestones} onConfirm={onConfirm} />
+        {parsed.firstMilestoneTasks &&
+          parsed.firstMilestoneTasks.length > 0 && (
+            <TasksView
+              tasks={parsed.firstMilestoneTasks}
+              onConfirm={onConfirm}
+            />
+          )}
+      </>
+    );
   }
   if (!parsed.feasible) {
     return (
