@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { ChatInput } from "~/components/chat/ChatInput";
+import { GoalClarifierSummaryCard } from "~/components/chat/GoalClarifierSummaryCard";
 import { GoalClarifierView } from "~/components/chat/GoalClarifierView";
 import { MarkdownMessage } from "~/components/chat/MarkdownMessage";
 import {
@@ -695,6 +696,8 @@ function ChatPage() {
                     )
                   )}
                 </div>
+              ) : m.metadata?.answers ? (
+                <GoalClarifierSummaryCard answers={m.metadata.answers} />
               ) : (
                 m.content
               ),
@@ -968,7 +971,7 @@ function ChatPage() {
                 {
                   id: Date.now().toString(),
                   type: MessageVariant.USER,
-                  content: summary,
+                  content: <GoalClarifierSummaryCard answers={answers} />,
                 },
               ]);
               setIsThinking(true);

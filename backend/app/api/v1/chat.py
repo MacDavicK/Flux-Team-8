@@ -366,13 +366,19 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
             break
 
     # ── Persist messages to DB ───────────────────────────────────────────────
+    user_msg_metadata = (
+        json.dumps({"answers": [a.model_dump() for a in body.answers]})
+        if body.intent == "GOAL_CLARIFY" and body.answers
+        else None
+    )
     await db.execute(
         """
-        INSERT INTO messages (conversation_id, role, content)
-        VALUES ($1, 'user', $2)
+        INSERT INTO messages (conversation_id, role, content, metadata)
+        VALUES ($1, 'user', $2, $3)
         """,
         conv_id,
         body.message,
+        user_msg_metadata,
     )
     goal_draft = result.get("goal_draft")
     result_approval = result.get("approval_status")

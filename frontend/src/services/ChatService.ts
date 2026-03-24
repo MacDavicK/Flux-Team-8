@@ -19,6 +19,7 @@ export interface HistoryMessage {
     questions?: GoalClarifierQuestion[];
     rag_used?: boolean;
     rag_sources?: { title: string; url: string | null }[];
+    answers?: GoalClarifierAnswer[];
   } | null;
 }
 

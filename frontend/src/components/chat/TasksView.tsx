@@ -21,7 +21,7 @@ export function TasksView({ tasks, onConfirm }: TasksViewProps) {
     <div className="space-y-4 my-2">
       <div className="flex items-center gap-2 mb-1">
         <CheckCircle2 className="w-5 h-5 text-sage" />
-        <h3 className="text-river font-semibold">First Milestone Tasks</h3>
+        <h3 className="text-river font-semibold">Milestone Tasks</h3>
       </div>
 
       <div className="space-y-2.5">
