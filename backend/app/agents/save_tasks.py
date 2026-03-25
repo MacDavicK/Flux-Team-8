@@ -270,10 +270,13 @@ async def save_tasks_node(state: AgentState) -> dict:
         # window (e.g. task_handler or LLM chose a time during sleep, or the
         # past-time guard landed on a sleep-window occurrence), advance it to the
         # first valid moment after sleep ends.
+        # EXCEPTION: One-off NEW_TASK reminders respect the user's explicit time
+        # even when it falls in the sleep window (e.g. "remind me at 10:50 PM").
         if scheduled_at_utc:
             try:
                 sleep_window = profile.get("sleep_window")
-                if sleep_window:
+                is_explicit_one_off = intent == "NEW_TASK" and not recurrence_rule
+                if sleep_window and not is_explicit_one_off:
                     dt_for_dtstart = pendulum.parse(scheduled_at_utc)
                     scheduled_at_utc = advance_past_sleep(
                         utc_iso=scheduled_at_utc,

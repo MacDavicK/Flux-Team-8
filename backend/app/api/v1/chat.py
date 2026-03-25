@@ -388,7 +388,8 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
         "ask_start_date" if awaiting_start_date else result.get("intent") or None
     )
     # Extract RAG provenance upfront — used in both metadata and resp below
-    _rag_output = result.get("rag_output") or {}
+    _rag_raw = result.get("rag_output")
+    _rag_output = _rag_raw if isinstance(_rag_raw, dict) else {}
     _rag_used = bool(_rag_output.get("retrieved"))
     _rag_sources = (
         [
