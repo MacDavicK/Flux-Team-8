@@ -352,6 +352,7 @@ async def checkpointer_lifespan() -> AsyncIterator[AsyncPostgresSaver]:
         min_size=1,
         max_size=5,
         kwargs={"autocommit": True},
+        check=AsyncConnectionPool.check_connection,
         reconnect_failed=None,
         max_waiting=30,
         max_lifetime=300,

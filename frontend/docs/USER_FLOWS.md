@@ -190,7 +190,7 @@ There are **three notification categories:**
 **App Behavior (web):**
 - Tapping the notification opens the app to the relevant task.
 - Status update process indicator is shown while acknowledgment is recorded.
-- On success, task is marked as **Acknowledged** in the DB.
+- On success, task is marked as **Done** in the DB.
 
 ---
 

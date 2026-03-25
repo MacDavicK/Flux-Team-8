@@ -254,7 +254,7 @@ function formatSlotLabel(iso: string): string {
 
 const WELCOME_MESSAGE = (name?: string) => {
   const firstName = name?.split(" ")[0];
-  return `Hey${firstName ? ` ${firstName}` : ""}! 👋 I'm your **Flux** assistant.\n\nI can help you:\n- **Set and track goals** — break big ambitions into milestones\n- **Build habits** — create routines that stick\n- **Stay on top of tasks** — reminders, rescheduling, and follow-ups\n\nWhat would you like to work on today?`;
+  return `Hey${firstName ? ` ${firstName}` : ""}! 👋 I'm your **Flux** assistant.\n\nTell me what you want to achieve — I'll help you get there. For example:\n- **Goal:** "I want to lose 10 pounds by summer"\n- **Habit:** "I want to meditate every morning"\n- **Task:** "Remind me to call Peter on Friday"\n\nWhat's on your mind?`;
 };
 
 function ChatPage() {

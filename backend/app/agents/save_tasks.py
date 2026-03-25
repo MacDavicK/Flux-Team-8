@@ -19,7 +19,7 @@ import pendulum
 
 from app.agents.pattern_observer import flag_goal_milestone_completion
 from app.services.rrule_expander import advance_past_sleep, next_occurrence_after
-from app.agents.state import AgentState
+from app.agents.state import AgentState, CLEAR
 from app.services.supabase import db
 
 
@@ -395,4 +395,5 @@ async def save_tasks_node(state: AgentState) -> dict:
         "approval_status": None,
         "proposed_tasks": None,
         "goal_start_date": None,
+        "rag_output": CLEAR,
     }

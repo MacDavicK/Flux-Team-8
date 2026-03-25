@@ -101,7 +101,7 @@ export function TaskDetailSheet({
 
               {/* CTAs */}
               <div className="flex flex-col gap-3 pt-1">
-                {/* Acknowledged — shown for pending tasks that are not projected */}
+                {/* Done — shown for pending tasks that are not projected */}
                 {!isDone && !isMissed && !task.isProjected && (
                   <motion.button
                     type="button"
@@ -113,7 +113,7 @@ export function TaskDetailSheet({
                     className="w-full glass-bubble flex items-center justify-center gap-2 py-3.5 rounded-2xl text-charcoal font-medium"
                   >
                     <CheckCircle2 className="w-5 h-5 text-river" />
-                    Acknowledged
+                    Done
                   </motion.button>
                 )}
 
