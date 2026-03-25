@@ -68,17 +68,24 @@ class TasksService {
   async confirmReschedule(
     taskId: string,
     scheduledAt: string,
+    scope: string = "one",
+    occurrenceDate?: string,
   ): Promise<{
     original_task_id: string;
     new_task_id: string;
     status: string;
     scheduled_at: string;
+    updated_count?: number;
   }> {
     const response = await apiFetch(
       `/api/v1/tasks/${taskId}/reschedule-confirm`,
       {
         method: "PATCH",
-        body: JSON.stringify({ scheduled_at: scheduledAt }),
+        body: JSON.stringify({
+          scheduled_at: scheduledAt,
+          scope,
+          ...(occurrenceDate ? { occurrence_date: occurrenceDate } : {}),
+        }),
       },
     );
     if (!response.ok) throw new Error("Failed to confirm reschedule");

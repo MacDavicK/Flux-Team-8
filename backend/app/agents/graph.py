@@ -25,6 +25,7 @@ from app.agents.goal_planner import goal_planner_node
 from app.agents.onboarding import onboarding_node
 from app.agents.orchestrator import orchestrator_node
 from app.agents.pattern_observer import pattern_observer_node
+from app.agents.rag_retriever import rag_retriever_node
 from app.agents.scheduler import scheduler_node
 from app.agents.state import AgentState
 from app.agents.task_handler import task_handler_node  # 11.1
@@ -155,28 +156,36 @@ def route_from_goal_clarifier(state: AgentState) -> str:
 
 def route_from_goal_planner(state: AgentState) -> str | list[Send]:
     """
-    Combined routing from goal_planner covering tasks 10.6 and 10.8.
+    Three-phase routing from goal_planner (10.6, 10.7, 10.8).
 
-    First call (no sub-agent outputs yet): fan out via Send() for true parallel
-    execution of classifier, scheduler, and pattern_observer (10.6).
+    Phase 1 — classifier_output is None:
+        Fire classifier solo via Send(). Classifier must complete first so its
+        category tags can gate the RAG retrieval decision in Phase 2.
 
-    Subsequent calls (all sub-agent outputs present): check user approval (10.8).
-      APPROVED  → save_tasks
-      ABANDONED → END
-      otherwise → END  (NEGOTIATING: state preserved; re-entered on next user message)
+    Phase 2 — classifier done, scheduler_output is None:
+        Fire scheduler, pattern_observer, and (conditionally) rag_retriever in
+        parallel. RAG only fires when the goal is tagged with a health-adjacent
+        category (settings.rag_trigger_tags). rag_output defaults to None when
+        skipped; goal_planner handles both cases gracefully.
+
+    Phase 3 — scheduler and pattern done (rag may or may not have run):
+        Check approval status (10.8).
+          APPROVED  → save_tasks
+          ABANDONED → END
+          otherwise → END (NEGOTIATING; re-entered on next user message)
     """
     classifier_done = state.get("classifier_output") is not None
     scheduler_done = state.get("scheduler_output") is not None
     pattern_done = state.get("pattern_output") is not None
 
-    if not (classifier_done and scheduler_done and pattern_done):
-        # 10.6 — Fan out: pass each sub-agent the state slice it needs
-        user_id = state["user_id"]
-        goal_draft = state.get("goal_draft") or {}
-        user_profile = state.get("user_profile") or {}
-        conv_history = state.get("conversation_history") or []
-        token_usage = state.get("token_usage") or {}
+    user_id = state["user_id"]
+    goal_draft = state.get("goal_draft") or {}
+    user_profile = state.get("user_profile") or {}
+    conv_history = state.get("conversation_history") or []
+    token_usage = state.get("token_usage") or {}
 
+    # ── Phase 1: run classifier solo first ───────────────────────
+    if not classifier_done:
         return [
             Send(
                 "classifier",
@@ -187,7 +196,12 @@ def route_from_goal_planner(state: AgentState) -> str | list[Send]:
                     "conversation_history": conv_history,
                     "token_usage": token_usage,
                 },
-            ),
+            )
+        ]
+
+    # ── Phase 2: parallel fan-out gated on classifier tags ───────
+    if not (scheduler_done and pattern_done):
+        sends = [
             Send(
                 "scheduler",
                 {
@@ -196,7 +210,7 @@ def route_from_goal_planner(state: AgentState) -> str | list[Send]:
                     "user_profile": user_profile,
                     "conversation_history": conv_history,
                     "token_usage": token_usage,
-                    "goal_start_date": state.get("goal_start_date"),  # FIX BUG #3
+                    "goal_start_date": state.get("goal_start_date"),
                 },
             ),
             Send(
@@ -211,11 +225,27 @@ def route_from_goal_planner(state: AgentState) -> str | list[Send]:
             ),
         ]
 
-    # 10.8 — Approval check after all sub-agents have reported
+        # Fire RAG only for health-adjacent goals
+        classifier_tags = set((state.get("classifier_output") or {}).get("tags", []))
+        if classifier_tags & set(settings.rag_trigger_tags):
+            sends.append(
+                Send(
+                    "rag_retriever",
+                    {
+                        "user_id": user_id,
+                        "goal_draft": goal_draft,
+                        "user_profile": user_profile,
+                        "conversation_history": conv_history,
+                        "token_usage": token_usage,
+                    },
+                )
+            )
+
+        return sends
+
+    # ── Phase 3: approval check after all sub-agents complete ────
     approval = state.get("approval_status") or "negotiating"
     if approval == "approved":
-        # goal_start_date is always set (asked pre-fan-out). Go directly to
-        # save_tasks — no reschedule round-trip needed.
         return "save_tasks"
     if approval == "abandoned":
         return END
@@ -241,6 +271,7 @@ def _build_graph() -> StateGraph:
     graph.add_node("classifier", classifier_node)
     graph.add_node("scheduler", scheduler_node)
     graph.add_node("pattern_observer", pattern_observer_node)
+    graph.add_node("rag_retriever", rag_retriever_node)
     graph.add_node("task_handler", task_handler_node)
     graph.add_node("goal_modifier", goal_modifier_node)
     graph.add_node("save_tasks", save_tasks_node)
@@ -271,13 +302,15 @@ def _build_graph() -> StateGraph:
     # goal_planner when intent is GOAL_PLAN (enough context gathered / answers received)
     graph.add_conditional_edges("goal_clarifier", route_from_goal_clarifier)
 
-    # 10.6 — goal_planner fans out via Send() on first call
-    # 10.7 — classifier/scheduler/pattern_observer reconverge to goal_planner
-    # 10.8 — goal_planner checks approval after sub-agents complete
+    # 10.6 — goal_planner fans out via Send() — two-phase:
+    #   Phase 1: classifier solo → goal_planner
+    #   Phase 2: scheduler + pattern_observer + rag_retriever (gated) → goal_planner
+    # 10.8 — goal_planner checks approval after all sub-agents complete
     graph.add_conditional_edges("goal_planner", route_from_goal_planner)
     graph.add_edge("classifier", "goal_planner")
     graph.add_edge("scheduler", "goal_planner")
     graph.add_edge("pattern_observer", "goal_planner")
+    graph.add_edge("rag_retriever", "goal_planner")
 
     # 10.9 — Terminal edges
     graph.add_edge("save_tasks", END)
@@ -319,6 +352,12 @@ async def checkpointer_lifespan() -> AsyncIterator[AsyncPostgresSaver]:
         min_size=1,
         max_size=5,
         kwargs={"autocommit": True},
+        check=AsyncConnectionPool.check_connection,
+        reconnect_failed=None,
+        max_waiting=30,
+        max_lifetime=300,
+        max_idle=60,
+        reconnect_timeout=5,
     ) as pool:
         cp = AsyncPostgresSaver(conn=pool)
         await cp.setup()

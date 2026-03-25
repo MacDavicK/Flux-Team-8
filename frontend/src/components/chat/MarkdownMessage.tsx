@@ -1,10 +1,41 @@
 import ReactMarkdown from "react-markdown";
 
-interface MarkdownMessageProps {
-  children: string;
+interface RagSource {
+  title: string;
+  url: string | null;
 }
 
-export function MarkdownMessage({ children }: MarkdownMessageProps) {
+interface MarkdownMessageProps {
+  children: string;
+  ragSources?: RagSource[];
+}
+
+/**
+ * Replace inline citation markers like [1], [1,3], [1, 3] with markdown links
+ * pointing to the corresponding ragSources entry (1-indexed).
+ */
+function linkifyCitations(text: string, sources: RagSource[]): string {
+  return text.replace(/\[(\d+(?:,\s*\d+)*)\]/g, (_, nums: string) => {
+    return nums
+      .split(",")
+      .map((n) => {
+        const idx = parseInt(n.trim(), 10) - 1;
+        const source = sources[idx];
+        if (!source?.url) return `[${n.trim()}]`;
+        return `[${n.trim()}](${source.url})`;
+      })
+      .join("");
+  });
+}
+
+export function MarkdownMessage({
+  children,
+  ragSources,
+}: MarkdownMessageProps) {
+  const content = ragSources?.length
+    ? linkifyCitations(children, ragSources)
+    : children;
+
   return (
     <ReactMarkdown
       components={{
@@ -35,9 +66,19 @@ export function MarkdownMessage({ children }: MarkdownMessageProps) {
           </code>
         ),
         hr: () => <hr className="my-2 border-black/10" />,
+        a: ({ href, children }) => (
+          <a
+            href={href}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center justify-center text-[10px] font-semibold leading-none bg-sage/20 text-sage hover:bg-sage/30 rounded px-1 py-0.5 mx-0.5 transition-colors no-underline"
+          >
+            {children}
+          </a>
+        ),
       }}
     >
-      {children}
+      {content}
     </ReactMarkdown>
   );
 }

@@ -53,7 +53,7 @@ export function TaskDetailSheet({
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             className="fixed bottom-0 left-0 right-0 z-50 max-w-md mx-auto"
           >
-            <div className="glass-card rounded-b-none p-6 pb-safe space-y-5">
+            <div className="glass-card rounded-b-none p-6 space-y-5">
               {/* Header */}
               <div className="flex items-start justify-between">
                 <div className="flex-1 pr-4">
@@ -101,8 +101,8 @@ export function TaskDetailSheet({
 
               {/* CTAs */}
               <div className="flex flex-col gap-3 pt-1">
-                {/* Acknowledged — always shown for pending tasks */}
-                {!isDone && !isMissed && (
+                {/* Done — shown for pending tasks that are not projected */}
+                {!isDone && !isMissed && !task.isProjected && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}
@@ -113,12 +113,12 @@ export function TaskDetailSheet({
                     className="w-full glass-bubble flex items-center justify-center gap-2 py-3.5 rounded-2xl text-charcoal font-medium"
                   >
                     <CheckCircle2 className="w-5 h-5 text-river" />
-                    Acknowledged
+                    Done
                   </motion.button>
                 )}
 
-                {/* Mark as Done — shown for missed tasks */}
-                {isMissed && (
+                {/* Mark as Done — shown for missed tasks that are not projected */}
+                {isMissed && !task.isProjected && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}
@@ -133,8 +133,8 @@ export function TaskDetailSheet({
                   </motion.button>
                 )}
 
-                {/* Reschedule — shown for pending and missed tasks */}
-                {!isDone && (
+                {/* Reschedule — shown for pending and projected tasks, not missed/done */}
+                {!isDone && !isMissed && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}

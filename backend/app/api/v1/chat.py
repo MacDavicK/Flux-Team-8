@@ -12,7 +12,7 @@ import itertools
 import json
 import re
 import uuid
-from typing import Any, cast
+from typing import Any, Optional, cast
 
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
@@ -28,7 +28,9 @@ from app.models.api_schemas import (
     ConversationListResponse,
     ConversationSummary,
     MessageSchema,
+    OnboardingOptionSchema,
     OnboardingStartRequest,
+    RagSource,
 )
 from app.services.context_manager import window_conversation_history
 from app.services.supabase import db
@@ -102,25 +104,87 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
         if user_row:
             user_tz = user_row["timezone"] or "UTC"
 
-        thread_id = str(uuid.uuid4())
-        conv = await db.fetchrow(
-            """
-            INSERT INTO conversations (user_id, langgraph_thread_id, context_type)
-            VALUES ($1, $2, 'general')
-            RETURNING id
-            """,
-            uuid.UUID(user_id),
-            thread_id,
-        )
-        conv_id: uuid.UUID = conv["id"]
+        # Resolve or create conversation (scoped to task reschedule)
+        conv_id: Optional[uuid.UUID] = None
+        if body.conversation_id:
+            conv = await db.fetchrow(
+                "SELECT id FROM conversations WHERE id = $1 AND user_id = $2",
+                uuid.UUID(body.conversation_id),
+                uuid.UUID(user_id),
+            )
+            if conv:
+                conv_id = conv["id"]
+
+        if conv_id is None:
+            thread_id = str(uuid.uuid4())
+            conv = await db.fetchrow(
+                """
+                INSERT INTO conversations (user_id, langgraph_thread_id, context_type)
+                VALUES ($1, $2, 'general')
+                RETURNING id
+                """,
+                uuid.UUID(user_id),
+                thread_id,
+            )
+            conv_id = conv["id"]
 
         task_title = task["title"]
+        is_recurring = bool(task.get("recurrence_rule"))
+
+        # ── Step 1: Ask scope (only for recurring tasks, first turn) ─────────
+        if is_recurring and not body.reschedule_scope:
+            scope_options = [
+                OnboardingOptionSchema(label="Just this one", value="scope:one"),
+                OnboardingOptionSchema(
+                    label="This one + all future", value="scope:series"
+                ),
+            ]
+            reply = (
+                f"Would you like to reschedule just this occurrence of **{task_title}**, "
+                f"or this one and all future occurrences?"
+            )
+            await db.execute(
+                "INSERT INTO messages (conversation_id, role, content) VALUES ($1, 'user', $2)",
+                conv_id,
+                body.message,
+            )
+            await db.execute(
+                "INSERT INTO messages (conversation_id, role, content, agent_node) VALUES ($1, 'assistant', $2, 'RESCHEDULE_SCOPE')",
+                conv_id,
+                reply,
+            )
+            await db.execute(
+                "UPDATE conversations SET last_message_at = NOW() WHERE id = $1",
+                conv_id,
+            )
+            resp = ChatMessageResponse(
+                conversation_id=str(conv_id),
+                message=reply,
+                agent_node="RESCHEDULE_SCOPE",
+                proposed_plan=None,
+                requires_user_action=True,
+                options=scope_options,
+            )
+            resp.spoken_summary = build_spoken_summary(resp)
+            yield f"data: {json.dumps({'type': 'complete', 'data': resp.model_dump(mode='json')})}\n\n"
+            return
+
+        # ── Step 2: Return time slot options ─────────────────────────────────
+        scope = body.reschedule_scope or "one"
+        series_mode = scope == "series"
         simple_slots = await _compute_simple_reschedule_slots(task, user_id, user_tz)
-        slot_options = _build_slot_options(simple_slots, user_tz, body.task_id)
-        real_slots = [o for o in slot_options if o.value != f"missed:{body.task_id}"]
+        slot_options = _build_slot_options(
+            simple_slots, user_tz, body.task_id, series_mode=series_mode
+        )
+        real_slots = [o for o in slot_options if o.value is not None]
         slot_count = len(real_slots)
+        scope_prefix = (
+            "You've chosen to update **all future occurrences**. "
+            if series_mode
+            else ""
+        )
         reply = (
-            f"Here {'is' if slot_count == 1 else 'are'} the next available "
+            f"{scope_prefix}Here {'is' if slot_count == 1 else 'are'} the next available "
             f"{'slot' if slot_count == 1 else 'slots'} for **{task_title}**. "
             f"Pick one or choose a custom date & time."
         )
@@ -302,13 +366,19 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
             break
 
     # ── Persist messages to DB ───────────────────────────────────────────────
+    user_msg_metadata = (
+        json.dumps({"answers": [a.model_dump() for a in body.answers]})
+        if body.intent == "GOAL_CLARIFY" and body.answers
+        else None
+    )
     await db.execute(
         """
-        INSERT INTO messages (conversation_id, role, content)
-        VALUES ($1, 'user', $2)
+        INSERT INTO messages (conversation_id, role, content, metadata)
+        VALUES ($1, 'user', $2, $3)
         """,
         conv_id,
         body.message,
+        user_msg_metadata,
     )
     goal_draft = result.get("goal_draft")
     result_approval = result.get("approval_status")
@@ -317,14 +387,38 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
     agent_node_value = (
         "ask_start_date" if awaiting_start_date else result.get("intent") or None
     )
+    # Extract RAG provenance upfront — used in both metadata and resp below
+    _rag_output = result.get("rag_output") or {}
+    _rag_used = bool(_rag_output.get("retrieved"))
+    _rag_sources = (
+        [
+            RagSource(title=s.get("title", ""), url=s.get("url") or None)
+            for s in _rag_output.get("sources", [])
+        ]
+        if _rag_used
+        else []
+    )
+    raw_options = result.get("options")
+    is_clarifier = agent_node_value == "GOAL_CLARIFY"
+
     if goal_draft and (approval_pending or awaiting_start_date):
         metadata: dict | None = {
             "proposed_plan": goal_draft,
             "classifier_output": result.get("classifier_output"),
             "approval_status": result_approval,
+            "rag_used": _rag_used,
+            "rag_sources": [s.model_dump() for s in _rag_sources],
         }
-    elif agent_node_value == "ONBOARDING" and result.get("options"):
-        metadata = {"options": result.get("options")}
+    elif is_clarifier and raw_options:
+        # Persist questions so the clarifier sheet can be restored on page refresh.
+        # Also preserve plan + approval_status when a plan is already pending
+        # (post-plan clarification path) so state restoration still works next turn.
+        metadata = {"questions": raw_options}
+        if goal_draft and approval_pending:
+            metadata["proposed_plan"] = goal_draft
+            metadata["approval_status"] = result_approval
+    elif agent_node_value == "ONBOARDING" and raw_options:
+        metadata = {"options": raw_options}
     else:
         metadata = None
     await db.execute(
@@ -364,16 +458,18 @@ async def _send_message_events(body: ChatMessageRequest, current_user: dict):
             conv_id,
         )
 
-    raw_options = result.get("options")
-    is_clarifier = agent_node_value == "GOAL_CLARIFY"
     resp = ChatMessageResponse(
         conversation_id=str(conv_id),
         message=reply,
         agent_node=agent_node_value,
-        proposed_plan=goal_draft if approval_pending else None,
-        requires_user_action=approval_pending,
+        proposed_plan=goal_draft if (approval_pending and not is_clarifier) else None,
+        requires_user_action=approval_pending and not is_clarifier,
         options=None if is_clarifier else raw_options,
         questions=raw_options if is_clarifier else None,
+        rag_used=_rag_used,
+        rag_sources=_rag_sources,
+        suggested_date=result.get("suggested_date"),
+        congested_dates=result.get("congested_dates") or [],
     )
     resp.spoken_summary = build_spoken_summary(resp)
     yield f"data: {json.dumps({'type': 'complete', 'data': resp.model_dump(mode='json')})}\n\n"

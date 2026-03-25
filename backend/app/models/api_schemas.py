@@ -24,6 +24,9 @@ class ChatMessageRequest(BaseModel):
     conversation_id: Optional[str] = None
     intent: Optional[str] = None  # Pre-set intent — skips orchestrator LLM call
     task_id: Optional[str] = None  # Required when intent == "RESCHEDULE_TASK"
+    reschedule_scope: Optional[str] = (
+        None  # "one" | "series" — set after scope selection
+    )
     answers: Optional[list[GoalClarifierAnswer]] = (
         None  # Structured answers for GOAL_CLARIFY
     )
@@ -47,8 +50,14 @@ class ClarifierQuestionSchema(BaseModel):
     question: str
     options: list[str] = []
     allows_custom: bool = True
+    multi_select: bool = False
     zod_validator: Optional[str] = None
     required: bool = True
+
+
+class RagSource(BaseModel):
+    title: str
+    url: Optional[str] = None
 
 
 class ChatMessageResponse(BaseModel):
@@ -60,6 +69,11 @@ class ChatMessageResponse(BaseModel):
     options: Optional[list[OnboardingOptionSchema]] = None
     questions: Optional[list[ClarifierQuestionSchema]] = None
     spoken_summary: Optional[str] = None
+    rag_used: bool = False
+    rag_sources: list[RagSource] = []
+    # Congestion-aware start date — populated when agent_node == "ask_start_date"
+    suggested_date: Optional[str] = None  # YYYY-MM-DD; lightest day in next 14
+    congested_dates: list[str] = []  # YYYY-MM-DD list; fully-booked days
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -227,6 +241,10 @@ class RescheduleRequest(BaseModel):
 
 class RescheduleConfirmRequest(BaseModel):
     scheduled_at: str  # ISO 8601 UTC datetime string
+    scope: str = "one"  # "one" | "series"
+    occurrence_date: Optional[str] = (
+        None  # YYYY-MM-DD; set when rescheduling a projected occurrence
+    )
 
 
 # ─────────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { z } from "zod";
 import { ChatBubble } from "~/components/chat/ChatBubble";
 import { ChatInput } from "~/components/chat/ChatInput";
+import { GoalClarifierSummaryCard } from "~/components/chat/GoalClarifierSummaryCard";
 import { GoalClarifierView } from "~/components/chat/GoalClarifierView";
 import { MarkdownMessage } from "~/components/chat/MarkdownMessage";
 import {
@@ -14,6 +15,7 @@ import {
 } from "~/components/chat/MilestoneRoadmapView";
 import { OnboardingOptions } from "~/components/chat/OnboardingOptions";
 import { PlanView } from "~/components/chat/PlanView";
+import { ProvenanceIndicator } from "~/components/chat/ProvenanceIndicator";
 import { StartDatePicker } from "~/components/chat/StartDatePicker";
 import { type ProposedTask, TasksView } from "~/components/chat/TasksView";
 import { ThinkingIndicator } from "~/components/chat/ThinkingIndicator";
@@ -48,6 +50,7 @@ export const Route = createFileRoute("/chat")({
   validateSearch: z.object({
     reschedule_task_id: z.string().optional(),
     task_name: z.string().optional(),
+    occurrence_date: z.string().optional(),
     conversation: z.string().optional(),
   }),
   loader: async () => {
@@ -149,7 +152,15 @@ function parseProposedPlan(proposed_plan: Record<string, unknown>): ParsedPlan {
   }
 
   const rawTasks = plan.proposed_tasks as
-    | Array<{ title: string; description?: string; week_range?: number[] }>
+    | Array<{
+        title: string;
+        description?: string;
+        scheduled_days?: string[];
+        suggested_time?: string;
+        duration_minutes?: number;
+        recurrence_rule?: string;
+        week_range?: number[];
+      }>
     | undefined;
   if (!Array.isArray(rawTasks) || rawTasks.length === 0) return empty;
 
@@ -178,11 +189,21 @@ function parseProposedPlan(proposed_plan: Record<string, unknown>): ParsedPlan {
       tasks: groupTasks,
     }));
 
+  const firstMilestoneTasks: ProposedTask[] = rawTasks.map((t) => ({
+    title: t.title,
+    description: t.description ?? "",
+    scheduled_days: t.scheduled_days ?? [],
+    suggested_time: t.suggested_time ?? "",
+    duration_minutes: t.duration_minutes ?? 30,
+    recurrence_rule: t.recurrence_rule ?? "",
+    week_range: t.week_range ?? [1, 6],
+  }));
+
   return {
     feasible: true,
     milestones,
     roadmap: null,
-    firstMilestoneTasks: null,
+    firstMilestoneTasks,
   };
 }
 
@@ -191,7 +212,18 @@ function renderPlanUI(
   onConfirm: () => void,
 ): React.ReactNode {
   if (parsed.feasible && parsed.milestones) {
-    return <PlanView plan={parsed.milestones} onConfirm={onConfirm} />;
+    return (
+      <>
+        <PlanView plan={parsed.milestones} onConfirm={onConfirm} />
+        {parsed.firstMilestoneTasks &&
+          parsed.firstMilestoneTasks.length > 0 && (
+            <TasksView
+              tasks={parsed.firstMilestoneTasks}
+              onConfirm={onConfirm}
+            />
+          )}
+      </>
+    );
   }
   if (!parsed.feasible) {
     return (
@@ -222,7 +254,7 @@ function formatSlotLabel(iso: string): string {
 
 const WELCOME_MESSAGE = (name?: string) => {
   const firstName = name?.split(" ")[0];
-  return `Hey${firstName ? ` ${firstName}` : ""}! 👋 I'm your **Flux** assistant.\n\nI can help you:\n- **Set and track goals** — break big ambitions into milestones\n- **Build habits** — create routines that stick\n- **Stay on top of tasks** — reminders, rescheduling, and follow-ups\n\nWhat would you like to work on today?`;
+  return `Hey${firstName ? ` ${firstName}` : ""}! 👋 I'm your **Flux** assistant.\n\nTell me what you want to achieve — I'll help you get there. For example:\n- **Goal:** "I want to lose 10 pounds by summer"\n- **Habit:** "I want to meditate every morning"\n- **Task:** "Remind me to call Peter on Friday"\n\nWhat's on your mind?`;
 };
 
 function ChatPage() {
@@ -232,7 +264,8 @@ function ChatPage() {
   useEffect(() => {
     setInMemoryToken(token);
   }, [token]);
-  const { reschedule_task_id, task_name, conversation } = Route.useSearch();
+  const { reschedule_task_id, task_name, occurrence_date, conversation } =
+    Route.useSearch();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isThinking, setIsThinking] = useState(false);
   const [progressLabel, setProgressLabel] = useState<string | undefined>(
@@ -257,6 +290,12 @@ function ChatPage() {
   // Preserve reschedule_task_id across URL rewrites (it's cleared from search params
   // when conversation_id is substituted in, but we still need it for slot confirmation).
   const rescheduleTaskIdRef = useRef<string | undefined>(reschedule_task_id);
+  // "one" | "series" — set when user picks scope for a recurring task reschedule.
+  const rescheduleScope = useRef<string>("one");
+  // Preserve occurrence_date for projected-occurrence reschedules.
+  const rescheduleOccurrenceDateRef = useRef<string | undefined>(
+    occurrence_date,
+  );
   const lastInputWasVoiceRef = useRef<boolean>(false);
   const voice = useVoice();
 
@@ -391,6 +430,59 @@ function ChatPage() {
 
   const handleSendMessage = useCallback(
     async (text: string) => {
+      // Handle scope selection for recurring task reschedule ("scope:one" | "scope:series")
+      if (rescheduleTaskIdRef.current && text.startsWith("scope:")) {
+        const scope = text.slice("scope:".length); // "one" | "series"
+        rescheduleScope.current = scope;
+        const displayLabel =
+          scope === "series" ? "This one + all future" : "Just this one";
+        setMessages((prev) => [
+          ...prev.map((m) => ({ ...m, options: null })),
+          {
+            id: Date.now().toString(),
+            type: MessageVariant.USER,
+            content: displayLabel,
+          },
+        ]);
+        setIsThinking(true);
+        chatService
+          .sendMessage(
+            `Help me reschedule this task`,
+            conversationIdRef.current,
+            {
+              intent: "RESCHEDULE_TASK",
+              task_id: rescheduleTaskIdRef.current,
+              reschedule_scope: scope,
+            },
+          )
+          .then((result) => {
+            setIsThinking(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                type: MessageVariant.AI,
+                content: <MarkdownMessage>{result.message}</MarkdownMessage>,
+                options: result.options,
+              },
+            ]);
+            scrollToBottom();
+          })
+          .catch(() => {
+            setIsThinking(false);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: Date.now().toString(),
+                type: MessageVariant.AI,
+                content:
+                  "Sorry, I couldn't load reschedule options. Please try again.",
+              },
+            ]);
+          });
+        return;
+      }
+
       // Handle slot confirmation (ISO UTC string from reschedule options)
       if (rescheduleTaskIdRef.current && /^\d{4}-\d{2}-\d{2}T/.test(text)) {
         const slotLabel = formatSlotLabel(text);
@@ -404,23 +496,28 @@ function ChatPage() {
         ]);
         setIsThinking(true);
         tasksService
-          .confirmReschedule(rescheduleTaskIdRef.current, text)
-          .then(() => {
+          .confirmReschedule(
+            rescheduleTaskIdRef.current,
+            text,
+            rescheduleScope.current,
+            rescheduleOccurrenceDateRef.current,
+          )
+          .then((result) => {
             setIsThinking(false);
             setProgressLabel(undefined);
             // Invalidate router cache so the home page re-fetches updated tasks.
             router.invalidate();
+            const count = result.updated_count ?? 1;
+            const successMsg =
+              count > 1
+                ? `Done! Moved ${count} upcoming sessions to the new time. You'll get reminders at the updated times.`
+                : `Done! Your task has been rescheduled. You'll get a reminder at the new time.`;
             setMessages((prev) => [
               ...prev,
               {
                 id: Date.now().toString(),
                 type: MessageVariant.AI,
-                content: (
-                  <MarkdownMessage>
-                    Done! Your task has been rescheduled. You'll get a reminder
-                    at the new time.
-                  </MarkdownMessage>
-                ),
+                content: <MarkdownMessage>{successMsg}</MarkdownMessage>,
               },
             ]);
             scrollToBottom();
@@ -489,9 +586,13 @@ function ChatPage() {
             type: MessageVariant.AI,
             content: (
               <div className="space-y-3">
-                <MarkdownMessage>{result.message}</MarkdownMessage>
+                <MarkdownMessage ragSources={result.rag_sources ?? []}>
+                  {result.message}
+                </MarkdownMessage>
                 {isStartDatePrompt ? (
                   <StartDatePicker
+                    defaultDate={result.suggested_date ?? undefined}
+                    disabledDates={result.congested_dates ?? []}
                     onSelect={(date) => handleSendMessage(date)}
                   />
                 ) : parsed ? (
@@ -510,6 +611,12 @@ function ChatPage() {
               </div>
             ),
             options: result.options,
+            provenance: result.rag_used
+              ? {
+                  rag_used: result.rag_used,
+                  rag_sources: result.rag_sources,
+                }
+              : undefined,
           };
 
           setMessages((prev) => [...prev, aiMessage]);
@@ -579,7 +686,9 @@ function ChatPage() {
             content:
               m.role === "assistant" ? (
                 <div className="space-y-3">
-                  <MarkdownMessage>{m.content}</MarkdownMessage>
+                  <MarkdownMessage ragSources={m.metadata?.rag_sources ?? []}>
+                    {m.content}
+                  </MarkdownMessage>
                   {isStartDatePrompt ? (
                     <StartDatePicker
                       onSelect={(date) => handleSendMessage(date)}
@@ -591,13 +700,35 @@ function ChatPage() {
                     )
                   )}
                 </div>
+              ) : m.metadata?.answers ? (
+                <GoalClarifierSummaryCard answers={m.metadata.answers} />
               ) : (
                 m.content
               ),
+            provenance:
+              m.role === "assistant" && m.metadata?.rag_used
+                ? {
+                    rag_used: m.metadata.rag_used ?? false,
+                    rag_sources: m.metadata.rag_sources ?? [],
+                  }
+                : undefined,
           };
         });
 
         setMessages(uiMessages);
+
+        // Restore clarifier sheet if the last assistant message was a GOAL_CLARIFY with questions
+        const lastMsg = filtered[filtered.length - 1];
+        if (
+          lastMsg?.role === "assistant" &&
+          lastMsg.agent_node === "GOAL_CLARIFY" &&
+          lastMsg.metadata?.questions?.length
+        ) {
+          setActiveClarifier({
+            questions: lastMsg.metadata.questions,
+            messageId: `history-${filtered.length - 1}`,
+          });
+        }
       } catch {
         // Silently fail — keep current chat state.
       } finally {
@@ -667,6 +798,12 @@ function ChatPage() {
                 <ChatBubble variant={message.type} animate={false}>
                   {message.content}
                 </ChatBubble>
+                {message.type === MessageVariant.AI && message.provenance && (
+                  <ProvenanceIndicator
+                    ragUsed={message.provenance.rag_used}
+                    ragSources={message.provenance.rag_sources}
+                  />
+                )}
                 {message.type === MessageVariant.AI &&
                   message.options &&
                   message.options.length > 0 && (
@@ -828,7 +965,6 @@ function ChatPage() {
           <GoalClarifierView
             questions={activeClarifier.questions}
             disabled={isThinking}
-            onDismiss={() => setActiveClarifier(null)}
             onSubmit={(answers) => {
               setActiveClarifier(null);
               const summary = answers
@@ -839,7 +975,7 @@ function ChatPage() {
                 {
                   id: Date.now().toString(),
                   type: MessageVariant.USER,
-                  content: summary,
+                  content: <GoalClarifierSummaryCard answers={answers} />,
                 },
               ]);
               setIsThinking(true);
@@ -877,9 +1013,15 @@ function ChatPage() {
                         type: MessageVariant.AI,
                         content: (
                           <div className="space-y-3">
-                            <MarkdownMessage>{result.message}</MarkdownMessage>
+                            <MarkdownMessage
+                              ragSources={result.rag_sources ?? []}
+                            >
+                              {result.message}
+                            </MarkdownMessage>
                             {isStartDatePrompt ? (
                               <StartDatePicker
+                                defaultDate={result.suggested_date ?? undefined}
+                                disabledDates={result.congested_dates ?? []}
                                 onSelect={(date) => handleSendMessage(date)}
                               />
                             ) : parsed ? (
@@ -890,6 +1032,12 @@ function ChatPage() {
                           </div>
                         ),
                         options: result.options,
+                        provenance: result.rag_used
+                          ? {
+                              rag_used: result.rag_used,
+                              rag_sources: result.rag_sources,
+                            }
+                          : undefined,
                       },
                     ]);
                     scrollToBottom();

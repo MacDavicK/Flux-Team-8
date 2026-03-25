@@ -32,13 +32,13 @@ export const Route = createFileRoute("/")({
     missed_task_id: z.string().optional(),
     date: z.string().optional(),
   }),
-  loader: async ({ location }) => {
+  loaderDeps: ({ search }) => ({ date: search.date }),
+  loader: async ({ deps }) => {
     const { user, token } = await serverGetMe();
     if (!user) throw redirect({ to: "/login" });
     if (!user.onboarded) throw redirect({ to: "/chat" });
 
-    const searchDate = (location.search as Record<string, string | undefined>)
-      .date;
+    const searchDate = deps.date;
     const dateParam = searchDate
       ? `?date=${encodeURIComponent(searchDate)}`
       : "";
@@ -145,11 +145,13 @@ function mapTaskToDisplayTypes(task: {
   };
 }
 
-function getGreeting(name?: string): string {
+function getGreeting(): string {
   const hour = new Date().getHours();
-  const salutation =
-    hour < 12 ? "Good morning" : hour < 17 ? "Good afternoon" : "Good evening";
-  return name ? `${salutation}, ${name.split(" ")[0]}` : salutation;
+  return hour < 12
+    ? "Good morning,"
+    : hour < 17
+      ? "Good afternoon,"
+      : "Good evening,";
 }
 
 function FlowPage() {
@@ -247,7 +249,8 @@ function FlowPage() {
       <AmbientBackground />
 
       <DateHeader
-        greeting={getGreeting(displayName)}
+        greeting={getGreeting()}
+        name={displayName?.split(" ")[0]}
         selectedDate={viewDate}
         onDateChange={(d) => {
           setViewDate(d);
@@ -283,7 +286,13 @@ function FlowPage() {
           setSelectedTask(null);
           navigate({
             to: "/chat",
-            search: { reschedule_task_id: taskId, task_name: taskTitle },
+            search: {
+              reschedule_task_id: taskId,
+              task_name: taskTitle,
+              ...(selectedTask?.occurrenceDate
+                ? { occurrence_date: selectedTask.occurrenceDate }
+                : {}),
+            },
           });
         }}
       />

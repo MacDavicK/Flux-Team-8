@@ -1,18 +1,24 @@
 import { Link } from "@tanstack/react-router";
 import { motion } from "framer-motion";
-import { SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, SlidersHorizontal } from "lucide-react";
 import { cn } from "~/utils/cn";
 
 interface ProfileHeaderProps {
   name: string;
   avatarUrl?: string;
   className?: string;
+  /** If provided, renders a back arrow linking to this route instead of the settings button */
+  backTo?: string;
+  /** If provided alongside no backTo, renders the settings button linking to this route */
+  settingsTo?: string;
 }
 
 export function ProfileHeader({
   name,
   avatarUrl,
   className,
+  backTo,
+  settingsTo,
 }: ProfileHeaderProps) {
   return (
     <motion.div
@@ -51,13 +57,25 @@ export function ProfileHeader({
         </h1>
       </div>
 
-      {/* Preferences shortcut */}
-      <Link
-        to="/profile"
-        className="shrink-0 w-10 h-10 glass-card rounded-2xl flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all duration-200"
-      >
-        <SlidersHorizontal className="w-4 h-4 text-river" />
-      </Link>
+      {/* Back button (profile page when coming from reflect) */}
+      {backTo && (
+        <Link
+          to={backTo}
+          className="shrink-0 w-10 h-10 glass-card rounded-2xl flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all duration-200"
+        >
+          <ArrowLeft className="w-4 h-4 text-river" />
+        </Link>
+      )}
+
+      {/* Settings button (reflect page entry point to profile) */}
+      {!backTo && settingsTo && (
+        <Link
+          to={settingsTo}
+          className="shrink-0 w-10 h-10 glass-card rounded-2xl flex items-center justify-center hover:bg-white/30 active:scale-95 transition-all duration-200"
+        >
+          <SlidersHorizontal className="w-4 h-4 text-river" />
+        </Link>
+      )}
     </motion.div>
   );
 }

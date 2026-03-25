@@ -1,7 +1,7 @@
 import json
 from typing import Type, TypeVar
 
-import litellm
+from openai import AsyncOpenAI
 from pydantic import BaseModel, ValidationError
 
 from app.config import settings
@@ -10,28 +10,31 @@ from app.services.supabase import db
 T = TypeVar("T", bound=BaseModel)
 
 # ─────────────────────────────────────────────────────────────────
-# 4.1 — LiteLLM global configuration
+# 4.1 — OpenAI-compatible client pointed at OpenRouter
 # ─────────────────────────────────────────────────────────────────
 
-litellm.set_verbose = False
-litellm.api_key = settings.openrouter_api_key
-litellm.api_base = settings.openrouter_base_url
-litellm.num_retries = 2
-litellm.request_timeout = 30  # seconds
+_client = AsyncOpenAI(
+    api_key=settings.openrouter_api_key,
+    base_url=settings.openrouter_base_url,
+    timeout=30.0,
+    max_retries=2,
+)
 
 # ─────────────────────────────────────────────────────────────────
 # 4.2 — Fallback configuration (3 model tiers)
 # ─────────────────────────────────────────────────────────────────
 
-litellm.fallbacks = [
-    {"openrouter/openai/gpt-4o": ["openrouter/anthropic/claude-sonnet-4"]},
-    {"openrouter/anthropic/claude-sonnet-4": ["openrouter/openai/gpt-4o"]},
-    {
-        "openrouter/openai/gpt-4o-mini": [
-            "openrouter/anthropic/claude-haiku-4-5-20251001"
-        ]
-    },
-]
+# Maps primary model → fallback models (openrouter/ prefix stripped)
+_FALLBACKS: dict[str, list[str]] = {
+    "openai/gpt-4o": ["anthropic/claude-sonnet-4"],
+    "anthropic/claude-sonnet-4": ["openai/gpt-4o"],
+    "openai/gpt-4o-mini": ["anthropic/claude-haiku-4-5-20251001"],
+}
+
+
+def _strip_openrouter_prefix(model: str) -> str:
+    """Strip the 'openrouter/' prefix that agent files use as a convention."""
+    return model.removeprefix("openrouter/")
 
 
 # ─────────────────────────────────────────────────────────────────
@@ -46,28 +49,44 @@ async def llm_call(
     max_tokens: int = 2048,
     user_id: str | None = None,
 ) -> str:
-    """Unified async LLM call via LiteLLM → OpenRouter. Returns raw text."""
+    """Unified async LLM call via OpenRouter. Returns raw text.
+
+    Tries the primary model first, then falls back to alternatives if it fails.
+    The 'openrouter/' prefix in model names is stripped before sending to OpenRouter.
+    """
     full_messages = [{"role": "system", "content": system}] + messages
+    primary = _strip_openrouter_prefix(model)
+    candidates = [primary] + [
+        _strip_openrouter_prefix(m) for m in _FALLBACKS.get(primary, [])
+    ]
 
-    response = await litellm.acompletion(
-        model=model,
-        messages=full_messages,
-        max_tokens=max_tokens,
-        extra_headers={
-            "HTTP-Referer": settings.openrouter_app_url,
-            "X-Title": settings.openrouter_app_name,
-        },
-    )
+    last_exc: Exception | None = None
+    for candidate in candidates:
+        try:
+            response = await _client.chat.completions.create(
+                model=candidate,
+                messages=full_messages,
+                max_tokens=max_tokens,
+                extra_headers={
+                    "HTTP-Referer": settings.openrouter_app_url,
+                    "X-Title": settings.openrouter_app_name,
+                },
+            )
+            # 4.6 — Track token usage when user_id present and usage data available
+            if user_id and response.usage:
+                await update_token_usage(
+                    user_id=user_id,
+                    provider="openrouter",
+                    tokens=response.usage.total_tokens,
+                )
+            return response.choices[0].message.content
+        except Exception as exc:
+            last_exc = exc
+            continue
 
-    # 4.6 — Track token usage when user_id present and usage data available
-    if user_id and response.usage:
-        await update_token_usage(
-            user_id=user_id,
-            provider="openrouter",
-            tokens=response.usage.total_tokens,
-        )
-
-    return response.choices[0].message.content
+    raise RuntimeError(
+        f"All model candidates failed for '{model}'. Last error: {last_exc}"
+    ) from last_exc
 
 
 # ─────────────────────────────────────────────────────────────────

@@ -1,15 +1,17 @@
 import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useRef, useState } from "react";
+import { DateTimePicker } from "~/components/ui/DateTimePicker";
 import { chatService } from "~/services/ChatService";
 import type { OnboardingOption } from "~/types";
 import { cn } from "~/utils/cn";
 
 interface OnboardingOptionsProps {
   options: OnboardingOption[];
-  onSelect: (value: string) => void;
+  onSelect: (value: string, displayLabel?: string) => void;
   onChangeNumber?: () => void;
   disabled?: boolean;
   phoneNumber?: string; // required for the OTP resend button
+  autoOpenSpecify?: boolean;
 }
 
 /**
@@ -220,8 +222,19 @@ export function OnboardingOptions({
   onChangeNumber,
   disabled,
   phoneNumber = "",
+  autoOpenSpecify = false,
 }: OnboardingOptionsProps) {
   const [specifyStep, setSpecifyStep] = useState<OnboardingOption | null>(null);
+
+  useEffect(() => {
+    if (autoOpenSpecify) {
+      const opt =
+        options.find((o) => o.value === null && o.input_type !== "datetime") ??
+        null;
+      if (opt) setSpecifyStep(opt);
+    }
+  }, [autoOpenSpecify, options]);
+
   const [specifyValue, setSpecifyValue] = useState("");
   const [specifyError, setSpecifyError] = useState<string | null>(null);
   const [datetimeStep, setDatetimeStep] = useState(false);
@@ -244,7 +257,13 @@ export function OnboardingOptions({
   const specifyOption = options.find(
     (o) => o.value === null && o.input_type !== "datetime",
   );
-  const regularOptions = options.filter((o) => o.value !== null);
+  // Sentinel values wrapped in __ (e.g. __skip_phone__) are skip-type actions —
+  // rendered as subtle text links rather than primary pill buttons.
+  const isSentinel = (v: string | null) => v !== null && /^__\w+__$/.test(v);
+  const skipOptions = options.filter((o) => isSentinel(o.value));
+  const regularOptions = options.filter(
+    (o) => o.value !== null && !isSentinel(o.value),
+  );
 
   function handleOptionClick(option: OnboardingOption) {
     if (disabled) return;
@@ -254,7 +273,7 @@ export function OnboardingOptions({
       setSpecifyValue("");
       setSpecifyError(null);
     } else {
-      onSelect(option.value);
+      onSelect(option.value, option.label);
     }
   }
 
@@ -290,24 +309,7 @@ export function OnboardingOptions({
     }
   }
 
-  function handleDatetimeSubmit() {
-    if (!datetimeValue || disabled) return;
-    // Convert local datetime string (YYYY-MM-DDTHH:mm) to UTC ISO for the slot-confirm path
-    const isoUtc = new Date(datetimeValue).toISOString();
-    setDatetimeStep(false);
-    setDatetimeValue("");
-    onSelect(isoUtc);
-  }
-
-  function handleDatetimeKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === "Enter") handleDatetimeSubmit();
-    if (e.key === "Escape") {
-      setDatetimeStep(false);
-      setDatetimeValue("");
-    }
-  }
-
-  // Compute min for datetime-local input: now rounded up to the next minute
+  // Compute min date for DateTimePicker (today's date in local YYYY-MM-DD)
   const nowLocal = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
     .toISOString()
     .slice(0, 16);
@@ -373,6 +375,25 @@ export function OnboardingOptions({
         )}
       </div>
 
+      {skipOptions.length > 0 && (
+        <div className="flex gap-4 pt-0.5">
+          {skipOptions.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => handleOptionClick(opt)}
+              disabled={disabled}
+              className={cn(
+                "text-xs text-river/50 hover:text-river/80 transition-colors underline underline-offset-2",
+                "disabled:opacity-40 disabled:cursor-not-allowed",
+              )}
+            >
+              Skip for now
+            </button>
+          ))}
+        </div>
+      )}
+
       <AnimatePresence>
         {specifyStep && (
           <motion.div
@@ -436,35 +457,18 @@ export function OnboardingOptions({
             animate={{ opacity: 1, height: "auto" }}
             exit={{ opacity: 0, height: 0 }}
             transition={{ duration: 0.2 }}
-            className="overflow-hidden"
+            className="overflow-hidden pt-1"
           >
-            <div className="flex gap-2 items-center pt-1">
-              <input
-                type="datetime-local"
-                value={datetimeValue}
-                min={nowLocal}
-                onChange={(e) => setDatetimeValue(e.target.value)}
-                onKeyDown={handleDatetimeKeyDown}
-                disabled={disabled}
-                className={cn(
-                  "flex-1 px-3 py-2 text-sm rounded-xl border bg-white/90 text-charcoal",
-                  "outline-none transition-colors border-charcoal/20 focus:border-sage",
-                  "disabled:opacity-40 disabled:cursor-not-allowed",
-                )}
-              />
-              <button
-                type="button"
-                onClick={handleDatetimeSubmit}
-                disabled={disabled || !datetimeValue}
-                className={cn(
-                  "px-3 py-2 rounded-xl text-sm font-medium transition-colors",
-                  "bg-terracotta text-white",
-                  "hover:bg-terracotta/90 disabled:opacity-40 disabled:cursor-not-allowed",
-                )}
-              >
-                OK
-              </button>
-            </div>
+            <DateTimePicker
+              value={datetimeValue || undefined}
+              onChange={(utcIso) => {
+                setDatetimeStep(false);
+                setDatetimeValue("");
+                onSelect(utcIso);
+              }}
+              minDate={nowLocal.slice(0, 10)}
+              disabled={disabled}
+            />
           </motion.div>
         )}
       </AnimatePresence>

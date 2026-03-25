@@ -21,14 +21,19 @@ async def classifier_node(state: AgentState) -> dict:
     goal_text = goal_draft.get("title") or goal_draft.get("description") or ""
 
     # goal_draft has no title/description during the fan-out phase (those fields
-    # are only populated after goal_planner runs). Fall back to the user's latest
-    # message from conversation_history so the classifier has something to work with.
+    # are only populated after goal_planner runs). Synthesize a compact description
+    # from the first user message (intent) + clarification_answers (details).
     if not goal_text:
         history = state.get("conversation_history") or []
-        for msg in reversed(history):
-            if msg.get("role") == "user":
-                goal_text = msg.get("content", "")
-                break
+        first_user_msg = next(
+            (m.get("content", "") for m in history if m.get("role") == "user"), ""
+        )
+        answers = goal_draft.get("clarification_answers") or []
+        if answers:
+            details = "\n".join(f"- {a['question_id']}: {a['answer']}" for a in answers)
+            goal_text = f"{first_user_msg}\n{details}"
+        else:
+            goal_text = first_user_msg
 
     # 9.3.2 — Call validated LLM with ClassifierOutput, max_tokens=128
     result: ClassifierOutput = await validated_llm_call(

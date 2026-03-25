@@ -22,6 +22,8 @@ For each question:
 - Provide 2–4 pre-defined `options` where the answer is likely one of a few known categories (e.g. fitness levels: Beginner / Intermediate / Advanced)
 - Set `allows_custom: true` if the user might have an answer that doesn't fit the options
 - Set `allows_custom: false` only if the options are exhaustive (e.g. Yes / No)
+- Set `multi_select: true` when the user could reasonably pick more than one option (e.g. "Which days can you train?", "What equipment do you have access to?")
+- Set `multi_select: false` (default) for all other questions, including those with a single definitive answer
 - Provide a `zod_validator` string only for open-ended numeric or text inputs that need validation (e.g. weight in kg: `z.string().regex(/^\d+(\.\d+)?$/, "Enter a valid number")`)
 - Mark `required: true` for questions whose answers are essential; `required: false` for nice-to-have context
 
@@ -63,6 +65,7 @@ Return ONLY valid JSON matching this schema:
       "question": "What's your current fitness level?",
       "options": ["Complete beginner", "I exercise occasionally", "I exercise regularly", "I'm quite fit"],
       "allows_custom": false,
+      "multi_select": false,
       "zod_validator": null,
       "required": true
     },
@@ -71,6 +74,7 @@ Return ONLY valid JSON matching this schema:
       "question": "What distance are you aiming to run comfortably?",
       "options": ["5K", "10K", "Half marathon", "Full marathon"],
       "allows_custom": true,
+      "multi_select": false,
       "zod_validator": null,
       "required": true
     },
@@ -79,8 +83,18 @@ Return ONLY valid JSON matching this schema:
       "question": "What is your current weight? (in kg)",
       "options": [],
       "allows_custom": true,
+      "multi_select": false,
       "zod_validator": "z.string().regex(/^\\d+(\\.\\d+)?$/, \"Please enter a valid number\")",
       "required": true
+    },
+    {
+      "id": "available_equipment",
+      "question": "What equipment or facilities do you have access to?",
+      "options": ["No equipment (bodyweight only)", "Dumbbells/kettlebells", "Gym membership", "Resistance bands", "Pull-up bar"],
+      "allows_custom": true,
+      "multi_select": true,
+      "zod_validator": null,
+      "required": false
     }
   ]
 }

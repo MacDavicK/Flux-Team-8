@@ -1,0 +1,98 @@
+Title: Sleep Deprivation: Effects on Weight Loss and Weight Loss Maintenance | Source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC3632337/
+Category: behavioral | Authority: peer_reviewed
+---
+Sleep is increasingly recognised as a critical determinant of body weight regulation. Evidence from epidemiological studies, laboratory experiments, and intervention trials demonstrates that insufficient sleep impairs weight loss, promotes fat gain, and undermines the maintenance of achieved weight loss.
+
+Epidemiological Evidence
+
+Large-scale prospective studies consistently show that short sleep duration (less than 7 hours per night) is associated with higher body weight and increased risk of obesity:
+
+- A meta-analysis of 45 prospective studies found that short sleep duration was associated with a 55% increased risk of obesity in adults and an 89% increased risk in children.
+- The relationship holds after controlling for energy intake, physical activity, age, and socioeconomic status, suggesting sleep is an independent risk factor.
+- Adults sleeping 5–6 hours per night weigh on average 1.8–2.5 kg more than those sleeping 7–8 hours.
+- The relationship is dose-dependent: shorter sleep is associated with higher BMI.
+
+Laboratory Evidence: Mechanisms
+
+Controlled sleep restriction studies (where participants' sleep is experimentally limited) have identified several mechanisms through which sleep deprivation promotes weight gain:
+
+1. Appetite hormone dysregulation
+
+Sleep deprivation produces robust changes in appetite-regulating hormones:
+- Ghrelin (hunger hormone): Increases significantly with sleep restriction. Ghrelin stimulates appetite and food-seeking behaviour.
+- Leptin (satiety hormone): Decreases with sleep restriction. Leptin signals satiety and suppresses appetite.
+- The combined effect: increased hunger, reduced fullness signals, and a drive toward energy-dense food consumption.
+
+In one classic study, restricting sleep to 4 hours for 2 nights increased ghrelin by 28% and decreased leptin by 18%, with participants reporting 24% greater hunger and 23% greater appetite — particularly for sweet, salty, and starchy high-calorie foods.
+
+2. Increased caloric intake
+
+Sleep-restricted individuals consume more calories, primarily from snacks and late-night eating:
+- Studies show 300–550 additional calories consumed per day during sleep-restricted periods
+- Preference shifts toward high-sugar, high-fat, energy-dense foods
+- The extended waking period creates additional opportunity for eating
+- Fatigue reduces inhibitory control, making it harder to resist food cravings
+
+3. Reduced energy expenditure
+
+Sleep deprivation reduces physical activity levels through:
+- Increased daytime fatigue and reduced motivation to exercise
+- Reduced non-exercise activity thermogenesis (NEAT) — spontaneous movement throughout the day
+- Impaired physical performance during exercise (reduced intensity and duration)
+
+4. Metabolic effects
+
+Beyond energy balance, sleep deprivation has direct metabolic effects:
+- Increased insulin resistance — less efficient glucose uptake by cells
+- Elevated cortisol levels, which promote fat storage particularly around the abdomen
+- Impaired growth hormone secretion (which normally peaks during deep sleep) — reducing muscle protein synthesis and fat mobilisation
+- Alterations in gut microbiome composition associated with metabolic dysfunction
+
+Effect on Weight Loss Interventions
+
+Sleep deprivation specifically undermines dietary weight loss:
+
+A landmark study by Nedeltcheva and colleagues randomised overweight adults to caloric restriction with either 8.5 hours or 5.5 hours sleep opportunity. Both groups lost similar total weight, but:
+- The adequate sleep group lost approximately 50% of weight as fat and 50% as lean mass
+- The sleep-restricted group lost 75% of weight as lean mass and only 25% as fat
+- The sleep-restricted group lost 55% less fat than the adequate sleep group
+
+This finding is critical: sleep deprivation during caloric restriction results in disproportionate loss of muscle rather than fat — the opposite of what is desired for healthy body composition change.
+
+Additionally, sleep-restricted participants experienced greater hunger and appetite despite the same caloric intake, suggesting that sustaining a dietary deficit is substantially harder when sleep-deprived.
+
+Recommended Sleep Duration for Adults
+
+The American Academy of Sleep Medicine and the Sleep Research Society recommend that adults aged 18–60 years sleep 7 or more hours per night on a regular basis to promote optimal health.
+
+For weight management specifically, 7–9 hours per night appears to be the optimal range:
+- Less than 7 hours: associated with weight gain and impaired weight loss
+- More than 9 hours regularly: associated in some studies with metabolic dysfunction (though this may reflect underlying health conditions causing prolonged sleep)
+
+Sleep Quality vs. Quantity
+
+Sleep quality matters alongside duration. Sleep disruptions — even brief awakenings — fragment sleep architecture and reduce time spent in deep sleep (slow-wave sleep) and REM sleep, both of which are metabolically important phases.
+
+Factors that impair sleep quality:
+- Sleep apnoea (common in overweight and obese individuals — a bidirectional relationship with obesity)
+- Screen use before bed (blue light suppresses melatonin secretion)
+- Alcohol (disrupts sleep architecture despite inducing sleepiness)
+- Caffeine consumed within 6 hours of bedtime
+- Irregular sleep schedule (including social jetlag — sleeping later on weekends)
+- Noise, light, or temperature disruptions
+
+Practical Strategies to Improve Sleep for Weight Management
+
+Maintain a consistent sleep schedule: Go to bed and wake at the same time every day, including weekends. Consistency of sleep timing is strongly associated with metabolic health.
+
+Optimise sleep environment: Dark, quiet, and cool (approximately 18°C/65°F) are ideal conditions. Use blackout curtains or an eye mask if needed.
+
+Limit screens before bed: Avoid blue-light-emitting screens for at least 1 hour before sleep. Use night mode on devices if use is unavoidable.
+
+Avoid caffeine after early afternoon: Caffeine has a half-life of 5–6 hours; consuming it after 2 pm can significantly disrupt sleep in sensitive individuals.
+
+Align exercise timing: Regular exercise improves sleep quality significantly. However, vigorous exercise within 2–3 hours of bedtime can delay sleep onset in some individuals.
+
+Limit alcohol near bedtime: While alcohol may hasten sleep onset, it fragments sleep in the second half of the night and reduces sleep quality overall.
+
+Address sleep apnoea: If you snore loudly, wake gasping, or feel unrefreshed despite adequate sleep hours, discuss sleep apnoea screening with your doctor. Treating sleep apnoea improves insulin sensitivity, reduces appetite, and directly supports weight loss efforts.

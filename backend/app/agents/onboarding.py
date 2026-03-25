@@ -22,6 +22,71 @@ from app.agents.state import AgentState
 from app.services.supabase import db
 
 # ─────────────────────────────────────────────────────────────────
+# Work-minutes parser — converts natural-language work schedule to
+# a per-day-of-week minute map used by the congestion check.
+# ─────────────────────────────────────────────────────────────────
+
+_WORK_MINUTES_FALLBACK: dict[str, int] = {
+    "mon": 480,
+    "tue": 480,
+    "wed": 480,
+    "thu": 480,
+    "fri": 480,
+    "sat": 0,
+    "sun": 0,
+}
+
+
+class _WorkMinutesByDay(BaseModel):
+    mon: int
+    tue: int
+    wed: int
+    thu: int
+    fri: int
+    sat: int
+    sun: int
+
+
+async def _parse_work_minutes_by_day(work_hours: str) -> dict[str, int]:
+    """
+    Convert a natural-language work schedule string into a per-day minute map.
+
+    Examples:
+      "9 AM to 5 PM, Monday to Friday"  → {"mon": 480, ..., "sat": 0, "sun": 0}
+      "I don't work set hours"           → all zeros
+      "Flexible hours, mostly weekdays"  → moderate estimate Mon–Fri
+
+    Uses a single structured LLM call (gpt-4o-mini). Never raises — falls back
+    to 480 min Mon–Fri on any error. Called once at end of onboarding and lazily
+    by ask_start_date_node for pre-feature users missing work_minutes_by_day.
+    """
+    from app.services.llm import validated_llm_call  # noqa: PLC0415 — lazy import
+
+    _SYSTEM = (
+        "You convert a natural-language work schedule description into exact minutes "
+        "worked per day of the week. Return a JSON object with keys: "
+        "mon, tue, wed, thu, fri, sat, sun — each an integer number of minutes. "
+        "For 'I don't work set hours' or similar, return all zeros. "
+        "For flexible/remote schedules estimate conservatively (e.g. 360 min weekdays). "
+        "Return only the JSON object, no explanation."
+    )
+    try:
+        result = await validated_llm_call(
+            model="openrouter/openai/gpt-4o-mini",
+            system_prompt=_SYSTEM,
+            messages=[
+                {"role": "user", "content": work_hours or "standard office hours"}
+            ],
+            output_model=_WorkMinutesByDay,
+            max_tokens=128,
+            max_retries=1,
+        )
+        return result.model_dump()
+    except Exception:
+        return dict(_WORK_MINUTES_FALLBACK)
+
+
+# ─────────────────────────────────────────────────────────────────
 # Quick-select option definitions
 #
 # Each option has a label (shown to user) and a value (sent as the
@@ -113,6 +178,10 @@ _STEP_OPTIONS: dict[str, Optional[list[OnboardingOption]]] = {
                 "z.string().regex(/^\\+[1-9]\\d{1,14}$/, "
                 '"Enter your number in international format, e.g. +15551234567")'
             ),
+        ),
+        OnboardingOption(
+            label="Skip — I'll set SMS/WhatsApp notifications up later",
+            value="__skip_phone__",
         ),
     ],
     "whatsapp_opt_in": [
@@ -207,10 +276,16 @@ def _apply_extraction(profile: dict, step: str, value: Any) -> dict:
     elif step == "chronotype":
         p["chronotype"] = str(value)
     elif step == "phone_number":
-        p["phone_number"] = str(value)  # Already E.164 from frontend validation
-        p["_phone_collected"] = True
-        # Reset OTP attempt counter so a re-entered number gets a fresh 3 attempts
-        p.pop("_otp_attempts", None)
+        if str(value) == "__skip_phone__":
+            # User chose to skip phone setup — mark all three phone steps done
+            p["_phone_collected"] = True
+            p["_otp_done"] = True
+            p["_whatsapp_answered"] = True
+        else:
+            p["phone_number"] = str(value)  # Already E.164 from frontend validation
+            p["_phone_collected"] = True
+            # Reset OTP attempt counter so a re-entered number gets a fresh 3 attempts
+            p.pop("_otp_attempts", None)
     elif step == "otp_verification":
         # OTP result is set by onboarding_node after async confirm_otp call
         p["_otp_verified"] = True
@@ -226,6 +301,7 @@ def _build_final_profile(p: dict) -> dict:
     """
     9.6.5 — Produce the clean profile JSON to be written to users.profile.
     Internal underscore-prefixed tracking keys are stripped out.
+    work_minutes_by_day is populated separately by _complete_onboarding.
     """
     return {
         "name": p.get("name", ""),
@@ -265,6 +341,9 @@ async def _complete_onboarding(
     import json as _json
 
     final_profile = _build_final_profile(profile)
+    # Parse work schedule into per-day minute map for the congestion check.
+    work_minutes = await _parse_work_minutes_by_day(final_profile.get("work_hours", ""))
+    final_profile["work_minutes_by_day"] = work_minutes
     notif_prefs = _build_final_notification_preferences(profile)
     timezone = profile.get("timezone", "UTC")
     name = final_profile.get("name", "")
@@ -459,7 +538,10 @@ async def onboarding_node(state: AgentState) -> dict:
         if new_step != step:
             # Step advanced — check if done
             if new_step is None:
-                canned = "Got it! Let me wrap things up."
+                if step == "phone_number" and user_msg == "__skip_phone__":
+                    canned = "No problem — you can enable SMS and WhatsApp reminders anytime from your profile settings."
+                else:
+                    canned = "Got it! Let me wrap things up."
                 updated_history = history + [{"role": "assistant", "content": canned}]
                 return await _complete_onboarding(user_id, profile, updated_history)
 
@@ -486,7 +568,10 @@ async def onboarding_node(state: AgentState) -> dict:
             next_question = _get_question(new_step, profile)
             name = profile.get("name", "")
             name_part = f", {name}" if name else ""
-            canned = f"Got it{name_part}! {next_question}"
+            if step == "phone_number" and user_msg == "__skip_phone__":
+                canned = f"No problem — you can enable SMS and WhatsApp reminders anytime from your profile settings. {next_question}"
+            else:
+                canned = f"Got it{name_part}! {next_question}"
             next_options = _STEP_OPTIONS.get(new_step)
             updated_history = history + [{"role": "assistant", "content": canned}]
             return {

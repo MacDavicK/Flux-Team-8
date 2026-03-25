@@ -131,7 +131,11 @@ function ReflectionPage() {
     <div className="min-h-screen pb-32">
       <AmbientBackground />
 
-      <ProfileHeader name={profile.name} avatarUrl={undefined} />
+      <ProfileHeader
+        name={profile.name}
+        avatarUrl={undefined}
+        settingsTo="/profile"
+      />
 
       <GoalProgressCard />
 

@@ -20,6 +20,16 @@ export function BottomNav() {
 
   const flowDisabled = isAuthenticated && user && user.onboarded && !hasTasks;
 
+  const notifPrefs = user?.notification_preferences as
+    | { phone_number?: string }
+    | null
+    | undefined;
+  const showPhoneAlert =
+    isAuthenticated &&
+    user?.onboarded &&
+    !user?.phone_verified &&
+    !notifPrefs?.phone_number;
+
   // Right nav item: Profile when tasks not yet created, Reflect otherwise
   const rightItem = flowDisabled
     ? {
@@ -154,11 +164,14 @@ export function BottomNav() {
                 <motion.span
                   animate={{ y: isActive ? -1 : 0, scale: isActive ? 1.1 : 1 }}
                   className={cn(
-                    "transition-colors duration-300",
+                    "relative transition-colors duration-300",
                     isActive ? "text-sage" : "text-river hover:text-sage-dark",
                   )}
                 >
                   {item.icon}
+                  {showPhoneAlert && (
+                    <span className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-amber-400" />
+                  )}
                 </motion.span>
                 <span
                   className={cn(

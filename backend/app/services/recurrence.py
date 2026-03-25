@@ -16,7 +16,7 @@ import logging
 
 import pendulum
 
-from app.services.rrule_expander import next_occurrence_after
+from app.services.rrule_expander import advance_past_sleep, next_occurrence_after
 from app.services.supabase import db
 
 logger = logging.getLogger(__name__)
@@ -34,7 +34,8 @@ async def advance_recurring_task(task_id: str) -> bool:
     """
     task_row = await db.fetchrow(
         """
-        SELECT id, recurrence_rule, scheduled_at, user_id, title, description,
+        SELECT id, recurrence_rule, scheduled_at, canonical_scheduled_at,
+               user_id, title, description,
                duration_minutes, trigger_type, location_trigger,
                goal_id, shared_with_goal_ids, escalation_policy
         FROM tasks WHERE id = $1
@@ -46,24 +47,55 @@ async def advance_recurring_task(task_id: str) -> bool:
 
     user_id = str(task_row["user_id"])
 
-    tz_row = await db.fetchrow("SELECT timezone FROM users WHERE id = $1", user_id)
-    user_tz = (tz_row["timezone"] if tz_row else None) or "UTC"
-
-    scheduled_at = task_row["scheduled_at"]
-    ref_dt = (
-        pendulum.instance(scheduled_at)
-        if hasattr(scheduled_at, "isoformat")
-        else pendulum.parse(str(scheduled_at))
+    tz_row = await db.fetchrow(
+        "SELECT timezone, profile FROM users WHERE id = $1", user_id
     )
+    user_tz = (tz_row["timezone"] if tz_row else None) or "UTC"
+    sleep_window = None
+    if tz_row and tz_row["profile"]:
+        profile_data = tz_row["profile"] if isinstance(tz_row["profile"], dict) else {}
+        sleep_window = profile_data.get("sleep_window")
+
+    raw_canonical = task_row["canonical_scheduled_at"]
+    if raw_canonical is not None:
+        canonical_dt = (
+            pendulum.instance(raw_canonical)
+            if hasattr(raw_canonical, "isoformat")
+            else pendulum.parse(str(raw_canonical))
+        )
+    else:
+        # Fallback for rows created before migration 016 (NULL canonical_scheduled_at).
+        scheduled_at = task_row["scheduled_at"]
+        canonical_dt = (
+            pendulum.instance(scheduled_at)
+            if hasattr(scheduled_at, "isoformat")
+            else pendulum.parse(str(scheduled_at))
+        )
 
     next_utc = next_occurrence_after(
         rrule_string=task_row["recurrence_rule"],
-        after_dt=ref_dt,
+        after_dt=canonical_dt,  # canonical position — not rescheduled time
         user_timezone=user_tz,
+        dtstart=canonical_dt,  # same — stable series anchor
     )
     if next_utc is None:
         logger.info("No further occurrences for recurring task %s", task_id)
         return False
+
+    # Sleep-window guard: advance next_utc past sleep if it lands during sleep.
+    if sleep_window and next_utc:
+        try:
+            next_utc = advance_past_sleep(
+                utc_iso=next_utc,
+                sleep_window=sleep_window,
+                user_timezone=user_tz,
+                rrule_string=task_row["recurrence_rule"],
+                dtstart=canonical_dt,  # was: dt_for_dtstart
+            )
+        except Exception as exc:
+            logger.warning(
+                "Sleep-window advance failed for recurring task %s: %s", task_id, exc
+            )
 
     # Goal timeframe guard
     goal_id = task_row["goal_id"]
@@ -101,20 +133,24 @@ async def advance_recurring_task(task_id: str) -> bool:
         INSERT INTO tasks (
             user_id, goal_id, title, description, status,
             scheduled_at, duration_minutes, trigger_type, location_trigger,
-            recurrence_rule, shared_with_goal_ids, escalation_policy
-        ) VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11)
+            recurrence_rule, shared_with_goal_ids, escalation_policy,
+            canonical_scheduled_at
+        ) VALUES ($1, $2, $3, $4, 'pending', $5, $6, $7, $8, $9, $10, $11, $12)
         """,
         user_id,
         goal_id,
         task_row["title"],
         task_row["description"],
-        pendulum.parse(next_utc),
+        pendulum.parse(next_utc),  # $5 = scheduled_at
         task_row["duration_minutes"],
         task_row["trigger_type"],
         task_row["location_trigger"],
         task_row["recurrence_rule"],
         shared_ids,
         task_row["escalation_policy"],
+        pendulum.parse(
+            next_utc
+        ),  # $12 = canonical_scheduled_at (= scheduled_at on new advance)
     )
     logger.info("Advanced recurring task %s → next occurrence at %s", task_id, next_utc)
     return True

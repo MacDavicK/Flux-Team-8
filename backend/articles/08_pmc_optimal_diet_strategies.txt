@@ -1,0 +1,66 @@
+Title: Optimal Diet Strategies for Weight Loss and Weight Loss Maintenance | Source: https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5764193/
+Category: nutrition | Authority: peer_reviewed
+---
+Identifying the optimal dietary strategy for weight loss and long-term weight maintenance remains one of the most debated questions in nutritional science. The evidence base from randomised controlled trials, systematic reviews, and meta-analyses provides important guidance, even as individual variation makes universal prescriptions difficult.
+
+The Primacy of Caloric Deficit
+
+The fundamental determinant of weight loss is the creation of a sustained caloric deficit: energy intake must be less than energy expenditure. Multiple well-controlled trials comparing diets of different macronutrient compositions but equal caloric content confirm that the macronutrient split has a relatively small effect on total weight loss compared with the magnitude of the deficit.
+
+The practical implication is that the "best diet" for weight loss is the one a person can adhere to. Adherence is the primary mediator between dietary recommendations and actual outcomes, making personalisation and palatability critical considerations.
+
+Comparison of Major Dietary Approaches
+
+Low-fat diets: Traditionally the most common recommendation. Meta-analyses show modest weight loss of 2–5 kg over 12 months. Low-fat diets can reduce LDL cholesterol and cardiovascular risk markers, but they have not consistently outperformed other approaches for weight loss specifically.
+
+Low-carbohydrate and ketogenic diets: These approaches restrict carbohydrate to 50–150 g/day (low-carb) or below 50 g/day (ketogenic), shifting the body toward fat and ketone utilisation. Early weight loss is greater than low-fat diets due to glycogen and water depletion. At 12 months, differences in fat loss are small. Long-term adherence can be challenging.
+
+Mediterranean diet: Characterised by high intake of vegetables, fruits, whole grains, olive oil, fish, and moderate consumption of dairy and red wine, with low intake of red and processed meats. Not explicitly designed for weight loss but consistently associated with weight loss and maintenance in trials, as well as superior cardiovascular outcomes. High palatability supports adherence.
+
+DASH diet (Dietary Approaches to Stop Hypertension): Emphasises fruits, vegetables, low-fat dairy, whole grains, and lean proteins while limiting sodium, red meat, sweets, and sugary drinks. Originally designed to reduce blood pressure but also effective for weight management and metabolic health improvement.
+
+Plant-based and vegan diets: Systematic reviews show that plant-based diets produce greater weight loss than omnivorous diets in controlled trials, partly due to lower energy density and higher fibre content. However, risks of nutritional deficiencies (vitamin B12, iron, zinc, omega-3 fatty acids) require attention and, in some cases, supplementation.
+
+Intermittent fasting: Approaches including alternate-day fasting, 5:2 (two days of severe restriction per week), and time-restricted eating (e.g., eating only within an 8-hour window) show comparable weight loss to continuous caloric restriction in trials of 3–12 months. Some individuals find these approaches easier to adhere to than daily caloric restriction.
+
+Role of Dietary Fibre
+
+Dietary fibre is one of the most consistently supported dietary components for weight management. High-fibre foods promote satiety through several mechanisms:
+- Physical bulk in the gastrointestinal tract
+- Slowing of gastric emptying
+- Fermentation by gut bacteria producing short-chain fatty acids that signal satiety
+- Reduced glycaemic response
+
+Adults should aim for 25–38 g of dietary fibre per day from vegetables, fruits, legumes, and whole grains. Most adults in Western countries consume approximately 15 g/day.
+
+Role of Protein in Weight Management
+
+Higher protein diets (25–30% of energy from protein) consistently produce greater satiety, better preservation of lean muscle mass during caloric restriction, and higher diet-induced thermogenesis compared with lower protein diets.
+
+Practical protein targets for weight management:
+- 1.2–1.6 g per kg of body weight per day for active individuals
+- 1.0–1.2 g per kg of body weight per day for less active individuals
+- Spreading protein evenly across meals maximises muscle protein synthesis
+
+High-protein foods: eggs, chicken breast, fish, Greek yoghurt, cottage cheese, lentils, tofu, edamame.
+
+Dietary Approaches to Support Long-Term Maintenance
+
+Weight maintenance is physiologically harder than initial weight loss because the body adapts to lower body weight by reducing resting metabolic rate. Dietary strategies to counter metabolic adaptation:
+
+- Maintain or increase protein intake to preserve lean mass
+- Avoid severe energy restriction during maintenance; modest deficits are more sustainable
+- Incorporate regular diet breaks (structured periods at maintenance calories) which evidence suggests can reduce metabolic adaptation
+- Focus on dietary quality and food volume (high-fibre, high-water-content foods) rather than severe restriction
+
+Practical Recommendations
+
+1. Choose a dietary approach that is sustainable for you personally — flavour preferences, cultural practices, cooking ability, and lifestyle must be considered.
+2. Prioritise whole, minimally processed foods across all dietary patterns.
+3. Aim for adequate protein at each meal (20–40 g per meal depending on body size).
+4. Include plenty of non-starchy vegetables (at least half of each meal plate).
+5. Limit ultra-processed foods, sugary beverages, and alcohol.
+6. Track intake at least periodically — evidence consistently links self-monitoring to better outcomes.
+7. Plan meals and prepare foods in advance to reduce reliance on convenience and fast food.
+
+The evidence does not support any single diet as universally superior. The most effective diet is the one that creates a sufficient caloric deficit while being nutritionally complete, sustainable, and aligned with the individual's preferences and lifestyle.
