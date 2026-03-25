@@ -259,9 +259,12 @@ class _RagService:
 
     def format_rag_context(self, chunks: list[dict]) -> str:
         """
-        Filter chunks below rag_relevance_threshold and format as
-        numbered blocks ready for LLM prompt injection.
+        Filter chunks below rag_relevance_threshold, deduplicate by title,
+        and format as numbered blocks ready for LLM prompt injection.
         Returns empty string if no chunks survive the filter.
+
+        Deduplication ensures citation numbers [1]..[N] exactly match the
+        N-entry sources list returned by rag_retriever_node.
         """
         relevant = [
             c for c in chunks if c.get("score", 0) >= settings.rag_relevance_threshold
@@ -269,8 +272,18 @@ class _RagService:
         if not relevant:
             return ""
 
+        # Keep first (highest-scored) chunk per unique source title so that
+        # citation indices in the prompt align with the deduplicated sources list.
+        seen: set[str] = set()
+        deduped: list[dict] = []
+        for chunk in relevant:
+            title = chunk.get("title", "")
+            if title not in seen:
+                seen.add(title)
+                deduped.append(chunk)
+
         blocks = []
-        for i, chunk in enumerate(relevant, start=1):
+        for i, chunk in enumerate(deduped, start=1):
             blocks.append(
                 f"[{i}] Title: {chunk['title']}\n"
                 f"Source: {chunk['source']}\n"

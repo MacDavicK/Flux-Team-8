@@ -586,7 +586,9 @@ function ChatPage() {
             type: MessageVariant.AI,
             content: (
               <div className="space-y-3">
-                <MarkdownMessage>{result.message}</MarkdownMessage>
+                <MarkdownMessage ragSources={result.rag_sources ?? []}>
+                  {result.message}
+                </MarkdownMessage>
                 {isStartDatePrompt ? (
                   <StartDatePicker
                     defaultDate={result.suggested_date ?? undefined}
@@ -609,7 +611,7 @@ function ChatPage() {
               </div>
             ),
             options: result.options,
-            provenance: result.proposed_plan
+            provenance: result.rag_used
               ? {
                   rag_used: result.rag_used,
                   rag_sources: result.rag_sources,
@@ -684,7 +686,9 @@ function ChatPage() {
             content:
               m.role === "assistant" ? (
                 <div className="space-y-3">
-                  <MarkdownMessage>{m.content}</MarkdownMessage>
+                  <MarkdownMessage ragSources={m.metadata?.rag_sources ?? []}>
+                    {m.content}
+                  </MarkdownMessage>
                   {isStartDatePrompt ? (
                     <StartDatePicker
                       onSelect={(date) => handleSendMessage(date)}
@@ -702,7 +706,7 @@ function ChatPage() {
                 m.content
               ),
             provenance:
-              m.role === "assistant" && m.metadata?.proposed_plan
+              m.role === "assistant" && m.metadata?.rag_used
                 ? {
                     rag_used: m.metadata.rag_used ?? false,
                     rag_sources: m.metadata.rag_sources ?? [],
@@ -1009,7 +1013,11 @@ function ChatPage() {
                         type: MessageVariant.AI,
                         content: (
                           <div className="space-y-3">
-                            <MarkdownMessage>{result.message}</MarkdownMessage>
+                            <MarkdownMessage
+                              ragSources={result.rag_sources ?? []}
+                            >
+                              {result.message}
+                            </MarkdownMessage>
                             {isStartDatePrompt ? (
                               <StartDatePicker
                                 defaultDate={result.suggested_date ?? undefined}
@@ -1024,7 +1032,7 @@ function ChatPage() {
                           </div>
                         ),
                         options: result.options,
-                        provenance: result.proposed_plan
+                        provenance: result.rag_used
                           ? {
                               rag_used: result.rag_used,
                               rag_sources: result.rag_sources,

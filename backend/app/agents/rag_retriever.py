@@ -27,24 +27,36 @@ async def rag_retriever_node(state: AgentState) -> dict:
     goal_draft: dict = state.get("goal_draft") or {}
 
     # Build a semantic query from available goal fields
-    query_parts = filter(
-        None,
-        [
-            goal_draft.get("title", ""),
-            goal_draft.get("description", ""),
-            goal_draft.get("target", ""),
-            goal_draft.get("preferences", ""),
-        ],
+    query_parts = list(
+        filter(
+            None,
+            [
+                goal_draft.get("title", ""),
+                goal_draft.get("description", ""),
+                goal_draft.get("target", ""),
+                goal_draft.get("preferences", ""),
+            ],
+        )
     )
-    query = " ".join(query_parts).strip()
 
-    # Fall back to the latest user message if goal_draft fields are not yet populated
-    if not query:
-        history = state.get("conversation_history") or []
-        for msg in reversed(history):
-            if msg.get("role") == "user":
-                query = msg.get("content", "")
-                break
+    # If structured fields aren't populated yet (Phase 2 runs before goal_planner LLM call),
+    # build from clarification Q&A pairs which are available at this stage.
+    if not query_parts:
+        for qa in goal_draft.get("clarification_answers") or []:
+            answer = qa.get("answer", "").strip()
+            question = qa.get("question", "").strip()
+            if answer and answer.lower() not in {"none", "n/a", ""}:
+                query_parts.append(f"{question}: {answer}")
+
+    # Also prepend the first user message (original goal statement) for context.
+    history = state.get("conversation_history") or []
+    first_user_msg = next(
+        (m.get("content", "") for m in history if m.get("role") == "user"), ""
+    )
+    if first_user_msg:
+        query_parts.insert(0, first_user_msg)
+
+    query = " ".join(query_parts).strip()
 
     if not query:
         logger.warning("rag_retriever_node: no query could be built — returning empty")
