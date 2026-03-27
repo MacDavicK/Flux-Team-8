@@ -142,6 +142,7 @@ function mapTaskToDisplayTypes(task: {
     goalName,
     isProjected,
     occurrenceDate,
+    scheduledAt: scheduledAt ?? undefined,
   };
 }
 

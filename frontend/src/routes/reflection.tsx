@@ -40,7 +40,7 @@ export const Route = createFileRoute("/reflection")({
     const backendUrl = process.env.BACKEND_URL ?? "http://localhost:8000";
     const headers = { Authorization: `Bearer ${token}` };
 
-    const [overview, weekly, missed] = await Promise.all([
+    const [overview, weekly, missed, goalsProgress] = await Promise.all([
       fetch(`${backendUrl}/api/v1/analytics/overview`, { headers }).then((r) =>
         r.ok ? r.json() : {},
       ),
@@ -49,6 +49,9 @@ export const Route = createFileRoute("/reflection")({
       ),
       fetch(`${backendUrl}/api/v1/analytics/missed-by-cat`, { headers }).then(
         (r) => (r.ok ? r.json() : []),
+      ),
+      fetch(`${backendUrl}/api/v1/goals/progress`, { headers }).then((r) =>
+        r.ok ? r.json() : [],
       ),
     ]);
 
@@ -85,6 +88,7 @@ export const Route = createFileRoute("/reflection")({
       profile: user
         ? { id: user.id, name: user.name ?? "User", email: user.email }
         : null,
+      goalsProgress: Array.isArray(goalsProgress) ? goalsProgress : [],
       stats: {
         title: o.week_label ?? "This Week",
         items: [
@@ -120,8 +124,14 @@ export const Route = createFileRoute("/reflection")({
 });
 
 function ReflectionPage() {
-  const { profile, stats, insight, energyData, focusCategories } =
-    Route.useLoaderData();
+  const {
+    profile,
+    stats,
+    insight,
+    energyData,
+    focusCategories,
+    goalsProgress,
+  } = Route.useLoaderData();
 
   if (!profile) {
     return <LoadingState />;
@@ -137,7 +147,7 @@ function ReflectionPage() {
         settingsTo="/profile"
       />
 
-      <GoalProgressCard />
+      <GoalProgressCard initialGoals={goalsProgress} />
 
       <main className="px-5 space-y-6">
         <h2 className="text-display text-2xl italic text-charcoal">

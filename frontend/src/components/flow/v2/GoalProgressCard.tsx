@@ -1,6 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { apiFetch } from "~/lib/apiClient";
-import { isClient } from "~/utils/env";
 
 interface GoalProgress {
   goal_id: string;
@@ -68,23 +66,16 @@ function GoalCard({ goal }: { goal: GoalProgress }) {
   );
 }
 
-export function GoalProgressCard() {
-  const [goals, setGoals] = useState<GoalProgress[]>([]);
+export function GoalProgressCard({
+  initialGoals = [],
+}: {
+  initialGoals?: GoalProgress[];
+}) {
+  const [goals] = useState<GoalProgress[]>(initialGoals);
   const [index, setIndex] = useState(0);
 
   // Touch swipe state
   const touchStartX = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!isClient()) return;
-    apiFetch("/api/v1/goals/progress")
-      .then((r) => (r.ok ? r.json() : []))
-      .then((data: GoalProgress[]) => {
-        if (!Array.isArray(data) || data.length === 0) return;
-        setGoals(data);
-      })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     if (goals.length <= 1) return;

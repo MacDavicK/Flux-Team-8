@@ -123,4 +123,6 @@ export interface TimelineEvent {
   isProjected?: boolean;
   /** YYYY-MM-DD of the projected occurrence in the user's local timezone */
   occurrenceDate?: string;
+  /** ISO 8601 scheduled time from backend — used for past/future comparisons */
+  scheduledAt?: string;
 }

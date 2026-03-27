@@ -1,6 +1,6 @@
 -- ═══════════════════════════════════════════════════════════════
 -- Flux Demo Seed — Local Supabase
--- Idempotent: re-running wipes demo@flux.com and re-seeds fresh.
+-- Idempotent: re-running wipes ALL data and re-seeds fresh.
 --
 -- Run:
 --   docker run --rm --network=host postgres:15-alpine \
@@ -10,9 +10,11 @@
 
 BEGIN;
 
--- ─── 1. TRUNCATE ────────────────────────────────────────────────
-DELETE FROM auth.users    WHERE email = 'demo@flux.com';
-DELETE FROM public.users  WHERE email = 'demo@flux.com'; -- safety net
+-- ─── 1. TRUNCATE (wipe all data) ────────────────────────────────
+TRUNCATE public.dispatch_log, public.notification_log, public.messages,
+         public.patterns, public.tasks, public.conversations,
+         public.goals, public.users;
+DELETE FROM auth.users;
 
 -- ─── 2. CREATE auth user ────────────────────────────────────────
 -- migration 006_auth_user_trigger auto-creates public.users row.
@@ -72,6 +74,7 @@ BEGIN
         notification_preferences = jsonb_build_object(
             'phone_number',              '+919820965355',
             'whatsapp_opted_in',         true,
+            'call_opted_in',             true,
             'reminder_lead_minutes',     10,
             'escalation_window_minutes', 2
         ),

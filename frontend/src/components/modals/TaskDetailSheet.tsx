@@ -22,6 +22,9 @@ export function TaskDetailSheet({
 
   const isMissed = task.status === "missed";
   const isDone = task.status === "done" || task.status === "completed";
+  const isPast = task.scheduledAt
+    ? new Date(task.scheduledAt) <= new Date()
+    : false;
 
   const statusLabel = isMissed ? "Missed" : isDone ? "Completed" : "Upcoming";
 
@@ -102,7 +105,7 @@ export function TaskDetailSheet({
               {/* CTAs */}
               <div className="flex flex-col gap-3 pt-1">
                 {/* Done — shown for pending tasks that are not projected */}
-                {!isDone && !isMissed && !task.isProjected && (
+                {!isDone && !isMissed && !task.isProjected && isPast && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}
@@ -118,7 +121,7 @@ export function TaskDetailSheet({
                 )}
 
                 {/* Mark as Done — shown for missed tasks that are not projected */}
-                {isMissed && !task.isProjected && (
+                {isMissed && !task.isProjected && isPast && (
                   <motion.button
                     type="button"
                     whileTap={{ scale: 0.97 }}

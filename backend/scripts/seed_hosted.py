@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Flux Demo Seed — Hosted Supabase
-Idempotent: deletes demo@flux.com auth user and all their data, then re-seeds.
+Idempotent: wipes ALL data and auth users, then re-seeds.
 
 Called by seed-hosted.sh which sets these env vars:
   SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, DATABASE_URL
@@ -40,41 +40,38 @@ async def seed(supabase_url: str, service_role_key: str, database_url: str) -> N
 
     sb = create_client(supabase_url, service_role_key)
 
-    print("→ Checking for existing demo@flux.com auth user...")
-    try:
-        users_page = sb.auth.admin.list_users()
-        for u in users_page:
-            if getattr(u, "email", None) == DEMO_EMAIL:
-                sb.auth.admin.delete_user(u.id)
-                print(f"  Deleted auth user: {u.id}")
-                break
-    except Exception as exc:
-        print(f"  Warning: could not list/delete auth users: {exc}")
-
-    print("→ Creating demo@flux.com auth user...")
-    result = sb.auth.admin.create_user(
-        {
-            "email": DEMO_EMAIL,
-            "password": DEMO_PASSWORD,
-            "email_confirm": True,
-            "phone": DEMO_PHONE,
-            "phone_confirm": True,
-            "user_metadata": {"name": "Krish"},
-        }
-    )
-    uid = str(result.user.id)
-    print(f"  Created: {uid}")
-
-    # ── 2. asyncpg: all data in one transaction ───────────────────────
+    # ── 2. asyncpg: connect and wipe everything first ─────────────────
     # asyncpg requires postgresql:// not postgresql+asyncpg://
     pg_url = database_url.replace("postgresql+asyncpg://", "postgresql://")
     print("→ Connecting to database...")
     conn = await asyncpg.connect(pg_url)
 
     try:
+        # Wipe public tables + auth users directly via SQL (more reliable than Admin SDK)
+        print("→ Truncating all tables...")
+        await conn.execute(
+            "TRUNCATE public.dispatch_log, public.notification_log, public.messages,"
+            " public.patterns, public.tasks, public.conversations,"
+            " public.goals, public.users"
+        )
+        await conn.execute("DELETE FROM auth.users")
+        print("  Done.")
+
+        print("→ Creating demo@flux.com auth user...")
+        result = sb.auth.admin.create_user(
+            {
+                "email": DEMO_EMAIL,
+                "password": DEMO_PASSWORD,
+                "email_confirm": True,
+                "phone": DEMO_PHONE,
+                "phone_confirm": True,
+                "user_metadata": {"name": "Krish"},
+            }
+        )
+        uid = str(result.user.id)
+        print(f"  Created: {uid}")
+
         async with conn.transaction():
-            # Safety net: delete public.users row (cascade wasn't guaranteed)
-            await conn.execute("DELETE FROM public.users WHERE email = $1", DEMO_EMAIL)
             # Re-insert (trigger may not have fired for Admin SDK call)
             await conn.execute(
                 "INSERT INTO public.users (id, email, created_at, updated_at) "
@@ -99,7 +96,7 @@ async def seed(supabase_url: str, service_role_key: str, database_url: str) -> N
                 """,
                 '{"endpoint":"https://stub.push.service/flux-demo","keys":{"p256dh":"BNcRdreALRFXTkOOUHK1EtK2wtZ","auth":"tBHItJI5svbpez7KI4CCXg"}}',
                 '{"name":"Krish","sleep_window":{"start":"23:00","end":"06:00"},"work_hours":{"start":"09:00","end":"18:00","days":["Mon","Tue","Wed","Thu","Fri"]},"chronotype":"neutral","existing_commitments":[{"title":"Gym","days":["Tuesday","Thursday"],"time":"19:00","duration_minutes":60}]}',
-                '{"phone_number":"+919820965355","whatsapp_opted_in":true,"reminder_lead_minutes":10,"escalation_window_minutes":2}',
+                '{"phone_number":"+919820965355","whatsapp_opted_in":true,"call_opted_in":true,"reminder_lead_minutes":10,"escalation_window_minutes":2}',
                 uid,
             )
 

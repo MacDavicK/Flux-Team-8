@@ -58,12 +58,23 @@ async def get_overview(request: Request, user=Depends(get_current_user)) -> dict
         or 0
     )
     today_completion_pct = (today_done / today_total) if today_total > 0 else 0.0
+    week_start = today - timedelta(days=today.weekday())
+    tasks_completed = (
+        await db.fetchval(
+            "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status = 'done' AND DATE(scheduled_at) >= $2 AND DATE(scheduled_at) <= $3",
+            user_id,
+            week_start,
+            today,
+        )
+        or 0
+    )
     heatmap_rows = await db.fetch(
         "SELECT day, completed_count FROM activity_heatmap WHERE user_id = $1 ORDER BY day DESC LIMIT 365",
         user_id,
     )
     return {
         "streak_days": streak_days,
+        "tasks_completed": tasks_completed,
         "today_done": today_done,
         "today_total": today_total,
         "today_completion_pct": round(today_completion_pct, 4),
