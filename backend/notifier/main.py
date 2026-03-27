@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from datetime import datetime, timezone
 
 from app.config import settings
 from app.services.supabase import close_pool, init_pool
@@ -24,8 +25,9 @@ async def main() -> None:
     await recover_stuck_dispatches()
 
     logger.info(
-        "Notifier poll loop started (interval: %ds)",
+        "Notifier poll loop started (interval: %ds) at %s",
         settings.notification_poll_interval_seconds,
+        datetime.now(tz=timezone.utc).isoformat(timespec="seconds"),
     )
 
     while True:

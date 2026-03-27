@@ -59,15 +59,14 @@ async def get_overview(request: Request, user=Depends(get_current_user)) -> dict
     )
     today_completion_pct = (today_done / today_total) if today_total > 0 else 0.0
     week_start = today - timedelta(days=today.weekday())
-    tasks_completed = (
-        await db.fetchval(
-            "SELECT COUNT(*) FROM tasks WHERE user_id = $1 AND status = 'done' AND DATE(scheduled_at) >= $2 AND DATE(scheduled_at) <= $3",
-            user_id,
-            week_start,
-            today,
-        )
-        or 0
+    week_row = await db.fetchrow(
+        "SELECT COUNT(*) AS completed, COALESCE(SUM(duration_minutes), 0) AS focus_minutes FROM tasks WHERE user_id = $1 AND status = 'done' AND DATE(scheduled_at) >= $2 AND DATE(scheduled_at) <= $3",
+        user_id,
+        week_start,
+        today,
     )
+    tasks_completed = week_row["completed"] if week_row else 0
+    focus_hours = round((week_row["focus_minutes"] if week_row else 0) / 60, 1)
     heatmap_rows = await db.fetch(
         "SELECT day, completed_count FROM activity_heatmap WHERE user_id = $1 ORDER BY day DESC LIMIT 365",
         user_id,
@@ -75,6 +74,7 @@ async def get_overview(request: Request, user=Depends(get_current_user)) -> dict
     return {
         "streak_days": streak_days,
         "tasks_completed": tasks_completed,
+        "focus_hours": focus_hours,
         "today_done": today_done,
         "today_total": today_total,
         "today_completion_pct": round(today_completion_pct, 4),
@@ -133,11 +133,15 @@ async def get_missed_by_category(
 ) -> list:
     user_id = str(user["sub"])
     rows = await db.fetch(
-        "SELECT category, missed_count FROM missed_by_category WHERE user_id = $1 ORDER BY missed_count DESC",
+        "SELECT category, missed_count, total_count FROM missed_by_category WHERE user_id = $1 ORDER BY total_count DESC",
         user_id,
     )
     return [
-        {"category": row["category"], "missed_count": row["missed_count"]}
+        {
+            "category": row["category"],
+            "missed_count": row["missed_count"],
+            "total_count": row["total_count"],
+        }
         for row in rows
     ]
 

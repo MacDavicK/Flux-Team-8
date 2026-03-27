@@ -43,6 +43,18 @@ async def dispatch_push(task: dict, user_push_subscription: dict) -> bool:
         "scheduled_at": str(scheduled_at),
     }
 
+    keys = user_push_subscription.get("keys", {})
+    p256dh = keys.get("p256dh", "")
+    # A valid p256dh is a 65-byte uncompressed EC point, base64url-encoded (~87 chars).
+    # Reject obviously malformed keys before pywebpush raises a cryptic error.
+    if len(p256dh) < 65:
+        logger.warning(
+            "Skipping push for task %s: p256dh key is invalid (len=%d)",
+            task_id,
+            len(p256dh),
+        )
+        return False
+
     try:
         response = webpush(
             subscription_info=user_push_subscription,

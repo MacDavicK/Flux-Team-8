@@ -193,7 +193,7 @@ function FlowPage() {
       // Optimistic update — mark done immediately in local state.
       setData((prev) => ({
         events: prev.events.map((e) =>
-          e.id === taskId ? { ...e, isPast: true } : e,
+          e.id === taskId ? { ...e, isPast: true, status: "done" } : e,
         ),
       }));
 
@@ -202,7 +202,7 @@ function FlowPage() {
         // Revert optimistic update on error.
         setData((prev) => ({
           events: prev.events.map((e) =>
-            e.id === taskId ? { ...e, isPast: false } : e,
+            e.id === taskId ? { ...e, isPast: false, status: "pending" } : e,
           ),
         }));
       });

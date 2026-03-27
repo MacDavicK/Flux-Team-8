@@ -72,17 +72,23 @@ export const Route = createFileRoute("/reflection")({
       }),
     );
 
-    const byCategory = missed as { category?: string; missed_count?: number }[];
-    const totalMissed =
-      byCategory.reduce((s, c) => s + (c.missed_count ?? 0), 0) || 1;
+    const byCategory = missed as {
+      category?: string;
+      missed_count?: number;
+      total_count?: number;
+    }[];
     const focusCategories = byCategory
-      .filter((c) => c.category)
-      .map((c) => ({
-        name: c.category ?? "",
-        count: c.missed_count ?? 0,
-        percent: Math.round(((c.missed_count ?? 0) / totalMissed) * 100),
-        color: CATEGORY_COLORS[c.category ?? ""] ?? DEFAULT_COLOR,
-      }));
+      .filter((c) => c.category && (c.total_count ?? 0) > 0)
+      .map((c) => {
+        const total = c.total_count ?? 0;
+        const completed = total - (c.missed_count ?? 0);
+        return {
+          name: c.category ?? "",
+          count: completed,
+          percent: Math.round((completed / total) * 100),
+          color: CATEGORY_COLORS[c.category ?? ""] ?? DEFAULT_COLOR,
+        };
+      });
 
     const data = {
       profile: user
@@ -176,13 +182,13 @@ function ReflectionPage() {
           </div>
         </motion.div>
 
-        <motion.div
+        {/* <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
         >
           <EnergyAura data={energyData} />
-        </motion.div>
+        </motion.div> */}
 
         <motion.div
           initial={{ opacity: 0, y: 20 }}

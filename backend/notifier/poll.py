@@ -30,11 +30,19 @@ logger = logging.getLogger(__name__)
 
 async def notification_poll() -> None:
     """Main poll function called by APScheduler on each interval."""
+    logger.info("notification_poll tick")
     try:
-        await _step_push()
-        await _step_whatsapp()
-        await _step_call()
-        await _step_auto_miss()
+        push_n = await _step_push()
+        wa_n = await _step_whatsapp()
+        call_n = await _step_call()
+        miss_n = await _step_auto_miss()
+        logger.info(
+            "notification_poll done — push=%d whatsapp=%d call=%d auto_miss=%d",
+            push_n,
+            wa_n,
+            call_n,
+            miss_n,
+        )
     except Exception as exc:
         logger.exception("notification_poll error: %s", exc)
 
@@ -44,7 +52,7 @@ async def notification_poll() -> None:
 # ─────────────────────────────────────────────────────────────────
 
 
-async def _step_push() -> None:
+async def _step_push() -> int:
     """15.2.1 — Push reminders for tasks due within reminder_lead_minutes."""
     lead = settings.reminder_lead_minutes
     rows = await db.fetch(
@@ -60,6 +68,7 @@ async def _step_push() -> None:
           AND u.push_subscription IS NOT NULL
         """,
     )
+    logger.info("_step_push: %d row(s) found", len(rows))
 
     for row in rows:
         task_id = str(row["id"])
@@ -82,13 +91,15 @@ async def _step_push() -> None:
             logger.warning("Push dispatch failed for task %s: %s", task_id, exc)
             await _mark_dispatch_failed(task_id, "push", str(exc))
 
+    return len(rows)
+
 
 # ─────────────────────────────────────────────────────────────────
 # Step 2 — WhatsApp escalation (standard + aggressive only)
 # ─────────────────────────────────────────────────────────────────
 
 
-async def _step_whatsapp() -> None:
+async def _step_whatsapp() -> int:
     """15.2.3 — WhatsApp for tasks where push sent > escalation_window ago."""
     esc = settings.escalation_window_minutes
     rows = await db.fetch(
@@ -101,6 +112,7 @@ async def _step_whatsapp() -> None:
           AND reminder_sent_at <= now() - ('{esc} minutes')::interval
         """,
     )
+    logger.info("_step_whatsapp: %d row(s) found", len(rows))
 
     for row in rows:
         task_id = str(row["id"])
@@ -120,13 +132,15 @@ async def _step_whatsapp() -> None:
             logger.warning("WhatsApp dispatch failed for task %s: %s", task_id, exc)
             await _mark_dispatch_failed(task_id, "whatsapp", str(exc))
 
+    return len(rows)
+
 
 # ─────────────────────────────────────────────────────────────────
 # Step 3 — Voice call escalation (aggressive only)
 # ─────────────────────────────────────────────────────────────────
 
 
-async def _step_call() -> None:
+async def _step_call() -> int:
     """15.2.5 — Voice call for tasks where whatsapp sent > escalation_window ago."""
     esc = settings.escalation_window_minutes
     rows = await db.fetch(
@@ -139,6 +153,7 @@ async def _step_call() -> None:
           AND whatsapp_sent_at <= now() - ('{esc} minutes')::interval
         """,
     )
+    logger.info("_step_call: %d row(s) found", len(rows))
 
     for row in rows:
         task_id = str(row["id"])
@@ -158,13 +173,15 @@ async def _step_call() -> None:
             logger.warning("Call dispatch failed for task %s: %s", task_id, exc)
             await _mark_dispatch_failed(task_id, "call", str(exc))
 
+    return len(rows)
+
 
 # ─────────────────────────────────────────────────────────────────
 # Step 4 — Auto-miss (policy-aware) + recurring auto-advance
 # ─────────────────────────────────────────────────────────────────
 
 
-async def _step_auto_miss() -> None:
+async def _step_auto_miss() -> int:
     """
     15.2.7 — Mark tasks as missed once the grace period after scheduled_at has
     elapsed, regardless of which notification channels fired.
@@ -187,9 +204,12 @@ async def _step_auto_miss() -> None:
           AND scheduled_at <= now() - ('{grace} minutes')::interval
         """,
     )
+    logger.info("_step_auto_miss: %d row(s) found", len(rows))
 
     for row in rows:
         await _process_auto_miss(str(row["id"]), str(row["user_id"]))
+
+    return len(rows)
 
 
 async def _process_auto_miss(task_id: str, user_id: str) -> None:

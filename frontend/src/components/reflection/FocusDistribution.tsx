@@ -40,55 +40,36 @@ export function FocusDistribution({
         Focus Distribution
       </h3>
 
-      <div className="glass-card p-6">
-        {/* Overlapping circles visualization */}
-        <div className="relative h-40 flex items-center justify-center">
-          {categories.map((category, index) => {
-            const size = 60 + category.percent * 0.8;
-            const offset = index * 15;
-
-            return (
-              <motion.div
-                key={category.name}
-                className="absolute rounded-full mix-blend-multiply"
-                style={{
-                  width: size,
-                  height: size,
-                  backgroundColor: category.color,
-                  opacity: 0.6,
-                  left: `calc(50% - ${size / 2}px + ${(index - 1) * 20}px)`,
-                  top: `calc(50% - ${size / 2}px + ${offset}px)`,
-                }}
-                initial={{ scale: 0, opacity: 0 }}
-                animate={{ scale: 1, opacity: 0.6 }}
-                transition={{
-                  delay: index * 0.2,
-                  type: "spring",
-                  stiffness: 200,
-                  damping: 20,
-                }}
-              />
-            );
-          })}
-        </div>
-
-        {/* Legend */}
-        <div className="flex flex-wrap justify-center gap-4 mt-4">
-          {categories.map((category) => (
-            <div key={category.name} className="flex items-center gap-2">
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: category.color }}
-              />
-              <span className="text-charcoal text-sm capitalize">
+      <div className="glass-card p-6 flex flex-col gap-4">
+        {categories.map((category, index) => (
+          <div key={category.name}>
+            <div className="flex justify-between items-baseline mb-1.5">
+              <span className="text-charcoal text-sm capitalize flex items-center gap-2">
+                <span
+                  className="inline-block w-2 h-2 rounded-full"
+                  style={{ backgroundColor: category.color }}
+                />
                 {category.name}
               </span>
-              <span className="text-river text-xs">
-                ({Math.round(category.percent)}%)
+              <span className="text-river text-xs tabular-nums">
+                {category.percent}%
               </span>
             </div>
-          ))}
-        </div>
+            <div className="h-1.5 w-full rounded-full bg-stone-200/60 overflow-hidden">
+              <motion.div
+                className="h-full rounded-full"
+                style={{ backgroundColor: category.color }}
+                initial={{ width: 0 }}
+                animate={{ width: `${category.percent}%` }}
+                transition={{
+                  delay: index * 0.08,
+                  duration: 0.6,
+                  ease: "easeOut",
+                }}
+              />
+            </div>
+          </div>
+        ))}
       </div>
     </motion.div>
   );

@@ -94,7 +94,7 @@ async def seed(supabase_url: str, service_role_key: str, database_url: str) -> N
                     updated_at            = NOW()
                 WHERE id = $4
                 """,
-                '{"endpoint":"https://stub.push.service/flux-demo","keys":{"p256dh":"BNcRdreALRFXTkOOUHK1EtK2wtZ","auth":"tBHItJI5svbpez7KI4CCXg"}}',
+                None,
                 '{"name":"Krish","sleep_window":{"start":"23:00","end":"06:00"},"work_hours":{"start":"09:00","end":"18:00","days":["Mon","Tue","Wed","Thu","Fri"]},"chronotype":"neutral","existing_commitments":[{"title":"Gym","days":["Tuesday","Thursday"],"time":"19:00","duration_minutes":60}]}',
                 '{"phone_number":"+919820965355","whatsapp_opted_in":true,"call_opted_in":true,"reminder_lead_minutes":10,"escalation_window_minutes":2}',
                 uid,
@@ -513,7 +513,7 @@ async def seed(supabase_url: str, service_role_key: str, database_url: str) -> N
                     lrn,
                     "Study session: NumPy basics",
                     "pending",
-                    now + timedelta(minutes=10),
+                    now + timedelta(minutes=12),
                     60,
                     "aggressive",
                 ),
@@ -522,7 +522,7 @@ async def seed(supabase_url: str, service_role_key: str, database_url: str) -> N
                     fit,
                     "Evening run prep check-in",
                     "pending",
-                    now + timedelta(minutes=13),
+                    now + timedelta(minutes=15),
                     15,
                     "aggressive",
                 ),
@@ -685,6 +685,10 @@ async def seed(supabase_url: str, service_role_key: str, database_url: str) -> N
                 VALUES ($1, $2, $3, $4, $5, $6, $7)
                 """,
                 task_rows,
+            )
+            await conn.execute(
+                "UPDATE public.tasks SET trigger_type = 'time' WHERE user_id = $1 AND trigger_type IS NULL",
+                uid,
             )
             print(f"  Inserted {len(task_rows)} tasks")
 

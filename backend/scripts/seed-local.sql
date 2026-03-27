@@ -54,7 +54,7 @@ BEGIN
         onboarded             = true,
         phone_verified        = true,
         whatsapp_opt_in_at    = NOW(),
-        push_subscription     = '{"endpoint":"https://stub.push.service/flux-demo","keys":{"p256dh":"BNcRdreALRFXTkOOUHK1EtK2wtZ","auth":"tBHItJI5svbpez7KI4CCXg"}}'::jsonb,
+        push_subscription     = NULL,
         profile               = jsonb_build_object(
             'name',          'Krish',
             'sleep_window',  jsonb_build_object('start','23:00','end','06:00'),
@@ -309,10 +309,10 @@ BEGIN
             (CURRENT_DATE + INTERVAL '3 hours 30 minutes') AT TIME ZONE 'UTC', 5, 'standard'),
         -- NOW + 10 min — AGGRESSIVE (notifier fires within 1 poll cycle)
         (v_uid, v_lrn, 'Study session: NumPy basics', 'pending',
-            NOW() + INTERVAL '10 minutes', 60, 'aggressive'),
+            NOW() + INTERVAL '12 minutes', 60, 'aggressive'),
         -- NOW + 13 min — AGGRESSIVE
         (v_uid, v_fit, 'Evening run prep check-in', 'pending',
-            NOW() + INTERVAL '13 minutes', 15, 'aggressive'),
+            NOW() + INTERVAL '15 minutes', 15, 'aggressive'),
         -- 1:00 PM IST (07:30 UTC) — pending
         (v_uid, v_hlth, 'Drink water before lunch', 'pending',
             (CURRENT_DATE + INTERVAL '7 hours 30 minutes') AT TIME ZONE 'UTC', 5, 'silent'),
@@ -399,6 +399,9 @@ BEGIN
             'Current streak: 7 days. Personal best: 12 days.',
             '{"current_streak":7,"peak_streak":12}'::jsonb,
             0.95);
+
+    -- ── Set trigger_type on all time-based tasks (column has no default) ──
+    UPDATE public.tasks SET trigger_type = 'time' WHERE user_id = v_uid AND trigger_type IS NULL;
 
 END;
 $$;
